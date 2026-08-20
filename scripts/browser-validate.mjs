@@ -283,7 +283,18 @@ try {
   await page.click("#pregame-play");
   await page.waitForTimeout(300);
   check("game screen is shown", await page.isVisible("#scenario-canvas"));
-  check("scenario is Rocky Ascent L1", (await dev(page, "scenario")) === "Rocky Ascent L1");
+
+  // The registry now holds more than one Rocky-family scenario at L1 (Ascent,
+  // Descent), and `scenariosForDifficulty` picks among them at random — so the
+  // exact scenario shown here is no longer fixed. Assert the family/level
+  // pattern, not one hardcoded name.
+  const ROCKY_SCENARIO = /^Rocky (Ascent|Descent)( High)? L(\d+)$/;
+  const scenarioL1 = await dev(page, "scenario");
+  check(
+    "scenario is a Rocky-family L1 scenario",
+    ROCKY_SCENARIO.test(scenarioL1 ?? ""),
+    scenarioL1 ?? ""
+  );
 
   await page.click("#dev-autoplay-perfect");
 
@@ -314,7 +325,8 @@ try {
     `score ${await page.textContent("#hud-score")}`
   );
 
-  await waitForDev(page, "scenario", (value) => value === "Rocky Ascent L2");
+  const ROCKY_L2 = /^Rocky (Ascent|Descent)( High)? L2$/;
+  await waitForDev(page, "scenario", (value) => ROCKY_L2.test(value ?? ""));
   const afterFirst = {
     waypoint: await dev(page, "waypoint"),
     scenario: await dev(page, "scenario"),
@@ -324,7 +336,7 @@ try {
 
   check(
     "the first attempt completed and the run moved on",
-    afterFirst.scenario === "Rocky Ascent L2",
+    ROCKY_L2.test(afterFirst.scenario ?? ""),
     `now ${afterFirst.scenario}`
   );
   check(
@@ -374,7 +386,14 @@ try {
   /* Part 2 — L4 looks much more ridiculous than L1                       */
   /* ==================================================================== */
 
+  // `?dev=1&level=N` forces every slot to difficulty N, but with more than one
+  // Rocky-family scenario authoring L1 and L4 now, WHICH one fills that slot is
+  // still `scenariosForDifficulty`'s random pick — Ascent(15)/Descent(16) at
+  // L1, and any of the four at L4 (Ascent 30, Descent 32, either High 24). The
+  // exact count is no longer fixed, so these are range checks against the
+  // authored data, not one hardcoded number.
   const routeSteps = {};
+  const routeScenario = {};
   for (const [level, file] of [
     [1, "08-route-l1.png"],
     [4, "09-route-l4.png"],
@@ -391,6 +410,7 @@ try {
       return of > 0 && at >= Math.ceil(of * 0.55);
     });
     routeSteps[level] = Number((waypoint ?? "0/0").split("/")[1]);
+    routeScenario[level] = await dev(shot, "scenario");
     // Hide the dev panel so it does not cover the right-hand panel.
     await shot.evaluate(() => document.getElementById("dev-panel")?.setAttribute("hidden", ""));
     await shot.waitForTimeout(150);
@@ -398,8 +418,18 @@ try {
     await shot.close();
   }
 
-  check("L1 authors 15 footholds", routeSteps[1] === 15, String(routeSteps[1]));
-  check("L4 authors 30 footholds", routeSteps[4] === 30, String(routeSteps[4]));
+  note(`L1 route: ${routeScenario[1]} (${routeSteps[1]} footholds)`);
+  note(`L4 route: ${routeScenario[4]} (${routeSteps[4]} footholds)`);
+  check(
+    "L1 authors a full Rocky-family route (15-16 footholds)",
+    routeSteps[1] >= 15 && routeSteps[1] <= 16,
+    String(routeSteps[1])
+  );
+  check(
+    "L4 authors a full Rocky-family route (24-32 footholds)",
+    routeSteps[4] >= 24 && routeSteps[4] <= 32,
+    String(routeSteps[4])
+  );
   check(
     "L4's climb is denser than L1's",
     routeSteps[4] > routeSteps[1],
@@ -452,6 +482,48 @@ try {
       "This asserts the live wiring reaches `listening` through Tuninator, not that a guitar was played."
   );
   await live.close();
+
+  /* ==================================================================== */
+  /* Part 4 — the synthetic mic actually drives real Tuninator detection   */
+  /* ==================================================================== */
+
+  const synth = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const synthErrors = [];
+  synth.on("pageerror", (error) => synthErrors.push(String(error)));
+  await synth.goto(`${BASE}/?dev=1&input=synth`, { waitUntil: "networkidle" });
+  await synth.click("#start-play");
+  await synth.waitForTimeout(1200);
+
+  check(
+    "the synthetic mic reaches listening through the real recognizer",
+    (await synth.textContent("#pregame-input-state"))?.includes("Listening to your guitar") ?? false
+  );
+  check(
+    "the synthetic path stays honest about not being a real guitar",
+    (await synth.textContent("#game-input-warning"))?.includes("synthetic") ?? false
+  );
+
+  await synth.click("#pregame-play");
+  await synth.waitForTimeout(300);
+  await synth.click("#dev-autoplay-perfect");
+
+  // `?input=synth` schedules real sine plucks through a mocked microphone, not
+  // injected note events -- Tuninator's real onset/pitch detection has to find
+  // them. `waitForDev` polls rather than sleeping a guess, because detection
+  // happens on Tuninator's own analysis cadence, not the test's.
+  const synthJudged = await waitForDev(
+    synth,
+    "perfect/good/miss",
+    (value) => Number((value ?? "0/0/0").split("/")[0]) >= 3,
+    15000
+  );
+  check(
+    "the real recognizer detects and judges the synthetic plucks",
+    Number((synthJudged ?? "0/0/0").split("/")[0]) >= 3,
+    `judged ${synthJudged}`
+  );
+  check("no page errors on the synthetic path", synthErrors.length === 0, synthErrors.join(" | "));
+  await synth.close();
 } finally {
   await browser.close();
   server.kill();

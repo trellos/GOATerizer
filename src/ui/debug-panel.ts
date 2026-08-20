@@ -11,7 +11,7 @@
 export type DebugSnapshot = Record<string, string>;
 
 export type DebugHandlers = {
-  onSourceChange: (source: "tuninator" | "test") => void;
+  onSourceChange: (source: "tuninator" | "synth" | "test") => void;
   onLatencyChange: (milliseconds: number) => void;
   onAutoplay: (mode: "perfect" | "good" | "scruffy" | "off") => void;
 };
@@ -31,7 +31,8 @@ export class DebugPanel {
     const source = root.querySelector("#dev-source");
     if (source instanceof HTMLSelectElement) {
       source.addEventListener("change", () => {
-        handlers.onSourceChange(source.value === "test" ? "test" : "tuninator");
+        const value = source.value;
+        handlers.onSourceChange(value === "test" || value === "synth" ? value : "tuninator");
       });
     }
 

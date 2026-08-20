@@ -275,7 +275,8 @@ button.chip[data-selected="true"] {
   color: var(--good);
 }
 
-#pregame-input-state[data-state="test"] {
+#pregame-input-state[data-state="test"],
+#pregame-input-state[data-state="synth"] {
   color: var(--perfect);
 }
 

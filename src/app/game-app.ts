@@ -22,6 +22,7 @@ import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { Transport } from "../audio/transport.js";
+import { SyntheticGuitarSource } from "../dev/synthetic-guitar.js";
 import { pickWeightedKey } from "../config/key-weighting.js";
 import { DEFAULT_TEMPO_ID, TEMPOS, tempoById, type TempoId } from "../config/tempos.js";
 import {
@@ -32,6 +33,7 @@ import {
 } from "../config/tuning.js";
 import { AttemptRuntime, type AttemptEvent, type EnergyEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
+import { TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
@@ -39,7 +41,7 @@ import { fingeringsForKey, type Fingering } from "../music/fingering.js";
 import { keyDisplayName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
-import { ROCKY_ASCENT } from "../scenario/registry.js";
+import { SCENARIOS } from "../scenario/registry.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
@@ -84,9 +86,21 @@ export class GameApp {
   /* Input ------------------------------------------------------------ */
   #provider: GuitarInputProvider | null = null;
   #providerKind: "tuninator" | "test" = "tuninator";
+  #synth: SyntheticGuitarSource | null = null;
+  /**
+   * True while `#provider` is a real `TuninatorGuitarInputProvider` whose mic
+   * was intercepted by `#synth`. Tracked separately from `#providerKind`,
+   * which stays `"tuninator"` in this case — as far as the adapter can tell,
+   * it is one. This is what keeps the "not a real guitar" banner honest for a
+   * source the provider itself has no way to distinguish from a real mic.
+   */
+  #micMocked = false;
+  /** What `#enterPregame`'s first `#switchProvider` call should use. */
+  #initialInputKind: "tuninator" | "test" | "synth" = "tuninator";
   #unsubscribeInput: (() => void)[] = [];
   #inputStatus: GuitarInputStatus | null = null;
   #latencyTrimMs = EXTRA_INPUT_LATENCY_MS;
+  readonly #timing = new TimingDeltaLog();
 
   /* Game state ------------------------------------------------------- */
   #screen: Screen = "start";
@@ -118,7 +132,13 @@ export class GameApp {
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
   #devMode = false;
-  /** Dev-only: forces every slot to one Rocky Ascent level. `?dev=1&level=4`. */
+  /**
+   * Dev-only: forces every slot to one difficulty level. `?dev=1&level=4`.
+   *
+   * Which scenario fills that level is still whatever `scenariosForDifficulty`
+   * picks — with more than one Rocky-family scenario authoring the same level,
+   * that is no longer always Rocky Ascent.
+   */
   #devLevel: number | null = null;
   #autoplay: "perfect" | "good" | "scruffy" | "off" = "off";
   #autoplayScheduledFor: string | null = null;
@@ -136,7 +156,10 @@ export class GameApp {
     this.#strip = new ScenarioStripView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
-    await this.#assets.load(ROCKY_ASCENT.assetUrls);
+    // Every registered scenario, not just one: a run can draw any of them into
+    // a slot (`scenariosForDifficulty`), and asset ids are namespaced per
+    // scenario so there is nothing to collide by loading them all up front.
+    await this.#assets.load(Object.assign({}, ...SCENARIOS.map((scenario) => scenario.assetUrls)));
     if (this.#assets.failed.length > 0) {
       console.warn("[goaterizer] assets failed to load:", this.#assets.failed);
     }
@@ -280,6 +303,9 @@ export class GameApp {
       },
       onLatencyChange: (ms) => {
         this.#latencyTrimMs = ms;
+        // Samples taken under the old trim describe a different rig. Keeping
+        // them would average the change away and make the trim look ineffective.
+        this.#timing.clear();
       },
       onAutoplay: (mode) => {
         this.#autoplay = mode;
@@ -291,18 +317,23 @@ export class GameApp {
     });
     this.#debug.setEnabled(this.#devMode);
 
-    // `?input=test` is dev-only on purpose: it is the only way to make the
-    // deterministic provider drive scoring, and it is what the browser
-    // validation suite uses in place of a guitar.
+    // `?input=test` and `?input=synth` are dev-only on purpose. `test` is the
+    // only way to make the deterministic provider drive scoring, and it is
+    // what the browser validation suite uses in place of a guitar. `synth`
+    // exists for environments (like the Browser pane used to build this game)
+    // that cannot grant microphone access at all, and still need to exercise
+    // the real Tuninator path rather than bypass it.
     const level = Number(params.get("level"));
     if (this.#devMode && Number.isInteger(level) && level >= 1 && level <= 7) {
       this.#devLevel = level;
     }
 
-    if (this.#devMode && params.get("input") === "test") {
-      this.#providerKind = "test";
+    const requestedInput = params.get("input");
+    if (this.#devMode && (requestedInput === "test" || requestedInput === "synth")) {
+      this.#initialInputKind = requestedInput;
+      if (requestedInput === "test") this.#providerKind = "test";
       const select = root.querySelector("#dev-source");
-      if (select instanceof HTMLSelectElement) select.value = "test";
+      if (select instanceof HTMLSelectElement) select.value = requestedInput;
     }
   }
 
@@ -344,7 +375,7 @@ export class GameApp {
     this.#gameView?.setMode(this.#setup.viewMode);
     this.#updateKeyReadouts();
 
-    await this.#switchProvider(this.#providerKind);
+    await this.#switchProvider(this.#initialInputKind);
   }
 
   /** New key and new bass line. Deliberately does NOT touch the transport. */
@@ -387,11 +418,11 @@ export class GameApp {
   /* Input                                                               */
   /* ------------------------------------------------------------------ */
 
-  async #switchProvider(kind: "tuninator" | "test"): Promise<void> {
-    if (kind === "test" && !this.#devMode) {
-      // Belt and braces: the test provider must never be reachable in normal
-      // play, whatever calls this.
-      console.warn("[goaterizer] refusing to use test input outside dev mode");
+  async #switchProvider(kind: "tuninator" | "test" | "synth"): Promise<void> {
+    if (kind !== "tuninator" && !this.#devMode) {
+      // Belt and braces: neither dev source must be reachable in normal play,
+      // whatever calls this.
+      console.warn(`[goaterizer] refusing to use ${kind} input outside dev mode`);
       return;
     }
 
@@ -400,12 +431,25 @@ export class GameApp {
     await this.#provider?.dispose();
 
     const context = this.#audio.context;
-    if (kind === "tuninator" && !context) {
+    if (kind !== "test" && !context) {
       this.#setInputStatusText("error", "Audio is not running yet.");
       return;
     }
 
-    this.#providerKind = kind;
+    // Only "synth" wants the mic mocked. Leaving a previous install in place
+    // would silently mock a genuine "Tuninator (live guitar)" selection too.
+    if (kind === "synth") {
+      if (!this.#synth) this.#synth = new SyntheticGuitarSource(context as AudioContext);
+      this.#synth.install();
+    } else {
+      this.#synth?.uninstall();
+    }
+    this.#micMocked = kind === "synth";
+
+    // The synthetic mic is still consumed through the real recognizer: as far
+    // as TuninatorGuitarInputProvider or Tuninator can tell, "synth" and
+    // "tuninator" are the same input.
+    this.#providerKind = kind === "test" ? "test" : "tuninator";
     this.#provider =
       kind === "test"
         ? new TestGuitarInputProvider()
@@ -429,15 +473,36 @@ export class GameApp {
 
   #onInputStatus(status: GuitarInputStatus): void {
     this.#inputStatus = status;
-    const state = status.kind === "test" ? "test" : status.state;
-    this.#setInputStatusText(state, status.message);
+    // `status.kind` cannot see the mocked mic -- as far as the provider is
+    // concerned it opened a real one -- so the synthetic case is read from
+    // `#micMocked`, tracked at the one place that actually knows. A real error
+    // still shows as an error: the mock does not hide a genuinely broken
+    // recognizer.
+    const state =
+      status.kind === "test"
+        ? "test"
+        : status.state === "error"
+          ? "error"
+          : this.#micMocked
+            ? "synth"
+            : status.state;
+    this.#setInputStatusText(
+      state,
+      this.#micMocked
+        ? `${status.message} (DEV: synthetic sine input, not a real guitar)`
+        : status.message
+    );
 
     const warning = document.getElementById("game-input-warning");
     if (warning instanceof HTMLElement) {
-      const problem = status.state === "error" || status.kind === "test";
+      const problem = status.state === "error" || status.kind === "test" || this.#micMocked;
       warning.hidden = !problem;
       warning.textContent =
-        status.kind === "test" ? "DEV: deterministic test input — not a guitar" : status.message;
+        status.kind === "test"
+          ? "DEV: deterministic test input — not a guitar"
+          : this.#micMocked
+            ? "DEV: synthetic sine input — not a guitar"
+            : status.message;
     }
   }
 
@@ -548,6 +613,14 @@ export class GameApp {
       case "judgment": {
         const judgment = event.judgment;
         if (judgment.type === "PerfectNote" || judgment.type === "GoodNote") {
+          // Calibration samples come from a human and a real guitar only.
+          // Autoplay -- discrete or synthetic -- schedules its attacks at the
+          // target time plus the current compensation, so it reports ~0 by
+          // construction; letting that into the log would quietly confirm
+          // whatever trim is already set.
+          if (this.#autoplay === "off" && this.#providerKind === "tuninator" && !this.#micMocked) {
+            this.#timing.record(judgment.beatDelta * this.#transport.secondsPerBeat * 1000);
+          }
           this.#timeline.markTargetOutcome(
             attempt.timelineKey,
             judgment.target.opportunityIndex,
@@ -774,6 +847,10 @@ export class GameApp {
     if (this.#provider instanceof TestGuitarInputProvider) {
       this.#provider.pump(this.#audio.now());
       this.#maybeScheduleAutoplay();
+    } else if (this.#micMocked) {
+      // The synthetic mic has no queue to pump -- plucks are real scheduled
+      // audio -- but it still needs the same per-attempt scheduling call.
+      this.#maybeScheduleAutoplay();
     }
 
     this.#current?.runtime.update(beat);
@@ -891,6 +968,9 @@ export class GameApp {
         this.#audio.outputLatencySeconds * 1000 +
         this.#latencyTrimMs
       ).toFixed(1),
+      "timing delta": this.#timingReadout(),
+      "suggested trim ms":
+        this.#timing.count >= 8 ? this.#timing.suggestedTrimMs(this.#latencyTrimMs)!.toFixed(1) : "—",
       scenario: attempt ? `${attempt.scenario.displayName} L${attempt.difficulty}` : "—",
       "attempt beat": attempt ? attempt.toAttemptBeat(beat).toFixed(2) : "—",
       "current target": target ? `#${target.opportunityIndex} ${midiToName(target.midi)}` : "—",
@@ -914,6 +994,18 @@ export class GameApp {
     });
   }
 
+  /**
+   * "n ms last, n ms median ± spread (n=count)" — positive is late. See
+   * `TimingDeltaLog` for why median/spread rather than a running mean.
+   */
+  #timingReadout(): string {
+    if (this.#timing.count === 0) return "— (no calibration samples yet)";
+    const last = this.#timing.last!;
+    const median = this.#timing.median!;
+    const spread = this.#timing.spread!;
+    return `${last.toFixed(1)} last, ${median.toFixed(1)} median ±${spread.toFixed(1)} (n=${this.#timing.count})`;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Dev autoplay                                                        */
   /* ------------------------------------------------------------------ */
@@ -925,14 +1017,21 @@ export class GameApp {
    * the rest late, which is the shape of a one-star pass — it exists so the
    * failure and partial-credit paths can be exercised in a browser without a
    * guitarist who can play badly on request.
+   *
+   * Two playback paths, same target loop and timing math: `TestGuitarInputProvider`
+   * takes already-judged discrete events; the synthetic mic (`#micMocked`)
+   * takes real sine plucks that the real recognizer has to detect, which is
+   * the whole reason it exists (`src/dev/synthetic-guitar.ts`).
    */
   #maybeScheduleAutoplay(): void {
     const provider = this.#provider;
     const attempt = this.#current;
+    const synth = this.#micMocked ? this.#synth : null;
+    const testProvider = provider instanceof TestGuitarInputProvider ? provider : null;
     if (
       this.#autoplay === "off" ||
       !attempt ||
-      !(provider instanceof TestGuitarInputProvider) ||
+      (!testProvider && !synth) ||
       this.#autoplayScheduledFor === attempt.timelineKey
     ) {
       return;
@@ -946,9 +1045,17 @@ export class GameApp {
       const offsetBeats = mode === "perfect" ? 0 : mode === "good" ? 0.3 : 0.34;
       const at = this.#transport.contextTimeAt(attempt.runtime.startBeat + target.startBeat);
       const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
-      provider.schedule([
-        { at: at + offsetBeats * secondsPerBeat + latency, kind: "attack", midi: target.midi },
-      ]);
+      const attackTime = at + offsetBeats * secondsPerBeat + latency;
+      if (testProvider) {
+        testProvider.schedule([{ at: attackTime, kind: "attack", midi: target.midi }]);
+      } else if (synth) {
+        // A hair short of the full duration, so consecutive notes at the same
+        // pitch still get a real onset each rather than reading as one long
+        // sustain -- the recognizer needs an amplitude dip to find the second
+        // attack.
+        const duration = Math.max(0.12, target.durationBeats * secondsPerBeat * 0.85);
+        synth.pluck(target.midi, attackTime, duration);
+      }
     });
   }
 }

@@ -117,8 +117,9 @@ Dev tooling is gated behind `?dev=1` and never reachable from normal play.
 | Parameter | Effect |
 |---|---|
 | `?dev=1` | Show the developer panel (transport, detection, judgment, latency, scenario progress) |
-| `?dev=1&input=test` | Drive the game from the **deterministic test provider** instead of a guitar. The UI says so, loudly, the whole time |
-| `?dev=1&level=N` | Play Rocky Ascent L*N* in every slot, for tuning one level without grinding up to it |
+| `?dev=1&input=test` | Drive the game from the **deterministic test provider** instead of a guitar. Bypasses Tuninator entirely — injects already-judged note events. The UI says so, loudly, the whole time |
+| `?dev=1&input=synth` | Drive the game from a **synthetic sine-wave microphone**, through the real Tuninator recognizer. For environments that cannot grant microphone access (this repo was built and calibrated partly in one) but still need the actual detection/latency pipeline exercised, not bypassed. "Autoplay perfect/good/scruffy" schedules real sine plucks instead of injected events. The UI says so, loudly, the whole time |
+| `?dev=1&level=N` | Force every slot to difficulty *N*, for tuning one level without grinding up to it. Which scenario fills it is still whatever the registry's difficulty pool picks — no longer always Rocky Ascent now that companion scenarios share levels with it |
 
 ---
 
