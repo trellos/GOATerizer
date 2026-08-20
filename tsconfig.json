@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /*
+     * `noUnusedLocals` / `noUnusedParameters` are deliberately OFF.
+     * `paths` below puts Tuninator's own source into this program, and
+     * TypeScript has no way to apply compiler options per file -- so those two
+     * flags would fail this build on unused-variable style in a library this
+     * repo does not own and must not edit. Every flag that is on is a
+     * type-safety flag, not a style flag.
+     */
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+
+    "types": ["node", "vite/client"],
+
+    /*
+     * The library's `dist/` is built separately (see scripts/setup-tuninator.mjs)
+     * and may not exist yet, so GOATerizer typechecks -- and bundles, see
+     * vite.config.ts -- against the library's PUBLIC ENTRY POINT source.
+     *
+     * `src/index.ts` *is* the public API. Nothing in this repo may deepen this
+     * path into `tuninator/src/**` internals.
+     */
+    "paths": {
+      "tuninator": ["../Tuninator/src/index.ts"]
+    }
+  },
+  "include": ["src", "tests", "vite.config.ts", "vitest.config.ts"]
+}

@@ -1,0 +1,207 @@
+import { describe, expect, it } from "vitest";
+
+import { KEY_WEIGHTS, pickWeightedKey } from "../src/config/key-weighting.js";
+import {
+  ALL_LANES,
+  DegreeTokenError,
+  formatDegreeToken,
+  laneIndexOf,
+  laneToDegreeRef,
+  parseDegreeToken,
+} from "../src/music/degrees.js";
+import {
+  degreeToMidi,
+  isDiatonic,
+  keyDisplayName,
+  keyId,
+  laneLabel,
+  laneMidiNotes,
+  laneOfMidi,
+  lanePositionOfMidi,
+  tonicMidi,
+  type RunKey,
+} from "../src/music/keys.js";
+import { midiToName, type PitchClassIndex } from "../src/music/pitch.js";
+import { resolveTargets } from "../src/game/targets.js";
+import { ROCKY_ASCENT } from "../src/scenario/registry.js";
+
+const G_MINOR: RunKey = { tonic: 7, mode: "minor" };
+const C_MAJOR: RunKey = { tonic: 0, mode: "major" };
+
+describe("authored octave-band tokens", () => {
+  it("reads the band prefix as a band, not as a flat", () => {
+    expect(parseDegreeToken("3")).toEqual({ degree: 3, octaveBand: 0 });
+    // The authored `b3` is "third degree, SECOND octave" -- not "flat three".
+    expect(parseDegreeToken("b3")).toEqual({ degree: 3, octaveBand: 1 });
+    expect(parseDegreeToken("c1")).toEqual({ degree: 1, octaveBand: 2 });
+  });
+
+  it("round-trips every lane", () => {
+    for (let lane = 0; lane < 15; lane += 1) {
+      const ref = laneToDegreeRef(lane);
+      expect(laneIndexOf(ref)).toBe(lane);
+      expect(parseDegreeToken(formatDegreeToken(ref))).toEqual(ref);
+    }
+  });
+
+  it("orders the 15 lanes as 1..7, b1..b7, c1", () => {
+    expect(ALL_LANES.map(formatDegreeToken)).toEqual([
+      "1", "2", "3", "4", "5", "6", "7",
+      "b1", "b2", "b3", "b4", "b5", "b6", "b7",
+      "c1",
+    ]);
+  });
+
+  it("rejects tokens it cannot map instead of guessing", () => {
+    for (const bad of ["", "8", "c2", "d1", "b8", "#3", "b", "1b"]) {
+      expect(() => parseDegreeToken(bad)).toThrow(DegreeTokenError);
+    }
+  });
+});
+
+describe("transposition", () => {
+  it("places the tonic in the octave starting at low E", () => {
+    for (let tonic = 0; tonic < 12; tonic += 1) {
+      const midi = tonicMidi({ tonic: tonic as PitchClassIndex, mode: "major" });
+      expect(midi).toBeGreaterThanOrEqual(40);
+      expect(midi).toBeLessThan(52);
+    }
+  });
+
+  it("keeps the whole two-octave span inside a guitar's range", () => {
+    for (const { key } of KEY_WEIGHTS) {
+      const notes = laneMidiNotes(key);
+      expect(notes[0]).toBeGreaterThanOrEqual(40); // E2, low open string
+      expect(notes[14]).toBeLessThanOrEqual(76); // E5, well inside the neck
+    }
+  });
+
+  it("produces the G natural-minor scale over two octaves", () => {
+    expect(laneMidiNotes(G_MINOR).map((m) => midiToName(m, true))).toEqual([
+      "G2", "A2", "Bb2", "C3", "D3", "Eb3", "F3",
+      "G3", "A3", "Bb3", "C4", "D4", "Eb4", "F4",
+      "G4",
+    ]);
+  });
+
+  it("produces the C major scale over two octaves", () => {
+    expect(laneMidiNotes(C_MAJOR).map((m) => midiToName(m))).toEqual([
+      "C3", "D3", "E3", "F3", "G3", "A3", "B3",
+      "C4", "D4", "E4", "F4", "G4", "A4", "B4",
+      "C5",
+    ]);
+  });
+
+  it("puts the two endpoint roots exactly two octaves apart in every key", () => {
+    for (const { key } of KEY_WEIGHTS) {
+      const notes = laneMidiNotes(key);
+      expect(notes[14]! - notes[0]!).toBe(24);
+      expect(notes[7]! - notes[0]!).toBe(12);
+    }
+  });
+
+  it("resolves the same degree an octave apart across bands", () => {
+    const low = degreeToMidi({ degree: 3, octaveBand: 0 }, G_MINOR);
+    const high = degreeToMidi({ degree: 3, octaveBand: 1 }, G_MINOR);
+    expect(high - low).toBe(12);
+  });
+
+  it("knows what is diatonic", () => {
+    expect(isDiatonic(degreeToMidi({ degree: 3, octaveBand: 0 }, G_MINOR), G_MINOR)).toBe(true);
+    // B natural is the major third -- not in G minor.
+    expect(isDiatonic(59, G_MINOR)).toBe(false);
+    expect(isDiatonic(59, C_MAJOR)).toBe(true);
+  });
+
+  it("maps played MIDI back to a lane, and off-scale notes to none", () => {
+    expect(laneOfMidi(43, G_MINOR)).toBe(0); // G2
+    expect(laneOfMidi(55, G_MINOR)).toBe(7); // G3
+    expect(laneOfMidi(44, G_MINOR)).toBeNull(); // G#2, non-diatonic
+    expect(laneOfMidi(30, G_MINOR)).toBeNull(); // below the span
+  });
+
+  it("places a non-diatonic pitch between the lanes it falls between", () => {
+    const position = lanePositionOfMidi(44, G_MINOR); // G#2, between G2 and A2
+    expect(position).toBeGreaterThan(0);
+    expect(position).toBeLessThan(1);
+    expect(lanePositionOfMidi(90, G_MINOR)).toBeNull();
+  });
+});
+
+describe("lane labels", () => {
+  it("shows the harmonic degree with its accidental, plus the note name", () => {
+    // This `b3` IS a flat: it is the harmonic label, not the authored token.
+    expect(laneLabel(2, G_MINOR)).toEqual({ degree: "b3", note: "Bb" });
+    expect(laneLabel(5, G_MINOR)).toEqual({ degree: "b6", note: "Eb" });
+    expect(laneLabel(0, G_MINOR)).toEqual({ degree: "1", note: "G" });
+    expect(laneLabel(2, C_MAJOR)).toEqual({ degree: "3", note: "E" });
+  });
+
+  it("spells flat keys with flats and sharp keys with sharps", () => {
+    expect(keyDisplayName({ tonic: 10, mode: "major" })).toBe("Bb major");
+    expect(keyDisplayName({ tonic: 6, mode: "major" })).toBe("F# major");
+    expect(keyDisplayName(G_MINOR)).toBe("G minor");
+  });
+});
+
+describe("key weighting", () => {
+  it("covers all 24 keys exactly once, each with a nonzero chance", () => {
+    expect(KEY_WEIGHTS).toHaveLength(24);
+    const ids = new Set(KEY_WEIGHTS.map((entry) => keyId(entry.key)));
+    expect(ids.size).toBe(24);
+    for (const entry of KEY_WEIGHTS) expect(entry.weight).toBeGreaterThan(0);
+  });
+
+  it("selects deterministically from an injected random source", () => {
+    expect(keyId(pickWeightedKey(() => 0))).toBe(keyId(KEY_WEIGHTS[0]!.key));
+    expect(keyId(pickWeightedKey(() => 0.999999))).toBe(keyId(KEY_WEIGHTS[23]!.key));
+  });
+
+  it("favours guitar-friendly keys without excluding awkward ones", () => {
+    const weightOf = (id: string) =>
+      KEY_WEIGHTS.find((entry) => keyId(entry.key) === id)?.weight ?? 0;
+    expect(weightOf("A-minor")).toBeGreaterThan(weightOf("C#-major"));
+    expect(weightOf("G-major")).toBeGreaterThan(weightOf("A#-minor"));
+  });
+});
+
+describe("target resolution", () => {
+  it("resolves Rocky Ascent L1 into the ascending two-octave scale of the run key", () => {
+    const level = ROCKY_ASCENT.levels.get(1)!;
+    const targets = resolveTargets(level, G_MINOR);
+    expect(targets).toHaveLength(15);
+    expect(targets.map((t) => t.midi)).toEqual(laneMidiNotes(G_MINOR));
+    expect(targets.map((t) => t.lane)).toEqual([...Array(15).keys()]);
+    expect(targets.map((t) => t.startBeat)).toEqual([...Array(15).keys()]);
+  });
+
+  it("skips rests and keeps opportunity indices contiguous", () => {
+    const level = ROCKY_ASCENT.levels.get(4)!;
+    const targets = resolveTargets(level, C_MAJOR);
+    expect(targets).toHaveLength(30);
+    expect(targets.map((t) => t.opportunityIndex)).toEqual([...Array(30).keys()]);
+    // The rest at prompt index 15 leaves a gap in promptIndex but not in
+    // opportunityIndex.
+    expect(targets[14]?.promptIndex).toBe(14);
+    expect(targets[15]?.promptIndex).toBe(16);
+    expect(targets[15]?.startBeat).toBe(8);
+  });
+
+  it("transposes the same authored level into every key without changing its shape", () => {
+    const level = ROCKY_ASCENT.levels.get(3)!;
+    for (const { key } of KEY_WEIGHTS) {
+      const targets = resolveTargets(level, key);
+      expect(targets).toHaveLength(23);
+      expect(targets.map((t) => t.lane)).toEqual(
+        resolveTargets(level, C_MAJOR).map((t) => t.lane)
+      );
+      // Interval structure is key-independent; absolute pitch is not.
+      const intervals = targets.map((t) => t.midi - targets[0]!.midi);
+      const reference = resolveTargets(level, C_MAJOR);
+      const majorish = key.mode === "major";
+      if (majorish) {
+        expect(intervals).toEqual(reference.map((t) => t.midi - reference[0]!.midi));
+      }
+    }
+  });
+});

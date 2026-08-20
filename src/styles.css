@@ -1,0 +1,583 @@
+/*
+ * One stylesheet. `:root` is the single source of truth for colour; component
+ * rules and `[data-*]` state selectors read tokens and never hardcode a value.
+ *
+ * Screen state is expressed with `data-*` attributes rather than class
+ * toggles, so the whole UI can be restyled without touching the TypeScript.
+ */
+
+:root {
+  --bg: #070a0d;
+  --panel: #0f141a;
+  --panel-raised: #161d25;
+  --line: #232c36;
+  --text: #dbe4ee;
+  --text-dim: #8494a4;
+  --accent: #3fb9d6;
+  --accent-strong: #8be5f7;
+  --good: #59d98a;
+  --perfect: #ffd34d;
+  --bad: #ff5b5b;
+  --radius: 6px;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+#app {
+  position: relative;
+  display: block;
+  height: 100vh;
+  width: 100vw;
+}
+
+.screen {
+  display: none;
+  height: 100%;
+  width: 100%;
+}
+
+.screen[data-active="true"] {
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+  color: var(--text);
+  padding: 0.5rem 0.9rem;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #04161c;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+button.chip {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  font-family: var(--mono);
+}
+
+button.chip[data-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #04161c;
+  font-weight: 700;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.button-row.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Start                                                                       */
+/* -------------------------------------------------------------------------- */
+
+#screen-start {
+  align-items: center;
+  justify-content: center;
+}
+
+.start-card {
+  text-align: center;
+  max-width: 34rem;
+  padding: 2rem;
+}
+
+.title {
+  font-size: clamp(2.6rem, 8vw, 4.6rem);
+  margin: 0;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tagline {
+  margin: 0.2rem 0 1.6rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-top: 0.9rem;
+}
+
+.high-scores {
+  margin-top: 2rem;
+  text-align: left;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.high-scores h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin: 0 0 0.5rem;
+}
+
+.high-scores ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+}
+
+.high-scores li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.15rem 0;
+  color: var(--text-dim);
+}
+
+.high-scores li b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pregame                                                                     */
+/* -------------------------------------------------------------------------- */
+
+.pregame-head {
+  padding: 1rem 1.4rem 0.4rem;
+}
+
+.pregame-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+.pregame-head .sub {
+  margin: 0.2rem 0 0;
+  color: var(--text-dim);
+  font-size: 0.86rem;
+}
+
+.pregame-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(260px, 22rem) 1fr;
+  gap: 1rem;
+  padding: 1rem 1.4rem 1.4rem;
+  min-height: 0;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  overflow-y: auto;
+  padding-right: 0.4rem;
+}
+
+.control-block {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.8rem;
+}
+
+.control-block h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+
+.readout {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+
+.readout.small {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-bottom: 0.35rem;
+}
+
+.note {
+  margin: 0.45rem 0 0;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
+.meter {
+  height: 6px;
+  background: #0a0e12;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--good);
+  transition: width 60ms linear;
+}
+
+#pregame-input-state[data-state="error"] {
+  color: var(--bad);
+}
+
+#pregame-input-state[data-state="listening"] {
+  color: var(--good);
+}
+
+#pregame-input-state[data-state="test"] {
+  color: var(--perfect);
+}
+
+.pregame-timeline,
+.game-timeline {
+  position: relative;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.pregame-timeline canvas,
+.game-timeline canvas,
+.scenario-strip canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Game                                                                        */
+/* -------------------------------------------------------------------------- */
+
+#screen-game {
+  position: relative;
+  gap: 0.5rem;
+  padding: 0.6rem;
+}
+
+.hud {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) auto minmax(9rem, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  font-family: var(--mono);
+}
+
+.hud-left {
+  display: flex;
+  gap: 0.9rem;
+  align-items: baseline;
+}
+
+.hud-stars {
+  color: var(--perfect);
+  font-weight: 700;
+}
+
+.hud-key {
+  color: var(--text-dim);
+}
+
+.hud-right {
+  text-align: right;
+}
+
+.hud-score {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.history {
+  display: flex;
+  gap: 3px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history-slot {
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #0b0f14;
+  display: grid;
+  place-items: center;
+  font-size: 0.5rem;
+  color: var(--perfect);
+  letter-spacing: -0.08em;
+  overflow: hidden;
+}
+
+.history-slot[data-state="current"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.history-slot[data-state="done"] {
+  background: var(--panel-raised);
+}
+
+.history-slot[data-state="failed"] {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.scenario-strip {
+  flex: 1 1 58%;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.game-timeline {
+  flex: 1 1 42%;
+}
+
+.energy-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+ * Sits at the bottom, deliberately: the three-star meter is drawn across the
+ * top of the current scenario panel and a banner there would cover it.
+ */
+.input-warning {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 91, 91, 0.14);
+  border: 1px solid var(--bad);
+  color: var(--bad);
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Results                                                                     */
+/* -------------------------------------------------------------------------- */
+
+#screen-results {
+  align-items: center;
+  justify-content: center;
+}
+
+.results-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.8rem 2rem;
+  max-width: 40rem;
+  text-align: center;
+}
+
+.results-card h2 {
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
+
+.rank {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  margin: 0.3rem 0 0.2rem;
+  color: var(--perfect);
+}
+
+.results-reason {
+  color: var(--text-dim);
+  font-size: 0.86rem;
+  margin: 0 0 1.2rem;
+}
+
+.results-figures {
+  display: flex;
+  justify-content: center;
+  gap: 2.2rem;
+  margin: 0 0 1.2rem;
+}
+
+.results-figures div {
+  text-align: center;
+}
+
+.results-figures dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+
+.results-figures dd {
+  margin: 0.2rem 0 0;
+  font-family: var(--mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.results-history {
+  justify-content: center;
+  margin-bottom: 1.4rem;
+}
+
+.results-card .button-row {
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dev panel                                                                   */
+/* -------------------------------------------------------------------------- */
+
+#dev-panel {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 21rem;
+  max-height: calc(100vh - 1rem);
+  overflow-y: auto;
+  background: rgba(8, 11, 15, 0.96);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  z-index: 50;
+}
+
+#dev-panel[hidden] {
+  display: none;
+}
+
+#dev-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  color: var(--accent);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+#dev-panel header button {
+  padding: 0 0.4rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+}
+
+#dev-readouts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.1rem 0.6rem;
+  margin: 0 0 0.6rem;
+}
+
+#dev-readouts dt {
+  color: var(--text-dim);
+}
+
+#dev-readouts dd {
+  margin: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.5rem;
+}
+
+.dev-controls label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-dim);
+}
+
+.dev-controls select,
+.dev-controls input {
+  font: inherit;
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0.15rem 0.3rem;
+  max-width: 11rem;
+}
+
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 900px) {
+  .pregame-body {
+    grid-template-columns: 1fr;
+  }
+}

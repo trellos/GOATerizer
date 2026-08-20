@@ -1,0 +1,1831 @@
+{
+  "$schema": "https://goaterizer.local/schema/scenario-v1.json",
+  "id": "rocky_ascent",
+  "displayName": "Rocky Ascent",
+  "theme": "GOATS",
+  "minigameClass": "ClimbMinigame",
+  "family": "Scale",
+  "visualVerb": "CLIMB",
+  "supportedLevels": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "scenarioPremise": "A goat climbs an orderly sequence of alpine boulders. Higher levels reuse the same small art library but author increasingly steep, exposed, and ridiculous waypoint paths.",
+  "runTransposition": {
+    "promptRepresentation": "diatonic_scale_degree",
+    "degreeVocabulary": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "b1",
+      "b2",
+      "b3",
+      "b4",
+      "b5",
+      "b6",
+      "b7",
+      "c1"
+    ],
+    "transposeToRunKey": true,
+    "nonDiatonicTargetsAllowed": false
+  },
+  "classParameters": {
+    "visualSpanMeasures": 4,
+    "poseCycle": [
+      "goat_rocky_ascent_advance_01",
+      "goat_rocky_ascent_advance_02",
+      "goat_rocky_ascent_advance_03",
+      "goat_rocky_ascent_advance_04"
+    ],
+    "badNotePolicy": "Wobble",
+    "measurePauseMs": 0,
+    "showDestinationFromStart": true,
+    "goodNoteBehavior": [
+      "increment successful progress",
+      "advance to next authored waypoint",
+      "cycle climber pose",
+      "show fx_rocky_ascent_dust at contact point",
+      "show fx_rocky_ascent_tick for Perfect, optionally smaller for Good"
+    ],
+    "badNoteBehavior": [
+      "do not advance waypoint",
+      "briefly wobble active goat pose and return to same transform"
+    ],
+    "minigameCompleteBehavior": [
+      "if passed, show goat_rocky_ascent_finish at prop_rocky_ascent_goal",
+      "otherwise freeze at furthest earned waypoint"
+    ]
+  },
+  "assetBindings": {
+    "background": [
+      "bg_rocky_ascent"
+    ],
+    "climberPoses": [
+      "goat_rocky_ascent_advance_01",
+      "goat_rocky_ascent_advance_02",
+      "goat_rocky_ascent_advance_03",
+      "goat_rocky_ascent_advance_04"
+    ],
+    "finishPose": [
+      "goat_rocky_ascent_finish"
+    ],
+    "waypointVisuals": [
+      "prop_rocky_ascent_step"
+    ],
+    "destinationVisual": [
+      "prop_rocky_ascent_goal"
+    ],
+    "stepEffects": [
+      "fx_rocky_ascent_dust",
+      "fx_rocky_ascent_tick"
+    ]
+  },
+  "assets": [
+    {
+      "id": "bg_rocky_ascent",
+      "slot": "background",
+      "type": "background",
+      "placeholderSourceId": "karsiori_mountains",
+      "sourceSelection": "Use one of the four 768x288 mountain background layers/compositions as the base. Leave the center-right ascent corridor readable.",
+      "runtimeNotes": "Opaque. Static or simple parallax. Same source art can support all four levels; level escalation comes from waypoint authoring."
+    },
+    {
+      "id": "goat_rocky_ascent_advance_01",
+      "slot": "climberPoses[]",
+      "type": "sprite",
+      "placeholderSourceId": "spring_goat_ram",
+      "sourceSelection": "Use frame 1 from goat or ram_strip5.png.",
+      "runtimeNotes": "Transparent. Placeholder only; treat as one reusable climb pose."
+    },
+    {
+      "id": "goat_rocky_ascent_advance_02",
+      "slot": "climberPoses[]",
+      "type": "sprite",
+      "placeholderSourceId": "spring_goat_ram",
+      "sourceSelection": "Use frame 2 from goat or ram_strip5.png.",
+      "runtimeNotes": "Transparent. Reuse cyclically."
+    },
+    {
+      "id": "goat_rocky_ascent_advance_03",
+      "slot": "climberPoses[]",
+      "type": "sprite",
+      "placeholderSourceId": "spring_goat_ram",
+      "sourceSelection": "Use frame 3 from goat or ram_strip5.png.",
+      "runtimeNotes": "Transparent. Reuse cyclically."
+    },
+    {
+      "id": "goat_rocky_ascent_advance_04",
+      "slot": "climberPoses[]",
+      "type": "sprite",
+      "placeholderSourceId": "spring_goat_ram",
+      "sourceSelection": "Use frame 4 from goat or ram_strip5.png.",
+      "runtimeNotes": "Transparent. Reuse cyclically."
+    },
+    {
+      "id": "goat_rocky_ascent_finish",
+      "slot": "finishPose",
+      "type": "sprite",
+      "placeholderSourceId": "spring_goat_ram",
+      "sourceSelection": "Use frame 5 from goat or ram_strip5.png.",
+      "runtimeNotes": "Transparent. Place at summit cairn on successful completion."
+    },
+    {
+      "id": "prop_rocky_ascent_step",
+      "slot": "waypointVisuals[]",
+      "type": "sprite",
+      "placeholderSourceId": "karsiori_rock_piles",
+      "sourceSelection": "Choose one small/medium silver, beige, or mossy pile; crop to transparent sprite.",
+      "runtimeNotes": "Duplicate per waypoint; vary transform only."
+    },
+    {
+      "id": "prop_rocky_ascent_goal",
+      "slot": "destinationVisual",
+      "type": "sprite",
+      "placeholderSourceId": "karsiori_rock_piles",
+      "sourceSelection": "Choose a taller stacked pile as a placeholder summit cairn.",
+      "runtimeNotes": "Single persistent goal. Keep visually subordinate until the final approach."
+    },
+    {
+      "id": "fx_rocky_ascent_dust",
+      "slot": "stepEffects[]",
+      "type": "sprite",
+      "placeholderSourceId": "spring_dust",
+      "sourceSelection": "Use one readable single frame from dusty.gif rather than the full animation.",
+      "runtimeNotes": "Transparent. Pivot at lower center. Show briefly at hoof/rock contact."
+    },
+    {
+      "id": "fx_rocky_ascent_tick",
+      "slot": "stepEffects[]",
+      "type": "sprite",
+      "placeholderSourceId": "codemanu_pixel_fx",
+      "sourceSelection": "Use a single small-hit / impact / star-like frame from the pack.",
+      "runtimeNotes": "Transparent. Center pivot. Scale in/out for Perfect feedback."
+    }
+  ],
+  "placeholderSources": {
+    "karsiori_mountains": {
+      "title": "FREE Pixel Art Mountains Tileset and Backgrounds",
+      "author": "karsiori",
+      "license": "CC0",
+      "sourcePage": "https://karsiori.itch.io/free-pixel-art-mountains-tileset-and-backgrounds",
+      "contains": [
+        "4 x 768x288 background layers",
+        "120 x 32x32 terrain tiles",
+        "31 decorative elements"
+      ],
+      "attributionRequired": false,
+      "selectionReason": "Good alpine palette and enough terrain/decor to block a readable rocky ascent."
+    },
+    "spring_goat_ram": {
+      "title": "Pixel Art Enemies - Axe Throwing Goat or Ram...",
+      "author": "Spring Spring",
+      "license": "CC0 option available on source page",
+      "sourcePage": "https://opengameart.org/content/pixel-art-enemies-axe-throwing-goat-or-ram-axe-throwing-monkey-or-ape-walking-pig",
+      "file": "goat or ram_strip5.png",
+      "attributionRequired": false,
+      "selectionReason": "Tiny side-scrolling pixel goat/ram strip with five frames; enough to stand in for four climb poses plus finish."
+    },
+    "karsiori_rock_piles": {
+      "title": "FREE Pixel Art Rock Pile Pack",
+      "author": "karsiori",
+      "license": "CC0",
+      "sourcePage": "https://karsiori.itch.io/pixel-art-rock-pile-pack",
+      "contains": [
+        "15 rock piles",
+        "2 sizes each",
+        "6 color families"
+      ],
+      "attributionRequired": false,
+      "selectionReason": "Enough reusable rock shapes for both footholds and a summit-cairn placeholder."
+    },
+    "spring_dust": {
+      "title": "Dust Animation",
+      "author": "Spring Spring",
+      "license": "CC0",
+      "sourcePage": "https://opengameart.org/content/dust-animation",
+      "file": "dusty.gif",
+      "attributionRequired": false,
+      "selectionReason": "Tiny pixel dust effect; use only one frame to preserve GOATerizer's billboard constraint."
+    },
+    "codemanu_pixel_fx": {
+      "title": "Free Pixel Effects Pack",
+      "author": "CodeManu",
+      "license": "CC0 / public domain",
+      "sourcePage": "https://opengameart.org/content/free-pixel-effects-pack",
+      "contains": [
+        "20 pixel-art effects",
+        "100x100 frames"
+      ],
+      "attributionRequired": false,
+      "selectionReason": "Provides a cheap success glint/impact placeholder without requiring bespoke art."
+    }
+  },
+  "productionNotes": [
+    "Placeholder sources do not need to match perfectly in palette or pixel density; normalize nearest-neighbor scale and color treatment in the prototype.",
+    "Do not animate the source strips/GIFs as traditional animation. Extract individual frames and treat them as independent static billboards.",
+    "Rocky Ascent remains a precision/progress scene, not a danger scene; even L4 should read as absurd commitment rather than chase/survival.",
+    "One successful note opportunity advances exactly one waypoint."
+  ],
+  "designerReview": {
+    "blockingIssues": [],
+    "resolved": [
+      {
+        "level": 3,
+        "issue": "The supplied durations totalled 12 beats, not 16.",
+        "resolution": "Authored as six quarter notes, a half note on 7, then the eight-note ascending eighth-note phrase b1..c1 played twice. 23 note opportunities, 16 beats."
+      },
+      {
+        "level": 4,
+        "issue": "The supplied durations totalled 8 beats and used an undefined token `8`.",
+        "resolution": "Authored as the full two-octave eighth-note run 1..c1 plus an eighth rest, played twice. 30 note opportunities, 16 beats. No `8` token; the octave root is `b1`."
+      }
+    ],
+    "nonBlockingTBD": [
+      "Star thresholds are now authored but PROVISIONAL — see each level's `stars.note`.",
+      "Waypoint coordinates are authored here and regenerable via scripts/author-rocky-ascent.mjs."
+    ]
+  },
+  "levels": {
+    "1": {
+      "difficulty": 1,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b7"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "c1"
+        },
+        {
+          "index": 15,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4
+        }
+      ],
+      "noteOpportunityCount": 15,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeCharacter": "pleasant boulder staircase",
+        "steepness": 0.25,
+        "footholdScaleRange": [
+          1,
+          1.15
+        ],
+        "exposure": "low",
+        "destinationTreatment": "summit cairn visible and comfortably close",
+        "waypointCount": 15,
+        "waypointGeneration": "author one waypoint per successful note opportunity; reuse prop_rocky_ascent_step",
+        "progressTrigger": "successful_note_judgment",
+        "sustainBehavior": "after advancing on a sustained note, hold the current climb pose/position through the note duration",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "character": "broad, calm, readable steps",
+          "startPosition": {
+            "x": 0.1,
+            "y": 0.88
+          },
+          "destination": {
+            "x": 0.8,
+            "y": 0.24
+          },
+          "waypoints": [
+            {
+              "x": 0.177,
+              "y": 0.8413,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.2236,
+              "y": 0.8027,
+              "scale": 1.075,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.24,
+              "y": 0.764,
+              "scale": 1.15,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.2564,
+              "y": 0.7253,
+              "scale": 1.0375,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.303,
+              "y": 0.6867,
+              "scale": 1.1125,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.38,
+              "y": 0.648,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.457,
+              "y": 0.6093,
+              "scale": 1.075,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.5036,
+              "y": 0.5707,
+              "scale": 1.15,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.52,
+              "y": 0.532,
+              "scale": 1.0375,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.5364,
+              "y": 0.4933,
+              "scale": 1.1125,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.583,
+              "y": 0.4547,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.66,
+              "y": 0.416,
+              "scale": 1.075,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.737,
+              "y": 0.3773,
+              "scale": 1.15,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.7836,
+              "y": 0.3387,
+              "scale": 1.0375,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.8,
+              "y": 0.3,
+              "scale": 1.1125,
+              "rotationDeg": 5
+            }
+          ]
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 68,
+        "star2Threshold": 120,
+        "star3Threshold": 150,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (150); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    },
+    "2": {
+      "difficulty": 2,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "half",
+          "durationBeats": 2,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "half",
+          "durationBeats": 2,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b7"
+        }
+      ],
+      "noteOpportunityCount": 14,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeCharacter": "longer, clearly ascending boulder route",
+        "steepness": 0.45,
+        "footholdScaleRange": [
+          0.9,
+          1.1
+        ],
+        "exposure": "moderate",
+        "destinationTreatment": "cairn higher and farther away",
+        "waypointCount": 14,
+        "waypointGeneration": "author one waypoint per successful note opportunity; reuse prop_rocky_ascent_step",
+        "progressTrigger": "successful_note_judgment",
+        "sustainBehavior": "after advancing on a sustained note, hold the current climb pose/position through the note duration",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "character": "longer and more obviously ascending; each step covers more ground",
+          "startPosition": {
+            "x": 0.1,
+            "y": 0.92
+          },
+          "destination": {
+            "x": 0.846,
+            "y": 0.14
+          },
+          "waypoints": [
+            {
+              "x": 0.1676,
+              "y": 0.8784,
+              "scale": 0.9,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.214,
+              "y": 0.832,
+              "scale": 0.975,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.2364,
+              "y": 0.7836,
+              "scale": 1.05,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.2601,
+              "y": 0.7339,
+              "scale": 0.9375,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.3108,
+              "y": 0.6832,
+              "scale": 1.0125,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.3883,
+              "y": 0.6317,
+              "scale": 0.9,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.4666,
+              "y": 0.5794,
+              "scale": 0.975,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.5194,
+              "y": 0.5266,
+              "scale": 1.05,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.5468,
+              "y": 0.4732,
+              "scale": 0.9375,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.5746,
+              "y": 0.4194,
+              "scale": 1.0125,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.6289,
+              "y": 0.3651,
+              "scale": 0.9,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.7096,
+              "y": 0.3104,
+              "scale": 0.975,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.7906,
+              "y": 0.2554,
+              "scale": 1.05,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.846,
+              "y": 0.2,
+              "scale": 0.9375,
+              "rotationDeg": -2
+            }
+          ]
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 63,
+        "star2Threshold": 112,
+        "star3Threshold": 140,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (140); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    },
+    "3": {
+      "difficulty": 3,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "half",
+          "durationBeats": 2,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b7"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "c1"
+        },
+        {
+          "index": 15,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 16,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 17,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 18,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 19,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 20,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 21,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b7"
+        },
+        {
+          "index": 22,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "c1"
+        }
+      ],
+      "noteOpportunityCount": 23,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeCharacter": "steeper exposed route with tighter boulders",
+        "steepness": 0.7,
+        "footholdScaleRange": [
+          0.75,
+          1
+        ],
+        "exposure": "high",
+        "destinationTreatment": "cairn near a visibly exposed summit",
+        "waypointCount": 23,
+        "waypointGeneration": "author one waypoint per successful note opportunity; reuse prop_rocky_ascent_step",
+        "progressTrigger": "successful_note_judgment",
+        "sustainBehavior": "after advancing on a sustained note, hold the current climb pose/position through the note duration",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "character": "steep and exposed; the repeated eighth-note phrase sprints up the top",
+          "startPosition": {
+            "x": 0.14,
+            "y": 0.93
+          },
+          "destination": {
+            "x": 0.7616,
+            "y": 0.06
+          },
+          "waypoints": [
+            {
+              "x": 0.1895,
+              "y": 0.8907,
+              "scale": 0.72,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.2282,
+              "y": 0.8513,
+              "scale": 0.81,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.2516,
+              "y": 0.812,
+              "scale": 0.9,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.2643,
+              "y": 0.7726,
+              "scale": 0.765,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.277,
+              "y": 0.7333,
+              "scale": 0.855,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.3005,
+              "y": 0.6939,
+              "scale": 0.72,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.3392,
+              "y": 0.6546,
+              "scale": 0.81,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.384,
+              "y": 0.6212,
+              "scale": 0.9,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.4288,
+              "y": 0.5878,
+              "scale": 0.765,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.4628,
+              "y": 0.5544,
+              "scale": 0.855,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.4816,
+              "y": 0.521,
+              "scale": 0.72,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.4896,
+              "y": 0.4875,
+              "scale": 0.81,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.4976,
+              "y": 0.4541,
+              "scale": 0.9,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.5164,
+              "y": 0.4207,
+              "scale": 0.765,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.5504,
+              "y": 0.3873,
+              "scale": 0.855,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.5952,
+              "y": 0.3539,
+              "scale": 0.72,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.64,
+              "y": 0.3205,
+              "scale": 0.81,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.674,
+              "y": 0.2871,
+              "scale": 0.9,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.6928,
+              "y": 0.2537,
+              "scale": 0.765,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.7008,
+              "y": 0.2202,
+              "scale": 0.855,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.7088,
+              "y": 0.1868,
+              "scale": 0.72,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.7276,
+              "y": 0.1534,
+              "scale": 0.81,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.7616,
+              "y": 0.12,
+              "scale": 0.9,
+              "rotationDeg": 3
+            }
+          ]
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 104,
+        "star2Threshold": 184,
+        "star3Threshold": 230,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (230); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    },
+    "4": {
+      "difficulty": 4,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 0.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 1.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 2.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 3.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 4.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 5.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 6.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "b7"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "c1"
+        },
+        {
+          "index": 15,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 7.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4.5
+        },
+        {
+          "index": 16,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 17,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 18,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 19,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 20,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 21,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 22,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 23,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "b1"
+        },
+        {
+          "index": 24,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b2"
+        },
+        {
+          "index": 25,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "b3"
+        },
+        {
+          "index": 26,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "b4"
+        },
+        {
+          "index": 27,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "b5"
+        },
+        {
+          "index": 28,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "b6"
+        },
+        {
+          "index": 29,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "b7"
+        },
+        {
+          "index": 30,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "c1"
+        },
+        {
+          "index": 31,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.5
+        }
+      ],
+      "noteOpportunityCount": 30,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeCharacter": "absurd near-vertical boulder climb",
+        "steepness": 0.95,
+        "footholdScaleRange": [
+          0.6,
+          0.9
+        ],
+        "exposure": "ridiculous",
+        "destinationTreatment": "tiny summit cairn at the top of the frame",
+        "waypointCount": 30,
+        "waypointGeneration": "author one waypoint per successful note opportunity; reuse prop_rocky_ascent_step",
+        "progressTrigger": "successful_note_judgment",
+        "sustainBehavior": "after advancing on a sustained note, hold the current climb pose/position through the note duration",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "character": "absurd near-vertical summit climb on tiny footholds",
+          "startPosition": {
+            "x": 0.3,
+            "y": 0.95
+          },
+          "destination": {
+            "x": 0.6,
+            "y": 0.04
+          },
+          "waypoints": [
+            {
+              "x": 0.355,
+              "y": 0.9203,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.32,
+              "y": 0.8907,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.285,
+              "y": 0.861,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.34,
+              "y": 0.8313,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.395,
+              "y": 0.8017,
+              "scale": 0.64,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.36,
+              "y": 0.772,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.325,
+              "y": 0.7423,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.38,
+              "y": 0.7127,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.435,
+              "y": 0.683,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.4,
+              "y": 0.6533,
+              "scale": 0.64,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.365,
+              "y": 0.6237,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.42,
+              "y": 0.594,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.475,
+              "y": 0.5643,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.44,
+              "y": 0.5347,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.405,
+              "y": 0.505,
+              "scale": 0.64,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.46,
+              "y": 0.4753,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.515,
+              "y": 0.4457,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.48,
+              "y": 0.416,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.445,
+              "y": 0.3863,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.5,
+              "y": 0.3567,
+              "scale": 0.64,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.555,
+              "y": 0.327,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.52,
+              "y": 0.2973,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.485,
+              "y": 0.2677,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.54,
+              "y": 0.238,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.595,
+              "y": 0.2083,
+              "scale": 0.64,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.56,
+              "y": 0.1787,
+              "scale": 0.52,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.525,
+              "y": 0.149,
+              "scale": 0.6,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.58,
+              "y": 0.1193,
+              "scale": 0.68,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.635,
+              "y": 0.0897,
+              "scale": 0.56,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.6,
+              "y": 0.06,
+              "scale": 0.64,
+              "rotationDeg": 5
+            }
+          ]
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 135,
+        "star2Threshold": 240,
+        "star3Threshold": 300,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (300); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    }
+  }
+}

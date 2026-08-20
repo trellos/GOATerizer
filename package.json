@@ -1,0 +1,31 @@
+{
+  "name": "goaterizer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser guitar game controlled by real guitar input via Tuninator. You really suck and this is your best shot.",
+  "scripts": {
+    "setup:tuninator": "node scripts/setup-tuninator.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:browser": "node scripts/browser-validate.mjs",
+    "art": "node scripts/generate-placeholder-art.mjs"
+  },
+  "dependencies": {
+    "tuninator": "file:../Tuninator"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "playwright-core": "^1.56.1",
+    "typescript": "^5.7.2",
+    "vite": "^7.0.0",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

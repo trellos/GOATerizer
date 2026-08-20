@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GOATerizer</title>
+    <!-- Inline, so there is no favicon request to 404 on. -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23070a0d'/%3E%3Cpath d='M3 10h8v3H3z' fill='%23eee6d6'/%3E%3Cpath d='M9 6h3v4H9z' fill='%23eee6d6'/%3E%3Cpath d='M11 4h2v2h-2z' fill='%23ba9e74'/%3E%3Cpath d='M4 13h1v2H4zm5 0h1v2H9z' fill='%23786c5c'/%3E%3C/svg%3E"
+    />
+    <meta
+      name="description"
+      content="A browser guitar game controlled by a real guitar. You really suck and this is your best shot."
+    />
+  </head>
+  <body>
+    <!--
+      All markup lives here. Nothing generates a screen at runtime; the app
+      shows and hides these and fills the slots marked with ids. Repeated
+      elements (the 16 history slots, the tempo buttons, the fingering options)
+      are cloned from the <template> blocks at the bottom into fixed containers.
+    -->
+    <main id="app">
+      <!-- ---------------------------------------------------------------- -->
+      <section class="screen" id="screen-start" data-active="true">
+        <div class="start-card">
+          <h1 class="title">GOATerizer</h1>
+          <p class="tagline">You really suck and this is your best shot.</p>
+          <button class="primary" id="start-play" type="button">Play</button>
+          <p class="hint">
+            Plug in or mic a guitar. The browser will ask for the microphone.
+          </p>
+          <div class="high-scores">
+            <h2>High scores</h2>
+            <ul id="start-high-scores"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section class="screen" id="screen-pregame">
+        <header class="pregame-head">
+          <h2>Warm up</h2>
+          <p class="sub">
+            The bass is already playing. Noodle. Watch your guitar land on the
+            timeline. Nothing is scored yet.
+          </p>
+        </header>
+
+        <div class="pregame-body">
+          <div class="controls">
+            <div class="control-block">
+              <h3>Key</h3>
+              <p class="readout" id="pregame-key">—</p>
+              <button class="secondary" id="pregame-reroll" type="button">
+                Reroll key + bass line
+              </button>
+            </div>
+
+            <div class="control-block">
+              <h3>Tempo</h3>
+              <div class="button-row" id="pregame-tempos"></div>
+            </div>
+
+            <div class="control-block">
+              <h3>Timeline view</h3>
+              <div class="button-row" id="pregame-views">
+                <button class="chip" type="button" data-view="key" data-selected="true">
+                  Key View
+                </button>
+                <button class="chip" type="button" data-view="tab">Tablature View</button>
+              </div>
+            </div>
+
+            <div class="control-block">
+              <h3>Fingering</h3>
+              <div class="button-row column" id="pregame-fingerings"></div>
+              <p class="note">
+                A physical reference only. Tuninator judges the pitch, not where
+                you fretted it.
+              </p>
+            </div>
+
+            <div class="control-block">
+              <h3>Guitar input</h3>
+              <p class="readout small" id="pregame-input-state">Not started.</p>
+              <div class="meter" id="pregame-level"><span></span></div>
+              <p class="readout small" id="pregame-detected">—</p>
+            </div>
+
+            <button class="primary" id="pregame-play" type="button">Play</button>
+          </div>
+
+          <div class="pregame-timeline">
+            <canvas id="pregame-canvas"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section class="screen" id="screen-game">
+        <header class="hud">
+          <div class="hud-left">
+            <span class="hud-stars" id="hud-stars">★ 0</span>
+            <span class="hud-key" id="hud-key">—</span>
+          </div>
+          <ol class="history" id="hud-history"></ol>
+          <div class="hud-right">
+            <span class="hud-score" id="hud-score">0</span>
+          </div>
+        </header>
+
+        <div class="scenario-strip">
+          <canvas id="scenario-canvas"></canvas>
+        </div>
+
+        <div class="game-timeline">
+          <canvas id="game-canvas"></canvas>
+        </div>
+
+        <canvas id="energy-canvas" class="energy-overlay"></canvas>
+        <div class="input-warning" id="game-input-warning" hidden></div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <section class="screen" id="screen-results">
+        <div class="results-card">
+          <h2 id="results-heading">Game over</h2>
+          <p class="rank" id="results-rank">—</p>
+          <p class="results-reason" id="results-reason"></p>
+
+          <dl class="results-figures">
+            <div><dt>Score</dt><dd id="results-score">0</dd></div>
+            <div><dt>Stars</dt><dd id="results-stars">0 / 48</dd></div>
+            <div><dt>Tempo best</dt><dd id="results-best">0</dd></div>
+          </dl>
+
+          <ol class="history results-history" id="results-history"></ol>
+
+          <div class="button-row">
+            <button class="primary" id="results-replay" type="button">
+              Replay same setup
+            </button>
+            <button class="secondary" id="results-new" type="button">New game</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!--
+      Developer panel. Hidden unless dev mode is on (?dev=1). It must never be
+      reachable from normal play: it can drive the game from injected input,
+      which would otherwise mean scoring fake guitar.
+    -->
+    <aside id="dev-panel" hidden>
+      <header>
+        <strong>dev</strong>
+        <button type="button" id="dev-close" aria-label="close">×</button>
+      </header>
+      <dl id="dev-readouts"></dl>
+      <div class="dev-controls">
+        <label>
+          Input source
+          <select id="dev-source">
+            <option value="tuninator">Tuninator (live guitar)</option>
+            <option value="test">Deterministic test input</option>
+          </select>
+        </label>
+        <label>
+          Latency trim (ms)
+          <input id="dev-latency" type="number" step="5" value="0" />
+        </label>
+        <div class="button-row">
+          <button class="chip" type="button" id="dev-autoplay-perfect">Autoplay perfect</button>
+          <button class="chip" type="button" id="dev-autoplay-good">Autoplay good</button>
+          <button class="chip" type="button" id="dev-autoplay-scruffy">Autoplay scruffy</button>
+          <button class="chip" type="button" id="dev-autoplay-off">Stop autoplay</button>
+        </div>
+      </div>
+    </aside>
+
+    <template id="tpl-history-slot">
+      <li class="history-slot" data-state="pending"><span class="slot-stars"></span></li>
+    </template>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
