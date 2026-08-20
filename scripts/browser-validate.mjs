@@ -36,11 +36,34 @@ const PORT = Number(process.env["PORT"] ?? 4319);
 const BASE = `http://127.0.0.1:${PORT}`;
 const keep = process.argv.includes("--keep");
 
-const CHROMIUM_CANDIDATES = [
-  process.env["CHROMIUM_PATH"],
-  "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
-  "/opt/pw-browsers/chromium/chrome-linux/chrome",
-].filter(Boolean);
+/**
+ * Where to find a Chromium to drive, best first.
+ *
+ * This script was written inside a Linux container and knew only that
+ * container's two Playwright paths, so it could not run on a developer machine
+ * at all — and a validation script nobody can run locally validates nothing.
+ *
+ * `playwright-core` deliberately downloads no browsers, so there is usually no
+ * bundled one; it can, however, launch an already-installed Chrome or Edge by
+ * channel. Prefer an explicit path, then Playwright's own build if someone ran
+ * `npx playwright install chromium`, then whatever the machine already has.
+ * Channel launches are the fallback rather than the default because a stable
+ * Chrome auto-updates underneath the suite.
+ */
+const BROWSER_CANDIDATES = [
+  ...[
+    process.env["CHROMIUM_PATH"],
+    "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+    "/opt/pw-browsers/chromium/chrome-linux/chrome",
+  ]
+    .filter((candidate) => candidate && existsSync(candidate))
+    .map((executablePath) => ({ label: executablePath, options: { executablePath } })),
+  { label: "playwright's bundled chromium", options: {} },
+  ...["chrome", "msedge", "chromium"].map((channel) => ({
+    label: `installed ${channel}`,
+    options: { channel },
+  })),
+];
 
 const checks = [];
 let failures = 0;
@@ -56,9 +79,14 @@ function note(message) {
   console.log(`NOTE  ${message}`);
 }
 
+// `npx` on Windows is `npx.cmd`, and CreateProcess does not consult PATHEXT the
+// way a shell does — spawning the bare name fails with ENOENT. Same reason
+// scripts/setup-tuninator.mjs names `npm.cmd`.
+const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
+
 async function serve() {
   const child = spawn(
-    "npx",
+    NPX,
     ["vite", "preview", "--port", String(PORT), "--strictPort", "--host", "127.0.0.1"],
     { cwd: REPO, stdio: "ignore" }
   );
@@ -75,11 +103,22 @@ async function serve() {
   throw new Error(`preview server did not come up on ${BASE}`);
 }
 
-function findChromium() {
-  for (const candidate of CHROMIUM_CANDIDATES) {
-    if (candidate && existsSync(candidate)) return candidate;
+/** Launches the first candidate browser that actually starts. */
+async function launchBrowser(args) {
+  const rejections = [];
+  for (const candidate of BROWSER_CANDIDATES) {
+    try {
+      const browser = await chromium.launch({ ...candidate.options, args });
+      note(`driving ${candidate.label}`);
+      return browser;
+    } catch (error) {
+      rejections.push(`  ${candidate.label} — ${String(error?.message ?? error).split("\n")[0]}`);
+    }
   }
-  throw new Error(`no Chromium found; tried:\n  ${CHROMIUM_CANDIDATES.join("\n  ")}`);
+  throw new Error(
+    `no usable Chromium. Tried:\n${rejections.join("\n")}\n\n` +
+      `Install one with \`npx playwright install chromium\`, or point CHROMIUM_PATH at a build.`
+  );
 }
 
 /** Reads a value out of the dev panel by its label. */
@@ -135,15 +174,12 @@ async function canvasHasInk(page, id) {
 }
 
 const server = await serve();
-const browser = await chromium.launch({
-  executablePath: findChromium(),
-  args: [
-    "--no-sandbox",
-    "--use-fake-device-for-media-stream",
-    "--use-fake-ui-for-media-stream",
-    "--autoplay-policy=no-user-gesture-required",
-  ],
-});
+const browser = await launchBrowser([
+  "--no-sandbox",
+  "--use-fake-device-for-media-stream",
+  "--use-fake-ui-for-media-stream",
+  "--autoplay-policy=no-user-gesture-required",
+]);
 
 try {
   rmSync(SHOTS, { recursive: true, force: true });
