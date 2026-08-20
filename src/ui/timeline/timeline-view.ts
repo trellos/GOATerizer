@@ -34,9 +34,17 @@ const THEME = {
   ground: "#0d1014",
   gutter: "#12161c",
   laneLine: "#1e242c",
-  laneLineRoot: "#2f3a46",
+  // Root and fifth get distinct hues, not just brighter versions of the plain
+  // row — the player should be able to find "where the root is" at a glance,
+  // the way a keyboard player finds middle C by feel. Root is the primary
+  // landmark (warm), fifth is secondary (cool), both kept duller than the
+  // judgment colours (perfect/good/target) so a lit-up note on top of the row
+  // never gets mistaken for the row accent itself.
+  laneLineRoot: "#5a4426",
+  laneLineFifth: "#2f3f52",
   laneText: "#8fa0b0",
-  laneTextRoot: "#dbe6f0",
+  laneTextRoot: "#f0c674",
+  laneTextFifth: "#9fc7e8",
   beatLine: "#171c23",
   measureLine: "#28313c",
   strike: "#f4f7fb",
@@ -201,12 +209,33 @@ export class TimelineView {
     }
   }
 
+  /**
+   * Root/fifth for a Key View row.
+   *
+   * Lane index is `octaveBand * 7 + (degree - 1)` (`music/degrees.ts`), so
+   * degree 1 (root) always falls on `row % 7 === 0` and degree 5 (fifth) on
+   * `row % 7 === 4`, in every octave band and every key — this needs no key
+   * lookup, unlike the label text next to it.
+   */
+  #rowAccent(row: number): "root" | "fifth" | null {
+    if (this.#mode !== "key") return null;
+    const degreeIndex = row % 7;
+    if (degreeIndex === 0) return "root";
+    if (degreeIndex === 4) return "fifth";
+    return null;
+  }
+
   #drawRows(): void {
     const ctx = this.#ctx;
     for (let row = 0; row < this.#rowCount; row += 1) {
       const y = this.#rowY(row);
-      const isRoot = this.#mode === "key" && row % 7 === 0;
-      ctx.strokeStyle = isRoot ? THEME.laneLineRoot : THEME.laneLine;
+      const accent = this.#rowAccent(row);
+      ctx.strokeStyle =
+        accent === "root"
+          ? THEME.laneLineRoot
+          : accent === "fifth"
+            ? THEME.laneLineFifth
+            : THEME.laneLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(this.#playLeft, Math.round(y) + 0.5);
@@ -229,11 +258,14 @@ export class TimelineView {
     for (let row = 0; row < this.#rowCount; row += 1) {
       const y = this.#rowY(row);
       if (this.#mode === "key") {
-        const isRoot = row % 7 === 0;
+        const accent = this.#rowAccent(row);
         const label = laneLabel(row, this.#key);
         const fingering = this.#fingering?.positions[row];
-        ctx.fillStyle = isRoot ? THEME.laneTextRoot : THEME.laneText;
-        ctx.font = `${isRoot ? "600 " : ""}11px ui-monospace, Menlo, Consolas, monospace`;
+        ctx.fillStyle =
+          accent === "root" ? THEME.laneTextRoot : accent === "fifth" ? THEME.laneTextFifth : THEME.laneText;
+        // Bold marks the root only — it stays the one landmark you can find
+        // without reading colour, the fifth is colour-only so it stays secondary.
+        ctx.font = `${accent === "root" ? "600 " : ""}11px ui-monospace, Menlo, Consolas, monospace`;
         ctx.textAlign = "left";
         // Scale degree first, note name retained: the player should be able to
         // read the note but is being taught the harmonic role.
