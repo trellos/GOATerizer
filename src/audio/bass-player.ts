@@ -16,6 +16,7 @@
  */
 
 import type { BassLine } from "./bass-line.js";
+import { forEachLoopEvent } from "./loop-scheduling.js";
 import { midiToFrequency } from "../music/pitch.js";
 import type { Transport } from "./transport.js";
 
@@ -100,20 +101,9 @@ export class BassPlayer {
     const from = this.#scheduledThroughBeat;
     if (horizonBeat <= from) return;
 
-    // Walk loop occurrences rather than absolute beats, so an arbitrary
-    // transport position maps onto the four-measure pattern without a modulo
-    // per note.
-    const loop = line.loopBeats;
-    const firstCycle = Math.floor(from / loop);
-    const lastCycle = Math.floor(horizonBeat / loop);
-
-    for (let cycle = firstCycle; cycle <= lastCycle; cycle += 1) {
-      for (const note of line.notes) {
-        const absoluteBeat = cycle * loop + note.startBeat;
-        if (absoluteBeat <= from || absoluteBeat > horizonBeat) continue;
-        this.#scheduleNote(note.midi, absoluteBeat, note.durationBeats);
-      }
-    }
+    forEachLoopEvent(line.notes, line.loopBeats, from, horizonBeat, (note, beat) =>
+      this.#scheduleNote(note.midi, beat, note.durationBeats)
+    );
 
     this.#scheduledThroughBeat = horizonBeat;
     this.#reapVoices();
@@ -125,19 +115,29 @@ export class BassPlayer {
     const stopTime = startTime + seconds;
 
     const osc = this.#context.createOscillator();
-    osc.type = "triangle";
+    // Sawtooth, not triangle. The line is voiced at 40-75 Hz so it sits under
+    // the guitar (see bass-line.ts), and almost no speaker a browser game is
+    // played on reproduces that fundamental at all — a laptop rolls off hard
+    // below ~150 Hz. What makes a bass note audible there is its harmonics: the
+    // ear reconstructs the missing fundamental from them. A triangle's
+    // harmonics fall off as 1/n² and had nothing left by the third, so the part
+    // was being rendered and simply not heard.
+    osc.type = "sawtooth";
     osc.frequency.value = midiToFrequency(midi);
 
     const gain = this.#context.createGain();
     // A plucked-ish envelope. Short attack so the beat is unmistakable, decay
     // well before the next beat so the pulse stays articulated.
     gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.exponentialRampToValueAtTime(0.7, startTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.5, startTime + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.0001, stopTime * 0.35 + startTime * 0.65);
 
     const filter = this.#context.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = 420;
+    // High enough to pass the first ~20 harmonics, which is what carries the
+    // note on a small speaker; low enough that the line still reads as bass and
+    // stays out of the register the target notes occupy.
+    filter.frequency.value = 1200;
 
     osc.connect(filter);
     filter.connect(gain);

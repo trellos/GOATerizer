@@ -5,7 +5,8 @@
  * guitar, the attempt runtime is the rules, and the views read state and draw
  * it. Views never mutate gameplay; the analyzer never touches a sprite.
  *
- *     AudioEngine ── AudioContext ──┬── Transport ── BassPlayer
+ *     AudioEngine ── AudioContext ──┬── Transport ──┬── BassPlayer
+ *                                   │               └── DrumPlayer
  *                                   └── TuninatorGuitarInputProvider
  *                                            │ normalised guitar events
  *                                            ▼
@@ -19,6 +20,7 @@
 import { AudioEngine } from "../audio/audio-engine.js";
 import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
+import { DrumPlayer } from "../audio/drum-player.js";
 import { Transport } from "../audio/transport.js";
 import { pickWeightedKey } from "../config/key-weighting.js";
 import { DEFAULT_TEMPO_ID, TEMPOS, tempoById, type TempoId } from "../config/tempos.js";
@@ -76,6 +78,7 @@ export class GameApp {
   readonly #audio = new AudioEngine();
   readonly #transport = new Transport(() => this.#audio.now());
   #bass: BassPlayer | null = null;
+  #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
 
   /* Input ------------------------------------------------------------ */
@@ -326,8 +329,14 @@ export class GameApp {
     if (context && master && !this.#bass) {
       this.#bass = new BassPlayer(context, this.#transport, master);
     }
+    // Guarded separately from the bass so a reload that already built one does
+    // not end up with two kits scheduling onto the same bus (AGENTS.md §13).
+    if (context && master && !this.#drums) {
+      this.#drums = new DrumPlayer(context, this.#transport, master);
+    }
     this.#regenerateBass();
     this.#bass?.start();
+    this.#drums?.start();
 
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
@@ -364,6 +373,7 @@ export class GameApp {
       // Phase-preserving: the loop keeps its place, only the rate changes.
       this.#transport.setBpm(tempoById(tempoId).bpm);
       this.#bass?.retime();
+      this.#drums?.retime();
     }
   }
 
