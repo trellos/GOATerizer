@@ -86,16 +86,34 @@ describe("timeline model", () => {
 
   it("only reports what is inside the visible window", () => {
     const timeline = model();
+
+    // Derived from the configured span rather than written out: the window is
+    // a tuning knob, and a test that hard-codes its width fails for the span
+    // changing rather than for the model being wrong.
+    const inWindow = (nowBeat: number, startBeat: number, durationBeats: number): boolean =>
+      // A note leaves the screen when it ENDS, not when it starts.
+      startBeat + durationBeats >= nowBeat - TIMELINE_HISTORY_BEATS &&
+      startBeat <= nowBeat + TIMELINE_FUTURE_BEATS;
+
+    const expected = (nowBeat: number): number[] =>
+      targets
+        .filter((target) => inWindow(nowBeat, 100 + target.startBeat, target.durationBeats))
+        .map((target) => 100 + target.startBeat);
+
+    // The attempt starts at 100, so nothing precedes it.
     const early = timeline.snapshot(100, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
-    // Two beats of future, two of history. The attempt starts at 100, so
-    // nothing precedes it and the window reaches targets 0-2.
-    expect(early.targets.map((t) => t.startBeat)).toEqual([100, 101, 102]);
+    expect(early.targets.map((t) => t.startBeat)).toEqual(expected(100));
+    expect(early.targets[0]?.startBeat).toBe(100);
 
     const later = timeline.snapshot(108, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
-    // A quarter note starting on 105 still has its tail inside the window at
-    // 106, so it is drawn -- a note leaves the screen when it ENDS, not when it
-    // starts.
-    expect(later.targets.map((t) => t.startBeat)).toEqual([105, 106, 107, 108, 109, 110]);
+    expect(later.targets.map((t) => t.startBeat)).toEqual(expected(108));
+    // Whatever the span, the window is bounded on both sides and centred on now.
+    expect(Math.min(...later.targets.map((t) => t.startBeat))).toBeGreaterThan(
+      108 - TIMELINE_HISTORY_BEATS - 2
+    );
+    expect(Math.max(...later.targets.map((t) => t.startBeat))).toBeLessThanOrEqual(
+      108 + TIMELINE_FUTURE_BEATS
+    );
   });
 
   it("keeps two attempts' targets apart across a transition", () => {
@@ -126,8 +144,10 @@ describe("timeline model", () => {
     const snapshot = timeline.snapshot(100, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
     expect(snapshot.bass.length).toBeGreaterThan(0);
     for (const note of snapshot.bass) {
-      expect(note.startBeat + note.durationBeats).toBeGreaterThanOrEqual(98);
-      expect(note.startBeat).toBeLessThanOrEqual(102);
+      expect(note.startBeat + note.durationBeats).toBeGreaterThanOrEqual(
+        100 - TIMELINE_HISTORY_BEATS
+      );
+      expect(note.startBeat).toBeLessThanOrEqual(100 + TIMELINE_FUTURE_BEATS);
       // Placed by scale degree, so the ear learns the relationship.
       expect(note.lane).toBeGreaterThanOrEqual(0);
       expect(note.lane).toBeLessThanOrEqual(6);

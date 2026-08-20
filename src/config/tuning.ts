@@ -158,10 +158,25 @@ export const MIN_ATTACK_CONFIDENCE = 0.3;
 /* Timeline                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Beats of future visible to the right of the strike line. GDD §12.1. */
-export const TIMELINE_FUTURE_BEATS = 2;
-/** Beats of history visible to the left of the strike line. GDD §12.1. */
-export const TIMELINE_HISTORY_BEATS = 2;
+/*
+ * How much musical time the timeline shows either side of the strike line.
+ *
+ * These two set the scroll speed: the play area is a fixed width, so a note
+ * takes `TIMELINE_FUTURE_BEATS` to travel from the right edge to the centre.
+ * Doubling them halves the pixels-per-beat, and therefore halves the speed.
+ *
+ * GDD §12.1 specifies two beats each way. Four is a deliberate, user-requested
+ * departure: at two beats a sixteenth-note run arrives too fast to read as
+ * pitch — the note is legible only once it is nearly on the line, which is late
+ * to be deciding which fret to be on. Four beats trades on-screen density for
+ * reading time. The GDD section records the change and the reason.
+ *
+ * Anything that consumes these must read them rather than assume 2, including
+ * the played-note retention window in `ui/timeline/timeline-model.ts`.
+ */
+export const TIMELINE_FUTURE_BEATS = 4;
+/** Beats of history visible to the left of the strike line. Mirrors the future. */
+export const TIMELINE_HISTORY_BEATS = 4;
 
 /* -------------------------------------------------------------------------- */
 /* Transport                                                                   */

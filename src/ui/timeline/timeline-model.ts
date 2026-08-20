@@ -11,6 +11,7 @@
  */
 
 import { laneOfMidi, lanePositionOfMidi, type RunKey } from "../../music/keys.js";
+import { TIMELINE_HISTORY_BEATS } from "../../config/tuning.js";
 import type { BassLine } from "../../audio/bass-line.js";
 import type { JudgmentOutcome } from "../../game/judgment.js";
 import type { ResolvedTarget } from "../../game/targets.js";
@@ -61,8 +62,15 @@ export type TimelineSnapshot = {
   bass: readonly BassNoteView[];
 };
 
-/** How long a played note lingers in history before it is dropped. */
-const HISTORY_BEATS = 6;
+/**
+ * How long a played note lingers before it is dropped.
+ *
+ * Derived, not chosen: a note must survive until it has scrolled off the left
+ * edge, so anything less than what the view actually shows deletes notes while
+ * they are still on screen. The margin covers the drop happening on a later
+ * frame than the note's last draw.
+ */
+const HISTORY_BEATS = TIMELINE_HISTORY_BEATS + 2;
 
 export class TimelineModel {
   #key: RunKey;

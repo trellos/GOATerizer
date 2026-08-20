@@ -676,20 +676,27 @@ Time scrolls from right to left.
 An incoming target note:
 
 - appears on the right,
-- takes **two beats** to travel to the center,
+- takes **four beats** to travel to the center,
 - reaches the center exactly when it should be played,
 - continues into history,
-- reaches the left edge **two beats later**.
+- reaches the left edge **four beats later**.
 
 The visible timeline therefore represents roughly:
 
 ```text
-2 beats of future
+4 beats of future
 +
 current strike line
 +
-2 beats of history
+4 beats of history
 ```
+
+> **Revised from two beats.** At two beats a sixteenth-note run arrives too fast
+> to read as pitch: the note only becomes legible once it is nearly on the strike
+> line, which is too late to be deciding which fret to be on. Four beats trades
+> on-screen note density for reading time. The span is one number in
+> `src/config/tuning.ts` (`TIMELINE_FUTURE_BEATS` / `TIMELINE_HISTORY_BEATS`);
+> the play area is a fixed width, so the span *is* the scroll speed.
 
 A strong vertical marker at the center defines the exact intended performance time.
 
