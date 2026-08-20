@@ -59,15 +59,21 @@ const REF = process.env["TUNINATOR_REF"] ?? "claude/guitar-event-recognizer-refa
 const update = process.argv.includes("--update");
 
 /**
- * npm's launcher on Windows is `npm.cmd`, not `npm`.
+ * Spawning npm on Windows needs the shell, and there is no way around it.
  *
  * `execFileSync` goes to `CreateProcess`, which — unlike a shell — does not
- * consult `PATHEXT`. So spawning `"npm"` fails with a bare `ENOENT` on Windows
- * even though `npm` works perfectly in the same terminal. Naming the real file
- * is the fix; `shell: true` would also work but would then need every argument
- * quoted against the Windows command-line parser.
+ * consult `PATHEXT`, so `"npm"` fails with a bare `ENOENT` even though `npm`
+ * works perfectly in the same terminal. The obvious fix, naming the real file
+ * `npm.cmd`, then fails with `EINVAL`: since the CVE-2024-27980 hardening, Node
+ * refuses to spawn `.cmd` and `.bat` at all without `shell: true`.
+ *
+ * So on win32 the shell goes on. Every argument this script passes npm is a
+ * bare word (`ci`, `run`, `build`) with nothing for cmd.exe to reinterpret, and
+ * the only path involved — the working directory, which may well contain
+ * spaces — travels in `cwd` rather than on the command line.
  */
-const NPM = process.platform === "win32" ? "npm.cmd" : "npm";
+const WIN32 = process.platform === "win32";
+const NPM = "npm";
 
 /** Aborts with an explanation rather than a stack trace. */
 function fail(message) {
@@ -86,7 +92,16 @@ function fail(message) {
 function run(command, args, cwd) {
   const printable = `${command} ${args.join(" ")}`;
   try {
-    execFileSync(command, args, { cwd, stdio: "inherit" });
+    // git is a real .exe and needs no shell; npm on Windows is a .cmd and has
+    // no other way in. See the NPM comment above. The command goes through as
+    // one string rather than command-plus-args because passing an args array
+    // alongside `shell: true` is deprecated (DEP0190) and prints a warning that
+    // looks, during setup, exactly like something going wrong.
+    if (WIN32 && command === NPM) {
+      execFileSync(printable, [], { cwd, stdio: "inherit", shell: true });
+    } else {
+      execFileSync(command, args, { cwd, stdio: "inherit" });
+    }
   } catch (error) {
     if (error?.code === "ENOENT") {
       fail(

@@ -79,15 +79,28 @@ function note(message) {
   console.log(`NOTE  ${message}`);
 }
 
-// `npx` on Windows is `npx.cmd`, and CreateProcess does not consult PATHEXT the
-// way a shell does — spawning the bare name fails with ENOENT. Same reason
-// scripts/setup-tuninator.mjs names `npm.cmd`.
-const NPX = process.platform === "win32" ? "npx.cmd" : "npx";
+/*
+ * Run Vite's own entry point on this Node, rather than going through `npx`.
+ *
+ * `npx` on Windows is `npx.cmd`, and there is no good way to spawn it: the bare
+ * name fails with ENOENT because CreateProcess ignores PATHEXT, and naming
+ * `npx.cmd` fails with EINVAL because Node ≥20.12 refuses to spawn `.cmd` and
+ * `.bat` without `shell: true` (the CVE-2024-27980 hardening). Turning the
+ * shell on to launch a script we already have on disk would mean submitting a
+ * path to cmd.exe's quoting rules for no benefit.
+ *
+ * `process.execPath` is the Node already running this file, so the preview
+ * server also cannot end up on a different Node than the caller's.
+ */
+const VITE_BIN = path.join(REPO, "node_modules", "vite", "bin", "vite.js");
 
 async function serve() {
+  if (!existsSync(VITE_BIN)) {
+    throw new Error(`vite is not installed at ${VITE_BIN} — run \`npm install\` first`);
+  }
   const child = spawn(
-    NPX,
-    ["vite", "preview", "--port", String(PORT), "--strictPort", "--host", "127.0.0.1"],
+    process.execPath,
+    [VITE_BIN, "preview", "--port", String(PORT), "--strictPort", "--host", "127.0.0.1"],
     { cwd: REPO, stdio: "ignore" }
   );
   for (let i = 0; i < 60; i += 1) {
