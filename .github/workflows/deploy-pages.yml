@@ -1,0 +1,123 @@
+name: Deploy to GitHub Pages
+
+# GOATerizer does not build on its own. `vite.config.ts` resolves the
+# `tuninator` import to `../Tuninator/src/index.ts`, and the AudioWorklet asset
+# is copied from `../Tuninator/dist/tuninator-worklet.js` — so this workflow
+# checks out both repositories side by side and builds the library first.
+#
+# The directory name is load-bearing: the library must land at a sibling path
+# literally named `Tuninator`.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment in flight; a newer push supersedes an in-progress one
+# rather than queuing behind it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+  # Which trellos/Tuninator revision to build against. GOATerizer's own state
+  # does not determine the library version it runs on, so this is pinned rather
+  # than left to default-branch drift.
+  #
+  # GOATerizer targets the 0.2 streaming recognizer API (`createRecognizer`, the
+  # `Note` lifecycle, `SourceTimeMs` + `Timebase`), which at time of writing
+  # exists only on the library's `claude/guitar-event-recognizer-refactor-t5g5yr`
+  # branch — `main` is still the 0.1 `createTuninator` surface and GOATerizer
+  # does not compile against it.
+  #
+  # Pinned to a COMMIT, not to that branch name: a feature branch works right up
+  # until its own merge deletes it, and then fails opaquely. A SHA cannot be
+  # deleted and cannot drift. **Move this to `main` once the library's 0.2 work
+  # lands there** — tracking main is the steady state; this pin is the exception
+  # that keeps the deploy building meanwhile. Keep it in step with
+  # `TUNINATOR_REF` in scripts/setup-tuninator.mjs, which serves the same
+  # purpose for local development.
+  LIBRARY_REF: eaf63f4bcd732183844df1550a9e10b6ee9c9fd5
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GOATerizer
+        uses: actions/checkout@v7
+        with:
+          path: GOATerizer
+
+      - name: Checkout trellos/Tuninator (sibling, for the library build)
+        uses: actions/checkout@v7
+        with:
+          repository: trellos/Tuninator
+          ref: ${{ env.LIBRARY_REF }}
+          # Must land as a sibling directory literally named "Tuninator":
+          # vite.config.ts and tsconfig.json both resolve the library through
+          # `path.resolve(here, "..", "Tuninator")`, relative to the GOATerizer
+          # checkout above.
+          path: Tuninator
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build the library
+        # Emits dist/index.js + .d.ts, and the self-contained
+        # dist/tuninator-worklet.js that GOATerizer's vite plugin copies into
+        # public/assets/. Without this the game still loads, but live guitar
+        # input reports `worklet-load-failed`.
+        run: |
+          npm ci
+          npm run build
+        working-directory: Tuninator
+
+      - name: Install GOATerizer dependencies
+        # Resolves the `tuninator: file:../Tuninator` dependency. Imports go
+        # through vite.config.ts's alias to the library's src/, not this
+        # resolved copy, but npm needs a valid package to satisfy the
+        # file: reference.
+        run: npm ci
+        working-directory: GOATerizer
+
+      - name: Test
+        # The rules — transposition, transport, judgment, stars, the climb, the
+        # run shell — are all headless and need no microphone. A red suite must
+        # not reach the published page.
+        run: npm test
+        working-directory: GOATerizer
+
+      - name: Build
+        env:
+          # A Pages project site serves from a subpath. Everything the game
+          # fetches at runtime — the worklet, the scenario art — is built from
+          # `import.meta.env.BASE_URL`, so a wrong base here 404s in production
+          # while working perfectly in local dev.
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+        working-directory: GOATerizer
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: GOATerizer/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
