@@ -688,3 +688,35 @@ When instructions conflict, use this order unless a newer explicit user instruct
 6. old prompts / examples / historical notes
 
 When unsure whether two documents conflict, do not silently merge them. Identify the conflict and use the most recent authoritative source.
+
+# Decision Logging Protocol (Mandatory)
+
+You must track all architectural, technical, and critical project decisions. Every time a significant choice is agreed upon, updated, or abandoned, you must log it immediately.
+
+### 1. Trigger Criteria
+Log a decision if it involves:
+* Choosing a tool, language, or framework over alternatives.
+* Modifying project architecture, folder structures, or workflows.
+* Approving a critical API design or data schema choice.
+* Accepting a specific technical debt or security trade-off.
+
+### 2. File Location & Naming
+* Maintain a centralized file named `DECISION_LOG.md`.
+
+### 3. Required Metadata Structure
+Every logged decision must use this exact schema:
+
+#### [DECISION-ID]: [Short, Descriptive Title]
+* **Date:** YYYY-MM-DD
+* **Status:** [Proposed | Accepted | Rejected | Superseded by ID]
+* **Owner:** [Name/Role]
+* **Context:** What problem are we solving? What constraints exist?
+* **Decision:** What specific path are we taking?
+* **Alternatives Considered:** What else did we look at, and why did we reject it?
+* **Consequences:** What are the positive and negative trade-offs of this choice?
+
+### 4. Agent Execution Flow
+1. **Identify:** Detect when a user conversation or a task output results in a baseline choice.
+2. **Draft:** Propose the log entry to the user before finalizing if the context is ambiguous.
+3. **Write:** Append the new entry to the top of the decision file or create the next sequential ADR markdown file.
+4. **Link:** If this decision supersedes a previous one, immediately update the status of the older decision to "Superseded by [New ID]".
