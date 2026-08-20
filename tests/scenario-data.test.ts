@@ -163,8 +163,11 @@ describe("Rocky Ascent scenario", () => {
     for (const difficulty of LEVELS) {
       expect(scenariosForDifficulty(difficulty)).toContain(ROCKY_ASCENT);
     }
+    // Not "the pool is empty" — Rocky Ascent High now authors 5 and 6, and
+    // this scenario's own boundary is what is under test here. The registry's
+    // pooling across scenarios is covered in scenario-registry.test.ts.
     for (const difficulty of [5, 6, 7]) {
-      expect(scenariosForDifficulty(difficulty)).toHaveLength(0);
+      expect(scenariosForDifficulty(difficulty)).not.toContain(ROCKY_ASCENT);
     }
   });
 

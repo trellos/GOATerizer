@@ -14,7 +14,7 @@ import { rankForStars, GOAT_RANKS } from "../src/game/ranks.js";
 import { DIFFICULTY_SEQUENCE, RunState, RUN_SLOT_COUNT } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import { ClimbMinigame } from "../src/scenario/minigames/climb-minigame.js";
-import { ROCKY_ASCENT } from "../src/scenario/registry.js";
+import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import type { RunKey } from "../src/music/keys.js";
 
 const KEY: RunKey = { tonic: 7, mode: "minor" };
@@ -316,15 +316,20 @@ describe("run shell", () => {
   it("fills only the slots the library actually authors", () => {
     const run = new RunState({ key: KEY, bpm: BPM, random: () => 0 });
     for (const slot of run.slots) {
-      if (slot.difficulty <= 4) expect(slot.scenario?.id).toBe("rocky_ascent");
-      else expect(slot.scenario).toBeNull();
+      const eligibleIds = scenariosForDifficulty(slot.difficulty).map((scenario) => scenario.id);
+      if (eligibleIds.length === 0) {
+        expect(slot.scenario).toBeNull();
+      } else {
+        expect(slot.scenario).not.toBeNull();
+        expect(eligibleIds).toContain(slot.scenario!.id);
+      }
     }
   });
 
   it("ends the run at the first slot nothing authors, as a content limit", () => {
     const run = new RunState({ key: KEY, bpm: BPM, random: () => 0 });
     const pass = (stars: number): AttemptResult => ({
-      scenarioId: "rocky_ascent",
+      scenarioId: run.currentSlot!.scenario!.id,
       difficulty: run.currentSlot!.difficulty,
       stars,
       passed: stars >= 1,
@@ -338,15 +343,17 @@ describe("run shell", () => {
       bestStreak: 1,
     });
 
-    // Slots 0..5 are difficulties 1,2,3,4,2,3 -- all authored, all followed by
-    // another authored slot.
-    for (let i = 0; i < 6; i += 1) expect(run.recordResult(pass(2))).toBeNull();
-    // Passing slot 6 (difficulty 4) lands on slot 7, difficulty 5, which
-    // nothing in the library authors.
+    // DIFFICULTY_SEQUENCE is [1,2,3,4,2,3,4,5,3,4,5,6,4,5,6,7]. With Rocky
+    // Ascent High and Rocky Descent High registered, every difficulty up to 6
+    // is authored by something -- slots 0..14 are all difficulties 1..6, and
+    // only the final slot (difficulty 7) is a real content limit.
+    for (let i = 0; i < 14; i += 1) expect(run.recordResult(pass(2))).toBeNull();
+    // Passing slot 14 (difficulty 6, the last authored slot) lands on slot 15,
+    // difficulty 7, which nothing in the library authors.
     expect(run.recordResult(pass(2))).toBe("content-limit");
     expect(run.over).toBe(true);
-    expect(run.slotsPlayed).toBe(7);
-    expect(run.totalStars).toBe(14);
+    expect(run.slotsPlayed).toBe(15);
+    expect(run.totalStars).toBe(30);
     expect(run.summary.ending).toBe("content-limit");
   });
 

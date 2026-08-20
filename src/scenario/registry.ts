@@ -11,6 +11,9 @@
  */
 
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
+import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
+import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
+import rockyDescentHighJson from "../../docs/scenarios/rocky-descent-high/rocky_descent_high.scenario.json";
 import { loadScenario } from "./load.js";
 import type { ScenarioDefinition } from "./types.js";
 
@@ -30,25 +33,62 @@ function assetUrls(scenarioDir: string, ids: readonly string[]): Record<string, 
   );
 }
 
-const ROCKY_ASCENT_ASSET_IDS = [
-  "bg_rocky_ascent",
-  "goat_rocky_ascent_advance_01",
-  "goat_rocky_ascent_advance_02",
-  "goat_rocky_ascent_advance_03",
-  "goat_rocky_ascent_advance_04",
-  "goat_rocky_ascent_finish",
-  "prop_rocky_ascent_step",
-  "prop_rocky_ascent_goal",
-  "fx_rocky_ascent_dust",
-  "fx_rocky_ascent_tick",
-] as const;
+/**
+ * The ten `ClimbMinigame` asset ids every Rocky-family scenario binds, derived
+ * from the scenario id rather than retyped per scenario: background, four
+ * advance poses, a finish pose, a foothold, a destination, and two effects.
+ * Every Rocky scenario's `assetBindings` follows this exact naming convention,
+ * so generating it once removes a per-scenario chance to typo an id that
+ * `loadScenario` would otherwise only catch at runtime.
+ */
+function climbAssetIds(scenarioId: string): readonly string[] {
+  return [
+    `bg_${scenarioId}`,
+    `goat_${scenarioId}_advance_01`,
+    `goat_${scenarioId}_advance_02`,
+    `goat_${scenarioId}_advance_03`,
+    `goat_${scenarioId}_advance_04`,
+    `goat_${scenarioId}_finish`,
+    `prop_${scenarioId}_step`,
+    `prop_${scenarioId}_goal`,
+    `fx_${scenarioId}_dust`,
+    `fx_${scenarioId}_tick`,
+  ];
+}
 
 export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
   rockyAscentJson,
-  assetUrls("rocky-ascent", ROCKY_ASCENT_ASSET_IDS)
+  assetUrls("rocky-ascent", climbAssetIds("rocky_ascent"))
 );
 
-export const SCENARIOS: readonly ScenarioDefinition[] = [ROCKY_ASCENT];
+/**
+ * A higher-register companion to Rocky Ascent: same route/rhythm shapes as
+ * L1-4, transposed up one octave and relabelled L3-6 (see the scenario file's
+ * `runTransposition` and `difficultyOffsetFromNormalVersion`).
+ */
+export const ROCKY_ASCENT_HIGH: ScenarioDefinition = loadScenario(
+  rockyAscentHighJson,
+  assetUrls("rocky-ascent-high", climbAssetIds("rocky_ascent_high"))
+);
+
+/** The same class, descending: every scale fragment falls from b1 toward 1. */
+export const ROCKY_DESCENT: ScenarioDefinition = loadScenario(
+  rockyDescentJson,
+  assetUrls("rocky-descent", climbAssetIds("rocky_descent"))
+);
+
+/** Rocky Descent's higher-register companion, at L3-6. */
+export const ROCKY_DESCENT_HIGH: ScenarioDefinition = loadScenario(
+  rockyDescentHighJson,
+  assetUrls("rocky-descent-high", climbAssetIds("rocky_descent_high"))
+);
+
+export const SCENARIOS: readonly ScenarioDefinition[] = [
+  ROCKY_ASCENT,
+  ROCKY_ASCENT_HIGH,
+  ROCKY_DESCENT,
+  ROCKY_DESCENT_HIGH,
+];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {
   return SCENARIOS.find((scenario) => scenario.id === id);
