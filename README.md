@@ -49,6 +49,13 @@ pins a library ref, deliberately:
 > the same ref for the same reason. When 0.2 lands on `main`, change it to
 > `main`.
 
+An existing `../Tuninator` is left where it is — you may be working on the
+library — but it is not taken on trust. Setup checks that `src/index.ts` exports
+`createRecognizer`, and if it does not (a checkout on `main` is still 0.1), it
+exits naming the revision it found and how to move it. Without that check the
+wrong ref surfaces much later as a Vite import resolution error that mentions
+neither this script nor refs.
+
 ### Why 0.2 and not `main`
 
 Two things in 0.2 are not conveniences, they are what makes honest rhythm-game
