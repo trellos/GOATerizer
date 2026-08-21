@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
 import {
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
@@ -71,5 +72,44 @@ describe("scenario registry", () => {
 
   it("L7 is a real content limit, not a bug: nothing authors it", () => {
     expect(scenariosForDifficulty(7)).toHaveLength(0);
+  });
+
+  it("authors every target inside the one-octave pitch space", () => {
+    for (const scenario of SCENARIOS) {
+      for (const [difficulty, level] of scenario.levels) {
+        for (const event of level.prompt) {
+          if (!event.degree) continue;
+          const lane = laneIndexOf(event.degree);
+          expect(
+            lane,
+            `${scenario.id} L${difficulty} authors lane ${lane}`
+          ).toBeLessThan(LANE_COUNT);
+          // Band 1 is the octave root and nothing else — a `b3` in a scenario
+          // file would mean the two-octave vocabulary crept back in.
+          if (event.degree.octaveBand === 1) expect(event.degree.degree).toBe(1);
+        }
+      }
+    }
+  });
+
+  it("gives the _high scenarios a different exercise, not a transposed one", () => {
+    // They no longer differ by register — there is only one octave — so their
+    // reason to sit two levels higher is that they sequence the octave rather
+    // than run it straight. If a level ever became a copy of its normal
+    // counterpart, the difficulty ladder would be lying.
+    const tokensOf = (scenario: typeof ROCKY_ASCENT, difficulty: number) =>
+      (scenario.levels.get(difficulty)?.prompt ?? [])
+        .map((event) => (event.degree ? formatDegreeToken(event.degree) : "-"))
+        .join(" ");
+
+    for (const [normal, high] of [
+      [ROCKY_ASCENT, ROCKY_ASCENT_HIGH],
+      [ROCKY_DESCENT, ROCKY_DESCENT_HIGH],
+    ] as const) {
+      for (const difficulty of [3, 4]) {
+        expect(tokensOf(high, difficulty)).not.toBe(tokensOf(normal, difficulty));
+        expect(tokensOf(high, difficulty)).not.toBe("");
+      }
+    }
   });
 });

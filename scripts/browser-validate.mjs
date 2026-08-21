@@ -163,6 +163,14 @@ async function waitForDev(page, label, predicate, timeoutMs = 30000) {
   return last;
 }
 
+/** A canvas's on-screen rectangle, in CSS pixels. */
+async function canvasBox(page, id) {
+  return page.evaluate((canvasId) => {
+    const box = document.getElementById(canvasId)?.getBoundingClientRect();
+    return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
+  }, id);
+}
+
 /** True when the canvas has drawn anything other than its ground colour. */
 async function canvasHasInk(page, id) {
   return page.evaluate((canvasId) => {
@@ -260,6 +268,19 @@ try {
   check("pregame timeline is drawing", (await canvasHasInk(page, "pregame-canvas")) > 40);
   await page.screenshot({ path: path.join(SHOTS, "02-pregame.png") });
 
+  check(
+    "the fingering picker offers more than one place on the neck, with diagrams",
+    await page.evaluate(() => {
+      const options = [...document.querySelectorAll("#pregame-fingerings button")];
+      return options.length >= 2 && options.every((node) => node.querySelector("svg.fret-diagram"));
+    })
+  );
+
+  // Captured here and compared after the run starts: the timeline must be the
+  // same rectangle on both screens, or it jumps under the player at exactly the
+  // moment the notes start counting.
+  const pregameTimelineBox = await canvasBox(page, "pregame-canvas");
+
   await page.click('#pregame-views button[data-view="tab"]');
   await page.waitForTimeout(700);
   await page.screenshot({ path: path.join(SHOTS, "03-pregame-tab.png") });
@@ -283,6 +304,15 @@ try {
   await page.click("#pregame-play");
   await page.waitForTimeout(300);
   check("game screen is shown", await page.isVisible("#scenario-canvas"));
+
+  const gameTimelineBox = await canvasBox(page, "game-canvas");
+  check(
+    "the timeline is the same rectangle in pregame and in the run",
+    ["x", "y", "width", "height"].every(
+      (side) => Math.abs(pregameTimelineBox[side] - gameTimelineBox[side]) < 0.5
+    ),
+    `${JSON.stringify(pregameTimelineBox)} → ${JSON.stringify(gameTimelineBox)}`
+  );
 
   // The registry now holds more than one Rocky-family scenario at L1 (Ascent,
   // Descent), and `scenariosForDifficulty` picks among them at random — so the

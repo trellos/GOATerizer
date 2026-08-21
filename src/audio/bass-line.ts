@@ -12,8 +12,8 @@
  *     whose backing only marks beats 1 and 3 is asking the player to guess;
  *   - beat 1 is the chord root, beat 3 the fifth, beats 2 and 4 a chord tone or
  *     a stepwise approach into the next chord;
- *   - everything an octave below the timeline's lowest lane, so it sits under
- *     the guitar instead of competing with it.
+ *   - everything below the timeline's lowest lane, so it sits under the guitar
+ *     instead of competing with it.
  *
  * Its job is harmonic orientation and ear training (GDD §3.3), not to be
  * interesting. It is not scored.
@@ -67,11 +67,12 @@ function stepDegree(degree: Degree, steps: number): Degree {
  * Degrees more than a sixth above the tonic are voiced *below* it instead — the
  * fifth becomes a fifth down, the leading tone a semitone under the root. That
  * is ordinary bass voice-leading, and it keeps the line inside a compact range
- * (D#1..D3 across all 24 keys) instead of leaping a seventh every time the
+ * (G1..F3 across all 24 keys) instead of leaping a seventh every time the
  * progression touches a high degree.
  *
- * Every note lands strictly below the lowest of the fifteen pitch lanes in
- * every key, so the bass never sits in the guitar's target register.
+ * Every note lands strictly below the lowest of the eight pitch lanes in every
+ * key — the highest a voiced degree can reach is `tonic - 3` — so the bass
+ * never sits in the guitar's target register.
  */
 const VOICE_DOWN_ABOVE_SEMITONES = 9;
 

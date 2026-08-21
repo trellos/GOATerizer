@@ -23,17 +23,11 @@
       "5",
       "6",
       "7",
-      "b1",
-      "b2",
-      "b3",
-      "b4",
-      "b5",
-      "b6",
-      "b7",
-      "c1"
+      "b1"
     ],
     "transposeToRunKey": true,
-    "nonDiatonicTargetsAllowed": false
+    "nonDiatonicTargetsAllowed": false,
+    "note": "One octave, root to root. `b1` is the octave root above `1`; there is no second band."
   },
   "classParameters": {
     "visualSpanMeasures": 4,
@@ -230,25 +224,14 @@
     "Placeholder sources do not need to match perfectly in palette or pixel density; normalize nearest-neighbor scale and color treatment in the prototype.",
     "Do not animate the source strips/GIFs as traditional animation. Extract individual frames and treat them as independent static billboards.",
     "Rocky Ascent remains a precision/progress scene, not a danger scene; even L4 should read as absurd commitment rather than chase/survival.",
-    "One successful note opportunity advances exactly one waypoint."
+    "One successful note opportunity advances exactly one waypoint.",
+    "The exercise is one octave, root to root. Higher levels climb it more times, faster — they do not climb higher."
   ],
   "designerReview": {
     "blockingIssues": [],
-    "resolved": [
-      {
-        "level": 3,
-        "issue": "The supplied durations totalled 12 beats, not 16.",
-        "resolution": "Authored as six quarter notes, a half note on 7, then the eight-note ascending eighth-note phrase b1..c1 played twice. 23 note opportunities, 16 beats."
-      },
-      {
-        "level": 4,
-        "issue": "The supplied durations totalled 8 beats and used an undefined token `8`.",
-        "resolution": "Authored as the full two-octave eighth-note run 1..c1 plus an eighth rest, played twice. 30 note opportunities, 16 beats. No `8` token; the octave root is `b1`."
-      }
-    ],
     "nonBlockingTBD": [
-      "Star thresholds are now authored but PROVISIONAL — see each level's `stars.note`.",
-      "Waypoint coordinates are authored here and regenerable via scripts/author-rocky-ascent.mjs."
+      "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
+      "Phrases and (for Rocky Ascent) waypoint coordinates are regenerable via scripts/author-rocky-scenarios.mjs."
     ]
   },
   "levels": {
@@ -350,7 +333,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b2"
+          "scaleDegree": "1"
         },
         {
           "index": 9,
@@ -360,7 +343,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3"
+          "scaleDegree": "2"
         },
         {
           "index": 10,
@@ -370,7 +353,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4"
+          "scaleDegree": "3"
         },
         {
           "index": 11,
@@ -380,7 +363,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5"
+          "scaleDegree": "4"
         },
         {
           "index": 12,
@@ -390,7 +373,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b6"
+          "scaleDegree": "5"
         },
         {
           "index": 13,
@@ -400,7 +383,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7"
+          "scaleDegree": "6"
         },
         {
           "index": 14,
@@ -410,7 +393,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "c1"
+          "scaleDegree": "7"
         },
         {
           "index": 15,
@@ -648,7 +631,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
+          "scaleDegree": "1"
         },
         {
           "index": 8,
@@ -658,7 +641,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b2"
+          "scaleDegree": "2"
         },
         {
           "index": 9,
@@ -668,7 +651,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b3"
+          "scaleDegree": "3"
         },
         {
           "index": 10,
@@ -678,7 +661,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b4"
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -688,7 +671,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b5"
+          "scaleDegree": "5"
         },
         {
           "index": 12,
@@ -698,7 +681,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6"
+          "scaleDegree": "6"
         },
         {
           "index": 13,
@@ -708,7 +691,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b7"
+          "scaleDegree": "7"
         }
       ],
       "noteOpportunityCount": 14,
@@ -931,7 +914,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
+          "scaleDegree": "1"
         },
         {
           "index": 8,
@@ -941,7 +924,7 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b2"
+          "scaleDegree": "2"
         },
         {
           "index": 9,
@@ -951,7 +934,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3"
+          "scaleDegree": "3"
         },
         {
           "index": 10,
@@ -961,7 +944,7 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b4"
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -971,7 +954,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b5"
+          "scaleDegree": "5"
         },
         {
           "index": 12,
@@ -981,7 +964,7 @@
           "startBeat": 10.5,
           "startMeasure": 3,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b6"
+          "scaleDegree": "6"
         },
         {
           "index": 13,
@@ -991,7 +974,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b7"
+          "scaleDegree": "7"
         },
         {
           "index": 14,
@@ -1001,7 +984,7 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "c1"
+          "scaleDegree": "b1"
         },
         {
           "index": 15,
@@ -1011,7 +994,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
+          "scaleDegree": "1"
         },
         {
           "index": 16,
@@ -1021,7 +1004,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b2"
+          "scaleDegree": "2"
         },
         {
           "index": 17,
@@ -1031,7 +1014,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3"
+          "scaleDegree": "3"
         },
         {
           "index": 18,
@@ -1041,7 +1024,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b4"
+          "scaleDegree": "4"
         },
         {
           "index": 19,
@@ -1051,7 +1034,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b5"
+          "scaleDegree": "5"
         },
         {
           "index": 20,
@@ -1061,7 +1044,7 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b6"
+          "scaleDegree": "6"
         },
         {
           "index": 21,
@@ -1071,7 +1054,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b7"
+          "scaleDegree": "7"
         },
         {
           "index": 22,
@@ -1081,7 +1064,7 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "c1"
+          "scaleDegree": "b1"
         }
       ],
       "noteOpportunityCount": 23,
@@ -1101,7 +1084,7 @@
         "sustainBehavior": "after advancing on a sustained note, hold the current climb pose/position through the note duration",
         "route": {
           "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
-          "character": "steep and exposed; the repeated eighth-note phrase sprints up the top",
+          "character": "steep and exposed; the repeated eighth-note run sprints up the top",
           "startPosition": {
             "x": 0.14,
             "y": 0.93
@@ -1368,7 +1351,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b2"
+          "scaleDegree": "1"
         },
         {
           "index": 9,
@@ -1378,7 +1361,7 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b3"
+          "scaleDegree": "2"
         },
         {
           "index": 10,
@@ -1388,7 +1371,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b4"
+          "scaleDegree": "3"
         },
         {
           "index": 11,
@@ -1398,7 +1381,7 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5"
+          "scaleDegree": "4"
         },
         {
           "index": 12,
@@ -1408,7 +1391,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6"
+          "scaleDegree": "5"
         },
         {
           "index": 13,
@@ -1418,7 +1401,7 @@
           "startBeat": 6.5,
           "startMeasure": 2,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b7"
+          "scaleDegree": "6"
         },
         {
           "index": 14,
@@ -1428,7 +1411,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "c1"
+          "scaleDegree": "7"
         },
         {
           "index": 15,
@@ -1527,7 +1510,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b2"
+          "scaleDegree": "1"
         },
         {
           "index": 25,
@@ -1537,7 +1520,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b3"
+          "scaleDegree": "2"
         },
         {
           "index": 26,
@@ -1547,7 +1530,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b4"
+          "scaleDegree": "3"
         },
         {
           "index": 27,
@@ -1557,7 +1540,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5"
+          "scaleDegree": "4"
         },
         {
           "index": 28,
@@ -1567,7 +1550,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6"
+          "scaleDegree": "5"
         },
         {
           "index": 29,
@@ -1577,7 +1560,7 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b7"
+          "scaleDegree": "6"
         },
         {
           "index": 30,
@@ -1587,7 +1570,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "c1"
+          "scaleDegree": "7"
         },
         {
           "index": 31,

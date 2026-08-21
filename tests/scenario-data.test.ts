@@ -18,6 +18,9 @@ const LEVELS = [1, 2, 3, 4] as const;
 /** difficulty -> note opportunities, from the Rocky Ascent specification. */
 const EXPECTED_OPPORTUNITIES: Record<number, number> = { 1: 15, 2: 14, 3: 23, 4: 30 };
 
+/** The whole authored vocabulary: one octave, root to root. */
+const OCTAVE = ["1", "2", "3", "4", "5", "6", "7", "b1"] as const;
+
 function level(difficulty: number): ScenarioLevelData {
   const data = ROCKY_ASCENT.levels.get(difficulty);
   if (!data) throw new Error(`Rocky Ascent has no level ${difficulty}`);
@@ -72,42 +75,44 @@ describe("Rocky Ascent scenario", () => {
     );
   });
 
-  it("L1 is the plain two-octave quarter-note scale plus a closing rest", () => {
+  it("L1 climbs the octave, restarts, and closes on a rest", () => {
     const tokens = level(1).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
     expect(tokens).toEqual([
+      ...OCTAVE,
       "1", "2", "3", "4", "5", "6", "7",
-      "b1", "b2", "b3", "b4", "b5", "b6", "b7",
-      "c1", "rest",
+      "rest",
     ]);
     expect(level(1).prompt.every((e) => e.duration === "quarter")).toBe(true);
   });
 
-  it("L2 lands half notes on 7 and b7", () => {
+  it("L2 leans on the leading tone at the end of each climb", () => {
     const halves = level(2).prompt.filter((e) => e.duration === "half");
-    expect(halves.map((e) => formatDegreeToken(e.degree!))).toEqual(["7", "b7"]);
+    expect(halves.map((e) => formatDegreeToken(e.degree!))).toEqual(["7", "7"]);
     expect(halves.map((e) => e.startBeat)).toEqual([6, 14]);
   });
 
-  it("L3 repeats the eight-note eighth phrase b1..c1 twice after a half note on 7", () => {
+  it("L3 repeats the eight-note eighth octave twice after a half note on 7", () => {
     const eighths = level(3).prompt.filter((e) => e.duration === "eighth");
     expect(eighths).toHaveLength(16);
-    const phrase = ["b1", "b2", "b3", "b4", "b5", "b6", "b7", "c1"];
-    expect(eighths.map((e) => formatDegreeToken(e.degree!))).toEqual([...phrase, ...phrase]);
+    expect(eighths.map((e) => formatDegreeToken(e.degree!))).toEqual([...OCTAVE, ...OCTAVE]);
     // The eighth run starts on beat 8 -- the second half of the attempt.
     expect(eighths[0]?.startBeat).toBe(8);
   });
 
-  it("L4 is the whole two-octave eighth run plus a rest, played twice", () => {
+  it("L4 is the octave plus a truncated second climb and a rest, played twice", () => {
     const tokens = level(4).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
-    const half = [
-      "1", "2", "3", "4", "5", "6", "7",
-      "b1", "b2", "b3", "b4", "b5", "b6", "b7",
-      "c1", "rest",
-    ];
+    const half = [...OCTAVE, "1", "2", "3", "4", "5", "6", "7", "rest"];
     expect(tokens).toEqual([...half, ...half]);
     expect(level(4).prompt.every((e) => e.duration === "eighth")).toBe(true);
     // Second pass starts exactly halfway through the attempt.
     expect(level(4).prompt[16]?.startBeat).toBe(8);
+  });
+
+  it.each(LEVELS)("L%i stays inside the one-octave vocabulary", (difficulty) => {
+    for (const event of level(difficulty).prompt) {
+      if (!event.degree) continue;
+      expect(OCTAVE).toContain(formatDegreeToken(event.degree));
+    }
   });
 
   it.each(LEVELS)("L%i authors one waypoint per note opportunity", (difficulty) => {

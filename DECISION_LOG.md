@@ -4,6 +4,50 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-015: The pregame and game screens are one geometry, not two layouts
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Pregame was a two-column layout (a control sidebar next to the timeline) and the run was three stacked bands. The timeline the player warmed up on was therefore a different rectangle from the one they played on, and it changed size and aspect at the exact moment notes started counting.
+* **Decision:** Both screens are the same three bands — a fixed-height top bar, a stage, and the timeline — expressed by one shared `.play-screen` grid rule with `grid-template-rows: var(--topbar-height) minmax(0, 58fr) minmax(0, 42fr)`. Everything the player sets up (key, tempo, view mode, fingering, input) lives in the stage, the band the scenario art occupies once the run begins.
+* **Alternatives Considered:** (a) Keeping the two layouts and merely matching the timeline's flex share. Rejected: the shares already matched and the panes still differed, because a flex line's leftover space resolves against whatever else is in it. (b) A flexbox version of the shared three-band layout. Rejected on measurement: it came out 0.5–0.7px apart across viewports, since flex distributes the remainder against each item's own base size; `fr` tracks do the same arithmetic whatever the bands contain. Verified pixel-identical at 1024x640, 1280x800 and 1600x1000, and pinned by a check in `scripts/browser-validate.mjs`.
+* **Consequences:** Positive — the timeline never moves under the player, and the setup controls get the full width the fingering diagrams need. Negative — the top bar's fixed height is a magic number (`--topbar-height`); content taller than it will clip rather than push, which is why it is a token and why both bars keep their contents small.
+
+---
+
+#### DECISION-014: Suggested fingerings are one-octave shapes inside a five-fret window, picked from neck diagrams
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The three-notes-per-string shapes that a two-octave scale needs span up to eight frets — D major wanted the fifth through the ninth fret — so the fretting hand had to travel mid-exercise. The pregame picker also offered them as text chips, which do not answer the question the player is actually asking.
+* **Decision:** `fingeringsForKey` builds one-octave shapes over three adjacent strings in two note-splits (`3 3 2`, "reaching up", and `2 3 3`, the compact box), rooted on the low E, A, D or G string, and offers only those that fit on the neck **and inside a five-fret window**. Each offer renders as a five-fret SVG neck diagram (`src/ui/fingering-diagram.ts`), sorted low position first so the row reads as a map of the neck.
+* **Alternatives Considered:** Keeping a single canonical shape per key. Rejected: the pregame choice exists so the player can pick where to practise, and one shape is not a choice. Which of the two splits is tighter depends on the mode (major favours the box, minor favours reaching up), so both are generated and the five-fret filter decides.
+* **Consequences:** Positive — every one of the 24 keys now offers at least two shapes in genuinely different neck regions (most offer four or five), and none makes the hand move. Negative — up to six diagram cards in the picker; they are small, but a key with many offers is a busier row than a key with two.
+
+---
+
+#### DECISION-013: The `_high` scenarios become sequenced exercises, not transposed ones
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Rocky Ascent High and Rocky Descent High existed for exactly one reason: they were their normal counterparts shifted up an octave, which is what justified their L3–6 difficulty band. Collapsing the timeline to one octave (DECISION-012) removes the second octave and with it their entire reason to exist — folded down, each level would have become a note-for-note copy of a normal-version level sitting two difficulty levels *lower*, which would make the ladder a lie.
+* **Decision:** Keep both scenarios, their art, and their L3–6 band, and give them a different musical axis: they sequence the octave in threes (`1 2 3 | 2 3 4 | 3 4 5 | 4 5 6 | 5 6 7 b1`, and its descending mirror) where the normal versions run it straight. Rhythms, note counts, waypoint routes and star thresholds are unchanged, so only the authored tokens moved.
+* **Alternatives Considered:** (a) Deleting the `_high` scenarios. Rejected: nothing else authors L5 or L6, so every run would hit the content limit at slot 12. (b) Folding their tokens down an octave and leaving them otherwise identical. Rejected: it produces duplicate content at mismatched difficulties, as above. (c) Asking the user first. Judged not worth blocking the other four parts of the request on, since sequencing is the standard next step after straight runs in any scale-practice regimen and the phrase tables are a two-line change in `scripts/author-rocky-scenarios.mjs` if the call is wrong.
+* **Consequences:** Positive — four scenarios stay musically distinct, L1–6 stays covered, and the difficulty ladder means something again; pinned by a registry test that fails if a `_high` level ever becomes a copy of its normal counterpart. Negative — "High" now names the route's position on the mountain rather than the register, which is a small lie in the scenario's *name* that the premise and production notes have to carry.
+
+---
+
+#### DECISION-012: Collapse the timeline to one octave, root to root
+* **Date:** 2026-08-21
+* **Status:** Accepted (supersedes the two-octave pitch space in `GOATerizer_Game_Design.md` §13.1)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The design specified fifteen lanes over two octaves. In play that is too much to hold in your head and answer on a guitar in real time: fifteen lanes are thin enough that the labels had to be set at 11px, and the exercise spans more neck than one hand position covers.
+* **Decision:** The pitch space is eight lanes, one octave root to root. The authored token vocabulary is `1..7` plus `b1` (the octave root); `b2..b7` and `c1` are now `DegreeTokenError`s rather than silently folded notes, so a scenario file written against the old vocabulary fails its validation test instead of transposing an exercise at runtime. Every Rocky-family scenario was re-authored inside the octave, preserving each level's rhythm, note count, route and star thresholds.
+* **Alternatives Considered:** Keeping fifteen lanes and only enlarging the labels. Rejected: the user's objection is about what a player can respond to in real time, not about type size, and the tablature stretch (DECISION-014) has the same root cause.
+* **Consequences:** Positive — rows are nearly twice as tall, so labels scale with them and nothing has to be hidden for being small; one octave is one hand position. `LOWEST_TONIC_MIDI` moves from E2 (40) to A2 (45), documented as provisional tuning: a one-octave span anchored at the open low E pins every key to first position, where only low-E-rooted shapes are reachable, and A2 puts every key where shapes on three strings fit. Negative — the game's register shifts up for every key, so existing high scores were set against a slightly different exercise; and the two-octave scale, which is a real thing guitarists practise, is no longer expressible until a future design adds a second-octave mode.
+
+---
+
 #### DECISION-011: Mock the browser's microphone API, not Tuninator's, for synthetic guitar input
 * **Date:** 2026-08-20
 * **Status:** Accepted

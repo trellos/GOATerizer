@@ -158,9 +158,9 @@ describe("bass line", () => {
       for (const roll of [0, 0.25, 0.5, 0.75, 0.99]) {
         for (const note of generateBassLine(key, () => roll).notes) {
           expect(note.midi).toBeLessThan(lowestLane);
-          // A playable bass register: D1 up to D3, across all 24 keys.
-          expect(note.midi).toBeGreaterThanOrEqual(26);
-          expect(note.midi).toBeLessThanOrEqual(50);
+          // A playable bass register: G1 up to F3, across all 24 keys.
+          expect(note.midi).toBeGreaterThanOrEqual(31);
+          expect(note.midi).toBeLessThanOrEqual(53);
         }
       }
     }

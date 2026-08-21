@@ -743,16 +743,9 @@ Key View prioritizes the relationship of each pitch to the current musical key.
 
 ## 13.1 Pitch Lanes
 
-There are **15 ordered lanes** representing a two-octave diatonic span:
+There are **8 ordered lanes** representing a one-octave diatonic span, root to root:
 
 ```text
-root
-2
-3
-4
-5
-6
-7
 root
 2
 3
@@ -765,9 +758,16 @@ root
 
 Minor keys use their appropriate scale-degree labels, such as `b3`.
 
-The two endpoint roots are two octaves apart.
+The two endpoint roots are one octave apart.
 
-The layout direction on screen may be chosen for readability; the important invariant is an ordered two-octave diatonic pitch space.
+The layout direction on screen may be chosen for readability; the important invariant is an ordered one-octave diatonic pitch space.
+
+> **Revised 2026-08-21.** This was a two-octave, fifteen-lane space. Two octaves
+> is more than a player can hold in their head and answer on a guitar in real
+> time: fifteen thin lanes are hard to read at a glance, and the exercise makes
+> the fretting hand travel. One octave is eight tall lanes, one hand position,
+> and a shape the player can actually internalise. See `DECISION_LOG.md`
+> (DECISION-012) and `src/music/degrees.ts`.
 
 ## 13.2 In-Game Lane Labels
 
@@ -792,7 +792,7 @@ The player can immediately see the note name but is encouraged to internalize it
 
 ## 13.3 Pregame Fingering Labels
 
-During pregame, the same 15 pitch lanes can instead display the selected suggested guitar fingering.
+During pregame, the same 8 pitch lanes can instead display the selected suggested guitar fingering.
 
 Examples:
 
@@ -812,7 +812,7 @@ The notation means:
 
 For example `E3` means low-E string, third fret.
 
-The entire two-octave selected scale shape should be visible so the player can orient physically before starting.
+The entire one-octave selected scale shape should be visible so the player can orient physically before starting.
 
 ## 13.4 Non-Diatonic Notes
 
@@ -859,7 +859,9 @@ A bend should visibly communicate movement toward the destination pitch rather t
 
 ## 14.3 Fingering Selection
 
-During pregame, the player can choose from several suggested two-octave fingerings for the selected key in different fretboard regions.
+During pregame, the player can choose from several suggested one-octave fingerings for the selected key in different fretboard regions.
+
+Each is shown as a five-fret neck diagram, because the choice being made is *where on the neck to practise this* and that is a picture rather than a sentence. Every offered shape fits inside one five-fret hand position; a shape that would make the hand travel is not offered.
 
 The selected fingering determines how target pitches are mapped onto strings and frets in Tablature View.
 
@@ -941,7 +943,7 @@ This selection is fixed for the run in the initial version.
 
 ### Fingering
 
-Choose one suggested two-octave scale fingering from several fretboard regions.
+Choose one suggested one-octave scale fingering from several fretboard regions.
 
 The same selection:
 
@@ -1219,7 +1221,7 @@ The harmonic/rhythmic grammar used to generate the persistent four-measure backi
 
 ## Tablature Wrong-Note Rendering
 
-A bad played pitch that does not map naturally into the selected two-octave fingering must still appear in history. The exact Tablature View presentation remains to be designed.
+A bad played pitch that does not map naturally into the selected one-octave fingering must still appear in history. The exact Tablature View presentation remains to be designed.
 
 ---
 
@@ -1271,4 +1273,4 @@ RESULTS / GAME OVER
 
 # 25. The Player Experience in One Paragraph
 
-The player starts a bass groove, sees a two-octave map of the current key, noodles until their hands and ears understand where they are, then presses Play. Sixteen ridiculous guitar challenges arrive without the beat ever stopping. Notes slide toward the center of the timeline; the player hits them, bends them, mangles them, or misses them. Good energy shoots upward and makes goats climb cliffs, kaiju flatten cities, beer cans explode open, or petty fantasy arguments become apocalyptic. Every minigame asks for at least one star. The exercises become increasingly brutal. The player either dies somewhere in the sequence and is informed that they are a damp defective lamb, or somehow reaches the end and earns the right to call themselves a **GOAT Markhor**.
+The player starts a bass groove, sees a one-octave map of the current key, noodles until their hands and ears understand where they are, then presses Play. Sixteen ridiculous guitar challenges arrive without the beat ever stopping. Notes slide toward the center of the timeline; the player hits them, bends them, mangles them, or misses them. Good energy shoots upward and makes goats climb cliffs, kaiju flatten cities, beer cans explode open, or petty fantasy arguments become apocalyptic. Every minigame asks for at least one star. The exercises become increasingly brutal. The player either dies somewhere in the sequence and is informed that they are a damp defective lamb, or somehow reaches the end and earns the right to call themselves a **GOAT Markhor**.

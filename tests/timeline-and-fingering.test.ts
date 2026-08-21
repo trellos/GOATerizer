@@ -4,7 +4,9 @@ import { generateBassLine } from "../src/audio/bass-line.js";
 import { KEY_WEIGHTS } from "../src/config/key-weighting.js";
 import { TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS } from "../src/config/tuning.js";
 import { resolveTargets } from "../src/game/targets.js";
+import { LANE_COUNT } from "../src/music/degrees.js";
 import {
+  DIAGRAM_FRETS,
   fingeringsForKey,
   formatFretPosition,
   OPEN_STRING_MIDI,
@@ -17,13 +19,24 @@ import { TimelineModel } from "../src/ui/timeline/timeline-model.js";
 const KEY: RunKey = { tonic: 7, mode: "minor" };
 
 describe("fingerings", () => {
-  it("offers at least one playable two-octave shape in every key", () => {
+  it("offers shapes in more than one neck region in every key", () => {
     for (const { key } of KEY_WEIGHTS) {
       const fingerings = fingeringsForKey(key);
-      expect(fingerings.length).toBeGreaterThan(0);
+      // Picking where to practise is only a choice if there is more than one
+      // place to practise — that is what the diagram picker is for.
+      expect(fingerings.length).toBeGreaterThanOrEqual(2);
       for (const fingering of fingerings) {
-        expect(fingering.positions).toHaveLength(15);
+        expect(fingering.positions).toHaveLength(LANE_COUNT);
       }
+      const regions = new Set(fingerings.map((entry) => entry.lowestFret));
+      expect(regions.size).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("orders the offers up the neck", () => {
+    for (const { key } of KEY_WEIGHTS) {
+      const frets = fingeringsForKey(key).map((entry) => entry.lowestFret);
+      expect([...frets].sort((a, b) => a - b)).toEqual(frets);
     }
   });
 
@@ -40,12 +53,34 @@ describe("fingerings", () => {
     }
   });
 
-  it("keeps every shape inside a reachable stretch of neck", () => {
+  it("keeps every shape inside one five-fret hand position", () => {
     for (const { key } of KEY_WEIGHTS) {
       for (const fingering of fingeringsForKey(key)) {
         expect(fingering.lowestFret).toBeGreaterThanOrEqual(0);
-        expect(fingering.highestFret).toBeLessThanOrEqual(17);
-        expect(fingering.highestFret - fingering.lowestFret).toBeLessThanOrEqual(7);
+        expect(fingering.highestFret).toBeLessThanOrEqual(15);
+        // The hand must not travel: the whole octave fits in the window the
+        // pregame diagram draws.
+        expect(fingering.highestFret - fingering.lowestFret).toBeLessThanOrEqual(
+          DIAGRAM_FRETS - 1
+        );
+        // ...and that window is the one the diagram is going to draw.
+        expect(fingering.windowStartFret).toBeLessThanOrEqual(fingering.lowestFret);
+        expect(fingering.highestFret - fingering.windowStartFret).toBeLessThanOrEqual(
+          DIAGRAM_FRETS - 1
+        );
+      }
+    }
+  });
+
+  it("puts both roots on the string the shape is named for", () => {
+    for (const { key } of KEY_WEIGHTS) {
+      for (const fingering of fingeringsForKey(key)) {
+        expect(fingering.positions[0]?.stringIndex).toBe(fingering.rootString);
+        const notes = laneMidiNotes(key);
+        const octave = fingering.positions[LANE_COUNT - 1]!;
+        expect((OPEN_STRING_MIDI[octave.stringIndex] as number) + octave.fret).toBe(
+          (notes[0] as number) + 12
+        );
       }
     }
   });
@@ -156,7 +191,7 @@ describe("timeline model", () => {
 
   it("keeps a wrong played note visible, and off the clean lanes", () => {
     const timeline = model();
-    timeline.addPlayed("p1", 44, 100.4); // G#2 is not in G minor
+    timeline.addPlayed("p1", 56, 100.4); // G#3 is not in G minor
     timeline.markPlayedOutcome("p1", null, true);
 
     const played = timeline.snapshot(100, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS).played;
@@ -170,17 +205,17 @@ describe("timeline model", () => {
 
   it("re-places a played note when the recognizer revises its pitch", () => {
     const timeline = model();
-    timeline.addPlayed("p1", 44, 100);
-    timeline.revisePlayed("p1", 43); // G2, the tonic
+    timeline.addPlayed("p1", 56, 100);
+    timeline.revisePlayed("p1", 55); // G3, the tonic
     const played = timeline.snapshot(100, 2, 2).played[0];
-    expect(played?.midi).toBe(43);
+    expect(played?.midi).toBe(55);
     expect(played?.diatonic).toBe(true);
     expect(played?.lanePosition).toBe(0);
   });
 
   it("re-places played notes when the key is rerolled under them", () => {
     const timeline = model();
-    timeline.addPlayed("p1", 43, 100);
+    timeline.addPlayed("p1", 55, 100);
     expect(timeline.snapshot(100, 2, 2).played[0]?.diatonic).toBe(true);
     // G is not in Db major (Db Eb F Gb Ab Bb C).
     timeline.setKey({ tonic: 1, mode: "major" });
@@ -189,14 +224,14 @@ describe("timeline model", () => {
 
   it("drops played notes once they are well past the left edge", () => {
     const timeline = model();
-    timeline.addPlayed("p1", 43, 100);
+    timeline.addPlayed("p1", 55, 100);
     timeline.prune(103);
     expect(timeline.snapshot(103, 2, 2).played).toHaveLength(0);
   });
 
   it("grows a sounding note until it is released", () => {
     const timeline = model();
-    timeline.addPlayed("p1", 43, 100);
+    timeline.addPlayed("p1", 55, 100);
     expect(timeline.snapshot(100.5, 2, 2).played[0]?.endBeat).toBeNull();
     timeline.endPlayed("p1", 101);
     expect(timeline.snapshot(101, 2, 2).played[0]?.endBeat).toBe(101);

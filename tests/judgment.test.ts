@@ -183,8 +183,8 @@ describe("wrong notes", () => {
 
   it("flags a non-diatonic pitch as wrong and off the clean lanes", () => {
     const harness = makeJudge(levelTargets(1));
-    // G# is not in G minor.
-    harness.play(44, 0.6);
+    // G#3 is not in G minor, and sits between the first two lanes.
+    harness.play(56, 0.6);
     const wrong = harness.events[0];
     expect(wrong?.type).toBe("WrongNote");
     expect(wrong?.type === "WrongNote" && wrong.diatonic).toBe(false);

@@ -37,7 +37,8 @@ import { TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
-import { fingeringsForKey, type Fingering } from "../music/fingering.js";
+import { LANE_COUNT } from "../music/degrees.js";
+import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingering.js";
 import { keyDisplayName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
@@ -45,6 +46,7 @@ import { SCENARIOS } from "../scenario/registry.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
+import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import { TimelineView, type TimelineViewMode } from "../ui/timeline/timeline-view.js";
@@ -233,6 +235,14 @@ export class GameApp {
     this.#refreshFingerings();
   }
 
+  /**
+   * Rebuilds the fingering picker for the current key.
+   *
+   * Each offer is a five-fret neck diagram rather than a line of text: the
+   * choice being made is "where on the neck do I want to practise this", and
+   * that is a picture. The label under it names the root string and the
+   * position so the choice is still readable without the diagram.
+   */
   #refreshFingerings(): void {
     const container = must("pregame-fingerings", HTMLDivElement);
     this.#fingerings = fingeringsForKey(this.#setup.key);
@@ -244,10 +254,20 @@ export class GameApp {
     for (const fingering of this.#fingerings) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "chip";
+      button.className = "fingering-option";
       button.dataset["fingering"] = fingering.id;
       button.dataset["selected"] = String(fingering.id === this.#setup.fingeringId);
-      button.textContent = fingering.label;
+      button.title = fingering.label;
+
+      // Two short lines rather than one long one: which string the root is on,
+      // and where the hand sits. The full description is on the tooltip.
+      const root = document.createElement("span");
+      root.textContent = `root on ${STRING_NAMES[fingering.rootString] ?? "?"}`;
+      const frets = document.createElement("span");
+      frets.className = "fingering-frets";
+      frets.textContent = `frets ${fingering.lowestFret}–${fingering.highestFret}`;
+      button.append(renderFingeringDiagram(fingering), root, frets);
+
       button.addEventListener("click", () => {
         this.#setup.fingeringId = fingering.id;
         for (const other of container.querySelectorAll<HTMLElement>("button")) {
@@ -683,7 +703,13 @@ export class GameApp {
     const nowBeat = this.#transport.beat;
     const from = this.#toOverlay(
       "game-canvas",
-      view.pointFor(energy.lane ?? 7, attempt.runtime.startBeat + energy.beat, nowBeat)
+      // A streak with no lane (a played note off the octave entirely) launches
+      // from the middle of the pitch axis rather than from an edge.
+      view.pointFor(
+        energy.lane ?? (LANE_COUNT - 1) / 2,
+        attempt.runtime.startBeat + energy.beat,
+        nowBeat
+      )
     );
     const to = this.#toOverlay("scenario-canvas", strip.currentPanelTarget);
     if (!from || !to) {

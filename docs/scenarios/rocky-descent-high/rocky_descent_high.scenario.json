@@ -14,7 +14,7 @@
   ],
   "difficultyOffsetFromNormalVersion": 2,
   "normalVersion": "rocky_descent",
-  "scenarioPremise": "A higher-register companion to Rocky Descent. The rhythm and route intensity mirror the normal L1–4 versions, but the musical range is shifted up one octave to b1 through c1 and the authored difficulty labels are shifted to L3–6.",
+  "scenarioPremise": "The harder companion to Rocky Descent, on the same one-octave route. Where the normal version falls straight down the octave, this one sequences it in threes, so the goat steps back up for every three it comes down. Authored difficulty labels are two levels above the normal version: L3–6 instead of L1–4.",
   "runTransposition": {
     "promptRepresentation": "diatonic_scale_degree",
     "degreeVocabulary": [
@@ -25,28 +25,11 @@
       "5",
       "6",
       "7",
-      "b1",
-      "b2",
-      "b3",
-      "b4",
-      "b5",
-      "b6",
-      "b7",
-      "c1"
-    ],
-    "activeDegreeRange": [
-      "b1",
-      "b2",
-      "b3",
-      "b4",
-      "b5",
-      "b6",
-      "b7",
-      "c1"
+      "b1"
     ],
     "transposeToRunKey": true,
     "nonDiatonicTargetsAllowed": false,
-    "note": "High version uses the second octave only: b1..b7 and c1."
+    "note": "One octave, root to root. `b1` is the octave root above `1`; there is no second band."
   },
   "classParameters": {
     "visualSpanMeasures": 4,
@@ -222,17 +205,17 @@
     }
   },
   "productionNotes": [
-    "This is the high-register companion to Rocky Descent.",
-    "Rhythmic structures are identical to the normal version, but pitch content is shifted from 1..b1 to b1..c1.",
+    "This is the hard companion to Rocky Descent, not a transposition of it.",
+    "The pitch content is the same one octave as the normal version; the difficulty comes from sequencing the octave in threes rather than running it straight.",
     "Supported difficulties are exactly two levels above the normal version: L3–6 instead of L1–4.",
     "One successful note opportunity advances exactly one waypoint.",
-    "Placeholder source families may be reused from the normal version; final art can distinguish the high version later."
+    "Placeholder source families may be reused from the normal version; final art can distinguish this version later."
   ],
   "designerReview": {
     "blockingIssues": [],
     "nonBlockingTBD": [
-      "Star thresholds remain provisional using the same 45% / 80% / 100% judgment-point policy.",
-      "Route coordinates should be visually tuned in-game."
+      "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
+      "Phrases and (for Rocky Ascent) waypoint coordinates are regenerable via scripts/author-rocky-scenarios.mjs."
     ]
   },
   "levels": {
@@ -256,8 +239,7 @@
           "startBeat": 0,
           "startMeasure": 1,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
@@ -267,8 +249,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 2,
@@ -278,8 +259,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 3,
@@ -289,8 +269,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "7"
         },
         {
           "index": 4,
@@ -300,8 +279,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "6"
         },
         {
           "index": 5,
@@ -311,8 +289,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "5"
         },
         {
           "index": 6,
@@ -322,8 +299,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "6"
         },
         {
           "index": 7,
@@ -333,8 +309,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "5"
         },
         {
           "index": 8,
@@ -344,8 +319,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "4"
         },
         {
           "index": 9,
@@ -355,8 +329,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "5"
         },
         {
           "index": 10,
@@ -366,8 +339,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -377,8 +349,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "3"
         },
         {
           "index": 12,
@@ -388,8 +359,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 13,
@@ -399,8 +369,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 14,
@@ -410,8 +379,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 15,
@@ -421,15 +389,14 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 16,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "high-register version of Rocky Descent L1; same rhythmic/visual intensity, but assigned to difficulty 3",
+        "routeCharacter": "sequenced descent: the route steps back up every third foothold",
         "steepness": 0.25,
         "footholdScaleRange": [
           1,
@@ -549,17 +516,17 @@
               "rotationDeg": 0
             }
           ],
-          "character": "high-register version of Rocky Descent L1; same rhythmic/visual intensity, but assigned to difficulty 3"
+          "character": "sequenced descent: the route steps back up every third foothold"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 72,
         "star2Threshold": 128,
         "star3Threshold": 160,
         "provisional": true,
-        "note": "PROVISIONAL. Pass=45%, Star2=80%, Star3=100% of all-Perfect maximum (160)."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (160); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -567,7 +534,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "4": {
@@ -590,8 +557,7 @@
           "startBeat": 0,
           "startMeasure": 1,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
@@ -601,8 +567,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 2,
@@ -612,8 +577,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 3,
@@ -623,8 +587,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "5"
         },
         {
           "index": 4,
@@ -634,8 +597,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 5,
@@ -645,8 +607,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 6,
@@ -656,8 +617,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 7,
@@ -667,8 +627,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         },
         {
           "index": 8,
@@ -678,8 +637,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 9,
@@ -689,8 +647,7 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 10,
@@ -700,8 +657,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 11,
@@ -711,8 +667,7 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "7"
         },
         {
           "index": 12,
@@ -722,8 +677,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "6"
         },
         {
           "index": 13,
@@ -733,8 +687,7 @@
           "startBeat": 10.5,
           "startMeasure": 3,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "5"
         },
         {
           "index": 14,
@@ -744,8 +697,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "6"
         },
         {
           "index": 15,
@@ -755,8 +707,7 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "5"
         },
         {
           "index": 16,
@@ -766,8 +717,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "4"
         },
         {
           "index": 17,
@@ -777,8 +727,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "5"
         },
         {
           "index": 18,
@@ -788,8 +737,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "4"
         },
         {
           "index": 19,
@@ -799,8 +747,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "3"
         },
         {
           "index": 20,
@@ -810,8 +757,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 21,
@@ -821,8 +767,7 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 22,
@@ -832,8 +777,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 23,
@@ -843,15 +787,14 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "high-register version of Rocky Descent L2; same rhythmic/visual intensity, but assigned to difficulty 4",
+        "routeCharacter": "one clean descent, then the same face taken again in sequenced threes at double speed",
         "steepness": 0.45,
         "footholdScaleRange": [
           0.9,
@@ -1019,17 +962,17 @@
               "rotationDeg": -2
             }
           ],
-          "character": "high-register version of Rocky Descent L2; same rhythmic/visual intensity, but assigned to difficulty 4"
+          "character": "one clean descent, then the same face taken again in sequenced threes at double speed"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 108,
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. Pass=45%, Star2=80%, Star3=100% of all-Perfect maximum (240)."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1037,7 +980,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "5": {
@@ -1060,8 +1003,7 @@
           "startBeat": 0,
           "startMeasure": 1,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
@@ -1071,8 +1013,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 2,
@@ -1082,8 +1023,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 3,
@@ -1093,8 +1033,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "7"
         },
         {
           "index": 4,
@@ -1104,8 +1043,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "6"
         },
         {
           "index": 5,
@@ -1115,8 +1053,7 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "5"
         },
         {
           "index": 6,
@@ -1126,8 +1063,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 7,
@@ -1137,8 +1073,7 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "5"
         },
         {
           "index": 8,
@@ -1148,8 +1083,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 9,
@@ -1159,8 +1093,7 @@
           "startBeat": 6.5,
           "startMeasure": 2,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "5"
         },
         {
           "index": 10,
@@ -1170,8 +1103,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -1181,8 +1113,7 @@
           "startBeat": 7.5,
           "startMeasure": 2,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "3"
         },
         {
           "index": 12,
@@ -1192,8 +1123,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "4"
         },
         {
           "index": 13,
@@ -1203,8 +1133,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "3"
         },
         {
           "index": 14,
@@ -1214,8 +1143,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "2"
         },
         {
           "index": 15,
@@ -1225,8 +1153,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "1"
         },
         {
           "index": 16,
@@ -1236,8 +1163,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 17,
@@ -1247,8 +1173,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 18,
@@ -1258,8 +1183,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 19,
@@ -1269,8 +1193,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "5"
         },
         {
           "index": 20,
@@ -1280,8 +1203,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 21,
@@ -1291,8 +1213,7 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 22,
@@ -1302,8 +1223,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 23,
@@ -1313,15 +1233,14 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "high-register version of Rocky Descent L3; same rhythmic/visual intensity, but assigned to difficulty 5",
+        "routeCharacter": "sequenced descent with gear changes: deliberate footholds, a sprint, then a clean run out",
         "steepness": 0.7,
         "footholdScaleRange": [
           0.75,
@@ -1489,17 +1408,17 @@
               "rotationDeg": -2
             }
           ],
-          "character": "high-register version of Rocky Descent L3; same rhythmic/visual intensity, but assigned to difficulty 5"
+          "character": "sequenced descent with gear changes: deliberate footholds, a sprint, then a clean run out"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 108,
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. Pass=45%, Star2=80%, Star3=100% of all-Perfect maximum (240)."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1507,7 +1426,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "6": {
@@ -1530,8 +1449,7 @@
           "startBeat": 0,
           "startMeasure": 1,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
@@ -1541,8 +1459,7 @@
           "startBeat": 0.5,
           "startMeasure": 1,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 2,
@@ -1552,8 +1469,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 3,
@@ -1563,8 +1479,7 @@
           "startBeat": 1.5,
           "startMeasure": 1,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "7"
         },
         {
           "index": 4,
@@ -1574,8 +1489,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "6"
         },
         {
           "index": 5,
@@ -1585,8 +1499,7 @@
           "startBeat": 2.5,
           "startMeasure": 1,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "5"
         },
         {
           "index": 6,
@@ -1596,8 +1509,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "6"
         },
         {
           "index": 7,
@@ -1607,8 +1519,7 @@
           "startBeat": 3.5,
           "startMeasure": 1,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "5"
         },
         {
           "index": 8,
@@ -1618,8 +1529,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "4"
         },
         {
           "index": 9,
@@ -1629,8 +1539,7 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "5"
         },
         {
           "index": 10,
@@ -1640,8 +1549,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -1651,8 +1559,7 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "3"
         },
         {
           "index": 12,
@@ -1662,8 +1569,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 13,
@@ -1673,8 +1579,7 @@
           "startBeat": 6.5,
           "startMeasure": 2,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 14,
@@ -1684,8 +1589,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 15,
@@ -1695,8 +1599,7 @@
           "startBeat": 7.5,
           "startMeasure": 2,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         },
         {
           "index": 16,
@@ -1706,8 +1609,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "b1"
         },
         {
           "index": 17,
@@ -1717,8 +1619,7 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "7"
         },
         {
           "index": 18,
@@ -1728,8 +1629,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "6"
         },
         {
           "index": 19,
@@ -1739,8 +1639,7 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "7"
         },
         {
           "index": 20,
@@ -1750,8 +1649,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "6"
         },
         {
           "index": 21,
@@ -1761,8 +1659,7 @@
           "startBeat": 10.5,
           "startMeasure": 3,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "5"
         },
         {
           "index": 22,
@@ -1772,8 +1669,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "6"
         },
         {
           "index": 23,
@@ -1783,8 +1679,7 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "5"
         },
         {
           "index": 24,
@@ -1794,8 +1689,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "c1",
-          "degreeVocabularyIndex": 14
+          "scaleDegree": "4"
         },
         {
           "index": 25,
@@ -1805,8 +1699,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "b7",
-          "degreeVocabularyIndex": 13
+          "scaleDegree": "5"
         },
         {
           "index": 26,
@@ -1816,8 +1709,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "b6",
-          "degreeVocabularyIndex": 12
+          "scaleDegree": "4"
         },
         {
           "index": 27,
@@ -1827,8 +1719,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "b5",
-          "degreeVocabularyIndex": 11
+          "scaleDegree": "3"
         },
         {
           "index": 28,
@@ -1838,8 +1729,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "b4",
-          "degreeVocabularyIndex": 10
+          "scaleDegree": "4"
         },
         {
           "index": 29,
@@ -1849,8 +1739,7 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "b3",
-          "degreeVocabularyIndex": 9
+          "scaleDegree": "3"
         },
         {
           "index": 30,
@@ -1860,8 +1749,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "b2",
-          "degreeVocabularyIndex": 8
+          "scaleDegree": "2"
         },
         {
           "index": 31,
@@ -1871,15 +1759,14 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 32,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "high-register version of Rocky Descent L4; same rhythmic/visual intensity, but assigned to difficulty 6",
+        "routeCharacter": "the sequenced descent twice over, at full speed, on tiny footholds",
         "steepness": 0.95,
         "footholdScaleRange": [
           0.6,
@@ -2095,17 +1982,17 @@
               "rotationDeg": -4
             }
           ],
-          "character": "high-register version of Rocky Descent L4; same rhythmic/visual intensity, but assigned to difficulty 6"
+          "character": "the sequenced descent twice over, at full speed, on tiny footholds"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 144,
         "star2Threshold": 256,
         "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. Pass=45%, Star2=80%, Star3=100% of all-Perfect maximum (320)."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (320); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -2113,7 +2000,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     }
   }

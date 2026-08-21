@@ -6,6 +6,7 @@ import {
   DegreeTokenError,
   formatDegreeToken,
   laneIndexOf,
+  LANE_COUNT,
   laneToDegreeRef,
   parseDegreeToken,
 } from "../src/music/degrees.js";
@@ -31,71 +32,69 @@ const C_MAJOR: RunKey = { tonic: 0, mode: "major" };
 describe("authored octave-band tokens", () => {
   it("reads the band prefix as a band, not as a flat", () => {
     expect(parseDegreeToken("3")).toEqual({ degree: 3, octaveBand: 0 });
-    // The authored `b3` is "third degree, SECOND octave" -- not "flat three".
-    expect(parseDegreeToken("b3")).toEqual({ degree: 3, octaveBand: 1 });
-    expect(parseDegreeToken("c1")).toEqual({ degree: 1, octaveBand: 2 });
+    // The authored `b1` is "first degree, SECOND octave" -- the octave root,
+    // not "flat one".
+    expect(parseDegreeToken("b1")).toEqual({ degree: 1, octaveBand: 1 });
   });
 
   it("round-trips every lane", () => {
-    for (let lane = 0; lane < 15; lane += 1) {
+    for (let lane = 0; lane < LANE_COUNT; lane += 1) {
       const ref = laneToDegreeRef(lane);
       expect(laneIndexOf(ref)).toBe(lane);
       expect(parseDegreeToken(formatDegreeToken(ref))).toEqual(ref);
     }
   });
 
-  it("orders the 15 lanes as 1..7, b1..b7, c1", () => {
+  it("orders the 8 lanes as 1..7, b1", () => {
+    expect(LANE_COUNT).toBe(8);
     expect(ALL_LANES.map(formatDegreeToken)).toEqual([
-      "1", "2", "3", "4", "5", "6", "7",
-      "b1", "b2", "b3", "b4", "b5", "b6", "b7",
-      "c1",
+      "1", "2", "3", "4", "5", "6", "7", "b1",
     ]);
   });
 
   it("rejects tokens it cannot map instead of guessing", () => {
-    for (const bad of ["", "8", "c2", "d1", "b8", "#3", "b", "1b"]) {
+    // `b2`..`b7` and `c1` were the second-octave vocabulary of the retired
+    // two-octave timeline. They must fail loudly rather than fold into the
+    // lower octave, which would silently rewrite an authored exercise.
+    for (const bad of ["", "8", "b2", "b7", "c1", "c2", "d1", "b8", "#3", "b", "1b"]) {
       expect(() => parseDegreeToken(bad)).toThrow(DegreeTokenError);
     }
   });
 });
 
 describe("transposition", () => {
-  it("places the tonic in the octave starting at low E", () => {
+  it("places the tonic in the octave starting at A2", () => {
     for (let tonic = 0; tonic < 12; tonic += 1) {
       const midi = tonicMidi({ tonic: tonic as PitchClassIndex, mode: "major" });
-      expect(midi).toBeGreaterThanOrEqual(40);
-      expect(midi).toBeLessThan(52);
+      expect(midi).toBeGreaterThanOrEqual(45);
+      expect(midi).toBeLessThan(57);
     }
   });
 
-  it("keeps the whole two-octave span inside a guitar's range", () => {
+  it("keeps the whole one-octave span inside a guitar's range", () => {
     for (const { key } of KEY_WEIGHTS) {
       const notes = laneMidiNotes(key);
-      expect(notes[0]).toBeGreaterThanOrEqual(40); // E2, low open string
-      expect(notes[14]).toBeLessThanOrEqual(76); // E5, well inside the neck
+      expect(notes).toHaveLength(8);
+      expect(notes[0]).toBeGreaterThanOrEqual(45); // A2, fifth fret of the low E
+      expect(notes[7]).toBeLessThanOrEqual(68); // G#4, well inside the neck
     }
   });
 
-  it("produces the G natural-minor scale over two octaves", () => {
+  it("produces the G natural-minor scale over one octave", () => {
     expect(laneMidiNotes(G_MINOR).map((m) => midiToName(m, true))).toEqual([
-      "G2", "A2", "Bb2", "C3", "D3", "Eb3", "F3",
-      "G3", "A3", "Bb3", "C4", "D4", "Eb4", "F4",
-      "G4",
+      "G3", "A3", "Bb3", "C4", "D4", "Eb4", "F4", "G4",
     ]);
   });
 
-  it("produces the C major scale over two octaves", () => {
+  it("produces the C major scale over one octave", () => {
     expect(laneMidiNotes(C_MAJOR).map((m) => midiToName(m))).toEqual([
-      "C3", "D3", "E3", "F3", "G3", "A3", "B3",
-      "C4", "D4", "E4", "F4", "G4", "A4", "B4",
-      "C5",
+      "C3", "D3", "E3", "F3", "G3", "A3", "B3", "C4",
     ]);
   });
 
-  it("puts the two endpoint roots exactly two octaves apart in every key", () => {
+  it("puts the two endpoint roots exactly one octave apart in every key", () => {
     for (const { key } of KEY_WEIGHTS) {
       const notes = laneMidiNotes(key);
-      expect(notes[14]! - notes[0]!).toBe(24);
       expect(notes[7]! - notes[0]!).toBe(12);
     }
   });
@@ -114,14 +113,14 @@ describe("transposition", () => {
   });
 
   it("maps played MIDI back to a lane, and off-scale notes to none", () => {
-    expect(laneOfMidi(43, G_MINOR)).toBe(0); // G2
-    expect(laneOfMidi(55, G_MINOR)).toBe(7); // G3
-    expect(laneOfMidi(44, G_MINOR)).toBeNull(); // G#2, non-diatonic
-    expect(laneOfMidi(30, G_MINOR)).toBeNull(); // below the span
+    expect(laneOfMidi(55, G_MINOR)).toBe(0); // G3, the tonic
+    expect(laneOfMidi(67, G_MINOR)).toBe(7); // G4, the octave root
+    expect(laneOfMidi(56, G_MINOR)).toBeNull(); // G#3, non-diatonic
+    expect(laneOfMidi(43, G_MINOR)).toBeNull(); // G2, an octave below the span
   });
 
   it("places a non-diatonic pitch between the lanes it falls between", () => {
-    const position = lanePositionOfMidi(44, G_MINOR); // G#2, between G2 and A2
+    const position = lanePositionOfMidi(56, G_MINOR); // G#3, between G3 and A3
     expect(position).toBeGreaterThan(0);
     expect(position).toBeLessThan(1);
     expect(lanePositionOfMidi(90, G_MINOR)).toBeNull();
@@ -166,12 +165,16 @@ describe("key weighting", () => {
 });
 
 describe("target resolution", () => {
-  it("resolves Rocky Ascent L1 into the ascending two-octave scale of the run key", () => {
+  it("resolves Rocky Ascent L1 into the octave of the run key, then a second climb", () => {
     const level = ROCKY_ASCENT.levels.get(1)!;
     const targets = resolveTargets(level, G_MINOR);
     expect(targets).toHaveLength(15);
-    expect(targets.map((t) => t.midi)).toEqual(laneMidiNotes(G_MINOR));
-    expect(targets.map((t) => t.lane)).toEqual([...Array(15).keys()]);
+    // One full octave, then as much of a second climb as the bar allows.
+    expect(targets.map((t) => t.midi)).toEqual([
+      ...laneMidiNotes(G_MINOR),
+      ...laneMidiNotes(G_MINOR).slice(0, 7),
+    ]);
+    expect(targets.map((t) => t.lane)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6]);
     expect(targets.map((t) => t.startBeat)).toEqual([...Array(15).keys()]);
   });
 

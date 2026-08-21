@@ -4,6 +4,8 @@
  * One key is chosen for a whole run. Every authored scenario prompt is written
  * in {@link ScaleDegreeRef}s and resolved into MIDI here, so the same Rocky
  * Ascent level plays in any of the 24 keys.
+ *
+ * The pitch space is one octave, root to root: eight lanes (`music/degrees.ts`).
  */
 
 import type { Degree, ScaleDegreeRef } from "./degrees.js";
@@ -67,15 +69,22 @@ export function keyId(key: RunKey): string {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The lowest MIDI note the run's tonic may take: E2, the guitar's low open
- * string.
+ * The lowest MIDI note the run's tonic may take: A2, the fifth fret of the low
+ * E string.
  *
- * The tonic is placed in the octave starting there, so the two-octave span
- * `tonic .. tonic+24` lands between E2 (40) and D#5 (75) whatever the key —
- * comfortably inside a standard-tuned guitar in first-to-eighth position, and
- * inside Tuninator's default 70–1400Hz analysis range with room to spare.
+ * PROVISIONAL TUNING. The tonic is placed in the octave starting there, so the
+ * one-octave span `tonic .. tonic+12` lands between A2 (45) and G#4 (68)
+ * whatever the key, and sits inside Tuninator's default 70–1400Hz analysis
+ * range with room at both ends.
+ *
+ * Why not E2, where the two-octave timeline started: a one-octave span is half
+ * as tall, and anchoring it at the open low E pins every key to first position,
+ * where only shapes rooted on the low E string are reachable. Starting at A2
+ * puts every key's octave inside the stretch of neck where shapes rooted on
+ * three different strings all fit, which is what makes the pregame fingering
+ * choice ("where on the neck do I want to practise this") a real choice.
  */
-export const LOWEST_TONIC_MIDI = 40;
+export const LOWEST_TONIC_MIDI = 45;
 
 export function tonicMidi(key: RunKey): number {
   return LOWEST_TONIC_MIDI + mod(key.tonic - (LOWEST_TONIC_MIDI % 12), 12);
@@ -92,7 +101,7 @@ export function degreeToMidi(ref: ScaleDegreeRef, key: RunKey): number {
   return tonicMidi(key) + 12 * ref.octaveBand + step;
 }
 
-/** The 15 lane MIDI notes, low to high. Index === lane index. */
+/** The 8 lane MIDI notes, low to high — root to root. Index === lane index. */
 export function laneMidiNotes(key: RunKey): number[] {
   return ALL_LANES.map((ref) => degreeToMidi(ref, key));
 }
@@ -105,7 +114,7 @@ export function isDiatonic(midi: number, key: RunKey): boolean {
 
 /**
  * The lane a played MIDI note belongs to, or `null` when it is not diatonic or
- * falls outside the two-octave span.
+ * falls outside the one-octave span.
  */
 export function laneOfMidi(midi: number, key: RunKey): number | null {
   const notes = laneMidiNotes(key);

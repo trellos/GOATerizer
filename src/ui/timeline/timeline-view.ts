@@ -2,10 +2,15 @@
  * The timeline canvas — Key View and Tablature View.
  *
  * Both modes render the same {@link TimelineModel}. Only the vertical axis
- * differs: Key View has fifteen diatonic pitch lanes, Tablature View has six
- * string rows. Time, duration, the strike line, judgment colouring and the
- * played-note overlay are shared, so the two views cannot disagree about what
- * happened.
+ * differs: Key View has eight diatonic pitch lanes — one octave, root to root —
+ * and Tablature View has six string rows. Time, duration, the strike line,
+ * judgment colouring and the played-note overlay are shared, so the two views
+ * cannot disagree about what happened.
+ *
+ * Type size is derived from the row height rather than fixed, because the
+ * labels are gameplay information read at a glance while both hands are busy
+ * (`AGENTS.md` §12). Nothing is ever hidden for being small: if a label does
+ * not fit, the row is too short, not the label too long.
  *
  * Horizontal position comes from the transport, every frame:
  *
@@ -23,12 +28,15 @@ import {
 } from "../../config/tuning.js";
 import type { Fingering } from "../../music/fingering.js";
 import { formatFretPosition, OPEN_STRING_MIDI, STRING_NAMES } from "../../music/fingering.js";
-import { laneLabel, type RunKey } from "../../music/keys.js";
+import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
 import { midiToName } from "../../music/pitch.js";
 import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js";
 
 export type TimelineViewMode = "key" | "tab";
+
+/** One monospace stack for every label the timeline draws. */
+const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
 
 const THEME = {
   ground: "#0d1014",
@@ -104,10 +112,39 @@ export class TimelineView {
   /* Geometry                                                            */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Row-label type size.
+   *
+   * Derived from the row height so the labels grow with the timeline instead of
+   * staying at the size that suited fifteen lanes. The floor keeps them legible
+   * on a short viewport; the ceiling stops eight fat rows turning into posters.
+   */
+  get #labelFontPx(): number {
+    return Math.round(Math.max(12, Math.min(22, this.#rowHeight * 0.46)));
+  }
+
+  /** Advance width of the monospace face at the current label size. */
+  get #labelCharPx(): number {
+    return this.#labelFontPx * 0.62;
+  }
+
+  /**
+   * Fret-number type size in Tablature View.
+   *
+   * Larger than a Key View label: in tablature the number *is* the note, so it
+   * carries the same weight a coloured bar does in Key View.
+   */
+  get #tabFontPx(): number {
+    return Math.round(Math.max(14, Math.min(28, this.#rowHeight * 0.48)));
+  }
+
   get #gutterWidth(): number {
-    // Tablature's gutter carries the whole selected shape (`E 6 8 10`), which
-    // is what gives the player a physical reference before the run starts.
-    return this.#mode === "key" ? 74 : 96;
+    // Sized from the widest label each mode actually draws: `b3 (Bb)` in Key
+    // View, and in Tablature the string name plus the whole selected shape
+    // (`A  5  7  9`), which is what gives the player a physical reference
+    // before the run starts.
+    const columns = this.#mode === "key" ? 9 : 12;
+    return Math.min(Math.round(columns * this.#labelCharPx) + 12, Math.round(this.#width * 0.3));
   }
 
   get #playLeft(): number {
@@ -255,7 +292,10 @@ export class TimelineView {
     ctx.stroke();
 
     ctx.textBaseline = "middle";
+    const font = this.#labelFontPx;
     for (let row = 0; row < this.#rowCount; row += 1) {
+      // Centred on the row line, where the notes are, rather than floating in
+      // the space above it.
       const y = this.#rowY(row);
       if (this.#mode === "key") {
         const accent = this.#rowAccent(row);
@@ -265,7 +305,7 @@ export class TimelineView {
           accent === "root" ? THEME.laneTextRoot : accent === "fifth" ? THEME.laneTextFifth : THEME.laneText;
         // Bold marks the root only — it stays the one landmark you can find
         // without reading colour, the fifth is colour-only so it stays secondary.
-        ctx.font = `${accent === "root" ? "600 " : ""}11px ui-monospace, Menlo, Consolas, monospace`;
+        ctx.font = `${accent === "root" ? "700 " : "500 "}${font}px ${MONO}`;
         ctx.textAlign = "left";
         // Scale degree first, note name retained: the player should be able to
         // read the note but is being taught the harmonic role.
@@ -273,20 +313,22 @@ export class TimelineView {
           this.#showFingeringLabels && fingering
             ? `${label.degree.padEnd(2)} ${formatFretPosition(fingering)}`
             : `${label.degree.padEnd(2)} (${label.note})`;
-        ctx.fillText(text, 6, y - this.#rowHeight / 2);
+        ctx.fillText(text, 8, y);
       } else {
         // String name, then every fret of the selected shape on that string —
-        // the two-octave scale laid out the way a hand would find it.
+        // the one-octave scale laid out the way a hand would find it.
         const frets = (this.#fingering?.positions ?? [])
           .filter((position) => position.stringIndex === row)
-          .map((position) => position.fret);
+          .map((position) => String(position.fret));
         ctx.textAlign = "left";
-        ctx.fillStyle = THEME.laneTextRoot;
-        ctx.font = "700 12px ui-monospace, Menlo, Consolas, monospace";
-        ctx.fillText(STRING_NAMES[row] ?? "", 8, y - this.#rowHeight / 2);
+        ctx.fillStyle = frets.length > 0 ? THEME.laneTextRoot : THEME.laneText;
+        ctx.font = `700 ${font}px ${MONO}`;
+        ctx.fillText(STRING_NAMES[row] ?? "", 8, y);
+        // Dimmed, never hidden: a string the shape does not use still has to
+        // read as a string, so the six rows stay countable.
         ctx.fillStyle = THEME.laneText;
-        ctx.font = "11px ui-monospace, Menlo, Consolas, monospace";
-        ctx.fillText(frets.join(" "), 26, y - this.#rowHeight / 2);
+        ctx.font = `600 ${font}px ${MONO}`;
+        ctx.fillText(frets.join(" ") || "·", 8 + this.#labelCharPx * 2.4, y);
       }
     }
   }
@@ -377,17 +419,31 @@ export class TimelineView {
     } else {
       const position = this.#fingering?.positions[note.lane];
       const y = this.#rowY(this.#rowForLane(note.lane));
-      // Tablature: a fret number sitting on its string, with a duration bar so
-      // the rhythm is still readable.
-      ctx.fillStyle = THEME.ground;
-      ctx.fillRect(x - 2, y - height / 2, Math.min(width, 22), height);
-      ctx.globalAlpha = note.outcome === "miss" ? 0.45 : 1;
-      ctx.fillStyle = colour;
-      ctx.font = "700 13px ui-monospace, Menlo, Consolas, monospace";
+      const text = position ? String(position.fret) : "?";
+      // Tablature: a fret number sitting on its string, with the note's
+      // duration drawn along the string line the way a sustain is written. The
+      // number is the target — it is set as large as the row allows and is
+      // never abbreviated away.
+      const size = this.#tabFontPx;
+      ctx.font = `800 ${size}px ${MONO}`;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(position ? String(position.fret) : "?", x, y);
-      ctx.fillRect(x, y + height / 2 - 2, width, 2);
+      const textWidth = ctx.measureText(text).width;
+
+      ctx.globalAlpha = note.outcome === "miss" ? 0.45 : 1;
+      ctx.fillStyle = colour;
+      ctx.fillRect(x, y - 1, width, Math.max(2, this.#rowHeight * 0.07));
+
+      // Knock the duration bar out from behind the digits, so the number reads
+      // as a number rather than a number with a line through it — and so the
+      // row below stays free for the note the player actually played.
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = THEME.ground;
+      ctx.fillRect(x - 3, y - size * 0.62, textWidth + 6, size * 1.24);
+
+      ctx.globalAlpha = note.outcome === "miss" ? 0.45 : 1;
+      ctx.fillStyle = colour;
+      ctx.fillText(text, x, y);
       ctx.globalAlpha = 1;
     }
 
@@ -431,7 +487,7 @@ export class TimelineView {
     } else if (this.#mode === "tab") {
       this.#drawPlayedTab(note, x, width, colour);
     } else {
-      // Off the two-octave span entirely: pinned to the edge it left through,
+      // Off the octave entirely: pinned to the edge it left through,
       // in a colour that says "out of range" rather than vanishing.
       const y = note.midi > 0 && note.lanePosition === null ? this.#edgeYFor(note.midi) : 0;
       ctx.fillStyle = THEME.outOfRange;
@@ -443,25 +499,29 @@ export class TimelineView {
 
   #drawPlayedTab(note: PlayedNote, x: number, width: number, colour: string): void {
     const ctx = this.#ctx;
+    // A shade under the target's size, so the player's own note reads as an
+    // overlay on the target rather than a second, competing target.
+    const size = Math.round(this.#tabFontPx * 0.75);
     const mapped = this.#tabPositionFor(note.midi);
+    ctx.font = `700 ${size}px ${MONO}`;
+    ctx.textAlign = "left";
+
     if (mapped) {
-      const y = this.#rowY(mapped.stringIndex);
+      // Below the string line, where the target's number is centred on it:
+      // two numbers stacked is what makes "you played 7, it wanted 9" legible.
+      const y = this.#rowY(mapped.stringIndex) + this.#rowHeight * 0.36;
       ctx.fillStyle = colour;
-      ctx.font = "600 11px ui-monospace, Menlo, Consolas, monospace";
-      ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(mapped.fret), x, y + this.#rowHeight * 0.32);
-      ctx.fillRect(x, y + this.#rowHeight * 0.32 + 8, width, 2);
+      ctx.fillText(String(mapped.fret), x, y);
+      ctx.fillRect(x, y + size * 0.66, width, 2);
       return;
     }
     // A pitch the chosen shape cannot express still has to appear. It is drawn
     // above the stave with its note name, rather than silently dropped.
     ctx.fillStyle = THEME.wrong;
-    ctx.font = "600 11px ui-monospace, Menlo, Consolas, monospace";
-    ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.fillText(midiToName(note.midi), x, 4);
-    ctx.fillRect(x, 18, Math.max(4, width), 2);
+    ctx.fillText(midiToName(note.midi), x, 3);
+    ctx.fillRect(x, 3 + size * 1.15, Math.max(4, width), 2);
   }
 
   /**
@@ -483,8 +543,11 @@ export class TimelineView {
   }
 
   #edgeYFor(midi: number): number {
-    // Above the top lane or below the bottom one.
-    return midi > 60 ? this.#rowY(this.#rowCount - 1) - this.#rowHeight * 0.4 : this.#height - 4;
+    // Above the top lane or below the bottom one — decided against the key's
+    // own octave, not a fixed pitch, so it stays right in all 24 keys.
+    const notes = laneMidiNotes(this.#key);
+    const above = midi > (notes[notes.length - 1] ?? 0);
+    return above ? this.#rowY(this.#rowCount - 1) - this.#rowHeight * 0.4 : this.#height - 4;
   }
 
   #clipPlayfield(): void {

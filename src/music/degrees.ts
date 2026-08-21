@@ -4,10 +4,10 @@
  * Two different notations use the letter `b` in this project and they mean
  * completely different things. Confusing them silently transposes the game.
  *
- *   1. **Authored octave-band tokens** — the vocabulary Rocky Ascent's
- *      `prompt[]` is written in: `1..7` for the first octave, `b1..b7` for the
- *      second octave, `c1` for the root two octaves up. Here `b` is the *band*
- *      letter, not an accidental. `b3` means "third degree, second octave".
+ *   1. **Authored octave-band tokens** — the vocabulary a scenario's `prompt[]`
+ *      is written in: `1..7` for the octave the run's tonic sits in, and `b1`
+ *      for the root one octave above it. Here `b` is the *band* letter, not an
+ *      accidental. `b1` means "first degree, second octave".
  *
  *   2. **Harmonic degree labels** — what the timeline shows the player:
  *      `1 2 b3 4 5 b6 b7` in a minor key. Here `b` *is* a flat.
@@ -20,12 +20,13 @@
 export type Degree = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 /**
- * Which octave of the two-octave timeline a degree sits in.
+ * Which octave of the timeline a degree sits in.
  *
- * `0` = first octave, `1` = second octave, `2` = the top root only. There is no
- * band 2 for anything but degree 1: the timeline stops at the two-octave root.
+ * `0` = the run key's own octave, `1` = the root above it. The timeline is one
+ * octave root-to-root, so band 1 exists for degree 1 and nothing else: there is
+ * no lane for a second `2`.
  */
-export type OctaveBand = 0 | 1 | 2;
+export type OctaveBand = 0 | 1;
 
 /** One target pitch, independent of key and of how it was written down. */
 export type ScaleDegreeRef = {
@@ -33,13 +34,12 @@ export type ScaleDegreeRef = {
   octaveBand: OctaveBand;
 };
 
-/** The 15 Key View lanes, low to high. Index === lane index. */
-export const LANE_COUNT = 15;
+/** The Key View lanes, low to high: `1 2 3 4 5 6 7 b1`. Index === lane index. */
+export const LANE_COUNT = 8;
 
 const TOKEN_BAND_PREFIX: Readonly<Record<string, OctaveBand>> = {
   "": 0,
   b: 1,
-  c: 2,
 };
 
 export class DegreeTokenError extends Error {
@@ -50,33 +50,34 @@ export class DegreeTokenError extends Error {
 }
 
 /**
- * Parses an authored octave-band token (`"1"`, `"b3"`, `"c1"`) into a
+ * Parses an authored octave-band token (`"1"`, `"7"`, `"b1"`) into a
  * {@link ScaleDegreeRef}.
  *
  * Throws rather than guessing: a scenario file with a typo should fail its
  * validation test, not transpose one note into the wrong octave at runtime.
+ * The tokens `b2..b7` and `c1` were the second-octave vocabulary of the old
+ * two-octave timeline and are now errors, not silently-folded notes.
  */
 export function parseDegreeToken(token: string): ScaleDegreeRef {
-  const match = /^([bc]?)([1-7])$/.exec(token);
-  if (!match) throw new DegreeTokenError(token, "expected /^[bc]?[1-7]$/");
+  const match = /^(b?)([1-7])$/.exec(token);
+  if (!match) throw new DegreeTokenError(token, "expected /^b?[1-7]$/");
 
   const band = TOKEN_BAND_PREFIX[match[1] ?? ""];
   if (band === undefined) throw new DegreeTokenError(token, "unknown octave-band prefix");
 
   const degree = Number(match[2]) as Degree;
-  if (band === 2 && degree !== 1) {
-    throw new DegreeTokenError(token, "the third octave band holds only the root (`c1`)");
+  if (band === 1 && degree !== 1) {
+    throw new DegreeTokenError(token, "the timeline is one octave: band `b` holds only the root");
   }
   return { degree, octaveBand: band };
 }
 
 /** Inverse of {@link parseDegreeToken}. Used by tests and by the debug panel. */
 export function formatDegreeToken(ref: ScaleDegreeRef): string {
-  const prefix = ref.octaveBand === 0 ? "" : ref.octaveBand === 1 ? "b" : "c";
-  return `${prefix}${ref.degree}`;
+  return `${ref.octaveBand === 0 ? "" : "b"}${ref.degree}`;
 }
 
-/** Lane index 0..14, low to high. The Key View's only ordering authority. */
+/** Lane index 0..7, low to high. The Key View's only ordering authority. */
 export function laneIndexOf(ref: ScaleDegreeRef): number {
   return ref.octaveBand * 7 + (ref.degree - 1);
 }

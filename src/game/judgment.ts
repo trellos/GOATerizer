@@ -55,7 +55,7 @@ export type JudgmentEvent =
       atBeat: number;
       /** False when the note is outside the run key entirely. */
       diatonic: boolean;
-      /** Continuous lane coordinate, or null when off the two-octave span. */
+      /** Continuous lane coordinate, or null when off the one-octave span. */
       lanePosition: number | null;
     }
   | { type: "TargetResolved"; target: ResolvedTarget; outcome: JudgmentOutcome }

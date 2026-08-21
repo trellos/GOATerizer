@@ -19,6 +19,8 @@
   --perfect: #ffd34d;
   --bad: #ff5b5b;
   --radius: 6px;
+  /* Fixed, and shared by both play screens — see `.play-screen`. */
+  --topbar-height: 2.6rem;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -102,11 +104,6 @@ button.chip[data-selected="true"] {
   flex-wrap: wrap;
 }
 
-.button-row.column {
-  flex-direction: column;
-  align-items: stretch;
-}
-
 /* -------------------------------------------------------------------------- */
 /* Start                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -181,40 +178,126 @@ button.chip[data-selected="true"] {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pregame                                                                     */
+/* Play screens — pregame and game share one geometry                          */
 /* -------------------------------------------------------------------------- */
 
-.pregame-head {
-  padding: 1rem 1.4rem 0.4rem;
-}
-
-.pregame-head h2 {
-  margin: 0;
-  font-size: 1.1rem;
-  letter-spacing: 0.02em;
-}
-
-.pregame-head .sub {
-  margin: 0.2rem 0 0;
-  color: var(--text-dim);
-  font-size: 0.86rem;
-}
-
-.pregame-body {
-  flex: 1;
+/*
+ * Pregame and game are deliberately the same three bands: a top bar of fixed
+ * height, a stage, and the timeline.
+ *
+ * Grid rather than flex, and one shared rule rather than two: `fr` tracks split
+ * the leftover height by the same arithmetic whatever each screen puts in its
+ * bands, so the timeline pane is the same rectangle to the pixel in pregame and
+ * in the run. With flex it came out half a pixel apart, which is a half pixel of
+ * the timeline moving under the player at exactly the moment the run starts.
+ */
+.play-screen[data-active="true"] {
   display: grid;
-  grid-template-columns: minmax(260px, 22rem) 1fr;
-  gap: 1rem;
-  padding: 1rem 1.4rem 1.4rem;
-  min-height: 0;
+  grid-template-rows: var(--topbar-height) minmax(0, 58fr) minmax(0, 42fr);
+  position: relative;
+  gap: 0.5rem;
+  padding: 0.6rem;
 }
 
-.controls {
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) auto minmax(9rem, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  font-family: var(--mono);
+  overflow: hidden;
+}
+
+.bar-left {
+  display: flex;
+  gap: 0.9rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.bar-right {
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.bar-title {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+/*
+ * The run key is the single standing fact the player has to keep in their head
+ * for sixteen minigames — every prompt on the timeline is a degree of it. It is
+ * set larger and brighter than the score, which changes constantly and can be
+ * glanced at, and it sits in the same place on both play screens.
+ */
+.bar-key {
+  color: var(--accent-strong);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.bar-hint {
+  margin: 0;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stage {
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.timeline-pane {
+  position: relative;
+  min-height: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.timeline-pane canvas,
+.stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Pregame setup — lives in the stage, where the scenario goes                 */
+/* -------------------------------------------------------------------------- */
+
+.setup-stage {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.6rem;
+  padding: 0.7rem;
   overflow-y: auto;
-  padding-right: 0.4rem;
+  background: var(--bg);
+}
+
+.setup-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.6rem;
+}
+
+.setup-stage .primary {
+  align-self: center;
+  min-width: 12rem;
 }
 
 .control-block {
@@ -234,14 +317,9 @@ button.chip[data-selected="true"] {
 
 .readout {
   font-family: var(--mono);
-  font-size: 1.15rem;
-  margin: 0 0 0.5rem;
-}
-
-.readout.small {
   font-size: 0.82rem;
   color: var(--text-dim);
-  margin-bottom: 0.35rem;
+  margin: 0 0 0.35rem;
 }
 
 .note {
@@ -280,59 +358,55 @@ button.chip[data-selected="true"] {
   color: var(--perfect);
 }
 
-.pregame-timeline,
-.game-timeline {
-  position: relative;
-  min-height: 0;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
+/* -------------------------------------------------------------------------- */
+/* Fingering picker                                                            */
+/* -------------------------------------------------------------------------- */
+
+.fingering-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
-.pregame-timeline canvas,
-.game-timeline canvas,
-.scenario-strip canvas {
+/*
+ * A diagram card, not a text chip: the player is choosing a place on the neck,
+ * and a five-fret picture answers that faster than any label can.
+ */
+.fingering-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.35rem 0.45rem 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--text-dim);
+}
+
+.fingering-option[data-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #04161c;
+  font-weight: 700;
+}
+
+.fingering-option .fret-diagram {
   display: block;
-  width: 100%;
-  height: 100%;
+  margin-bottom: 0.15rem;
+}
+
+.fingering-option .fingering-frets {
+  opacity: 0.75;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Game                                                                        */
 /* -------------------------------------------------------------------------- */
 
-#screen-game {
-  position: relative;
-  gap: 0.5rem;
-  padding: 0.6rem;
-}
-
-.hud {
-  display: grid;
-  grid-template-columns: minmax(9rem, 1fr) auto minmax(9rem, 1fr);
-  align-items: center;
-  gap: 0.8rem;
-  font-family: var(--mono);
-}
-
-.hud-left {
-  display: flex;
-  gap: 0.9rem;
-  align-items: baseline;
-}
-
 .hud-stars {
   color: var(--perfect);
   font-weight: 700;
-}
-
-.hud-key {
-  color: var(--text-dim);
-}
-
-.hud-right {
-  text-align: right;
 }
 
 .hud-score {
@@ -374,18 +448,6 @@ button.chip[data-selected="true"] {
 .history-slot[data-state="failed"] {
   border-color: var(--bad);
   color: var(--bad);
-}
-
-.scenario-strip {
-  flex: 1 1 58%;
-  min-height: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.game-timeline {
-  flex: 1 1 42%;
 }
 
 .energy-overlay {
@@ -578,7 +640,7 @@ button.chip[data-selected="true"] {
 /* -------------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
-  .pregame-body {
-    grid-template-columns: 1fr;
+  .bar-hint {
+    display: none;
   }
 }

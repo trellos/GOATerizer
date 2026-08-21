@@ -23,28 +23,11 @@
       "5",
       "6",
       "7",
-      "b1",
-      "b2",
-      "b3",
-      "b4",
-      "b5",
-      "b6",
-      "b7",
-      "c1"
-    ],
-    "activeDegreeRange": [
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-      "7",
       "b1"
     ],
     "transposeToRunKey": true,
     "nonDiatonicTargetsAllowed": false,
-    "note": "This scenario uses one octave only. b1 is the octave root above 1."
+    "note": "One octave, root to root. `b1` is the octave root above `1`; there is no second band."
   },
   "classParameters": {
     "visualSpanMeasures": 4,
@@ -221,18 +204,17 @@
     }
   },
   "productionNotes": [
-    "Rocky Descent intentionally reuses Rocky Ascent's placeholder source families; final art may later distinguish the two.",
-    "The class remains ClimbMinigame because the behavior is ordered progress through authored waypoints; route direction is scenario data.",
-    "Do not animate source strips/GIFs traditionally. Extract individual frames and use them as static billboards.",
-    "One successful note opportunity advances exactly one waypoint downward.",
-    "All four levels use only the single-octave degree range b1 through 1.",
-    "L4 should feel like absurd controlled downhill goat competence, not falling."
+    "Reuse the Rocky Ascent art conventions; only the route direction and framing change.",
+    "Do not animate the source strips/GIFs as traditional animation. Extract individual frames and treat them as independent static billboards.",
+    "Rocky Descent is a control scene, not a falling scene: even L4 should read as absurd deliberate footwork rather than a tumble.",
+    "One successful note opportunity advances exactly one waypoint.",
+    "The exercise is one octave, root to root."
   ],
   "designerReview": {
     "blockingIssues": [],
     "nonBlockingTBD": [
-      "Star thresholds are provisional using the same 45% / 80% / 100% judgment-point policy as Rocky Ascent.",
-      "Route coordinates are reasonable authored placeholders and should be visually tuned in the game."
+      "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
+      "Phrases and (for Rocky Ascent) waypoint coordinates are regenerable via scripts/author-rocky-scenarios.mjs."
     ]
   },
   "levels": {
@@ -250,187 +232,171 @@
           "index": 0,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 0.0,
+          "durationBeats": 1,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 1.0,
+          "durationBeats": 1,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "beatWithinMeasure": 2,
+          "scaleDegree": "7"
         },
         {
           "index": 2,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 2.0,
+          "durationBeats": 1,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 3,
+          "scaleDegree": "6"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 3.0,
+          "durationBeats": 1,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 4.0,
+          "durationBeats": 1,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 1,
+          "scaleDegree": "4"
         },
         {
           "index": 5,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 5.0,
+          "durationBeats": 1,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 6.0,
+          "durationBeats": 1,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 7,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 7.0,
+          "durationBeats": 1,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
         },
         {
           "index": 8,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 8.0,
+          "durationBeats": 1,
+          "startBeat": 8,
           "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 9,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 9.0,
+          "durationBeats": 1,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "beatWithinMeasure": 2,
+          "scaleDegree": "7"
         },
         {
           "index": 10,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 10.0,
+          "durationBeats": 1,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 3,
+          "scaleDegree": "6"
         },
         {
           "index": 11,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 11.0,
+          "durationBeats": 1,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 12.0,
+          "durationBeats": 1,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 1,
+          "scaleDegree": "4"
         },
         {
           "index": 13,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 13.0,
+          "durationBeats": 1,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 14,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 14.0,
+          "durationBeats": 1,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 15,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 15.0,
+          "durationBeats": 1,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 16,
-      "authoredBeatCount": 16.0,
+      "authoredBeatCount": 16,
       "visual": {
         "routeCharacter": "broad, calm downhill boulder staircase",
         "routeDirection": "descending",
         "steepness": 0.25,
         "footholdScaleRange": [
-          1.0,
+          1,
           1.15
         ],
         "exposure": "low",
@@ -455,7 +421,7 @@
             {
               "x": 0.2456,
               "y": 0.2388,
-              "scale": 1.0,
+              "scale": 1,
               "rotationDeg": 0
             },
             {
@@ -485,7 +451,7 @@
             {
               "x": 0.3711,
               "y": 0.4325,
-              "scale": 1.0,
+              "scale": 1,
               "rotationDeg": 0
             },
             {
@@ -515,7 +481,7 @@
             {
               "x": 0.6282,
               "y": 0.6262,
-              "scale": 1.0,
+              "scale": 1,
               "rotationDeg": 0
             },
             {
@@ -545,7 +511,7 @@
             {
               "x": 0.7463,
               "y": 0.82,
-              "scale": 1.0,
+              "scale": 1,
               "rotationDeg": 0
             }
           ]
@@ -553,12 +519,12 @@
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 72,
         "star2Threshold": 128,
         "star3Threshold": 160,
         "provisional": true,
-        "note": "PROVISIONAL. Pass is 45% and two stars 80% of the all-Perfect maximum (160); three stars equals the maximum, so \u2605\u2605\u2605 requires every note opportunity at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (160); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -566,7 +532,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default; streak may still be tracked for debug/general systems."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "2": {
@@ -583,100 +549,91 @@
           "index": 0,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 0.0,
+          "durationBeats": 1,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 1.0,
+          "durationBeats": 1,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "beatWithinMeasure": 2,
+          "scaleDegree": "7"
         },
         {
           "index": 2,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 2.0,
+          "durationBeats": 1,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 3,
+          "scaleDegree": "6"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 3.0,
+          "durationBeats": 1,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 4.0,
+          "durationBeats": 1,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 1,
+          "scaleDegree": "4"
         },
         {
           "index": 5,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 5.0,
+          "durationBeats": 1,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 6.0,
+          "durationBeats": 1,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 7,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 7.0,
+          "durationBeats": 1,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
         },
         {
           "index": 8,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 8.0,
+          "startBeat": 8,
           "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 9,
@@ -686,19 +643,17 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 10,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 11,
@@ -708,19 +663,17 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 13,
@@ -730,19 +683,17 @@
           "startBeat": 10.5,
           "startMeasure": 3,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 14,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 15,
@@ -752,19 +703,17 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         },
         {
           "index": 16,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 17,
@@ -774,19 +723,17 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 19,
@@ -796,19 +743,17 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 20,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 21,
@@ -818,19 +763,17 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 22,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 23,
@@ -840,12 +783,11 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 24,
-      "authoredBeatCount": 16.0,
+      "authoredBeatCount": 16,
       "visual": {
         "routeCharacter": "longer and more obviously descending rocky route",
         "routeDirection": "descending",
@@ -1022,12 +964,12 @@
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 108,
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars equals the maximum, so \u2605\u2605\u2605 requires every note opportunity at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1035,7 +977,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default; streak may still be tracked for debug/general systems."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "3": {
@@ -1052,56 +994,51 @@
           "index": 0,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 0.0,
+          "durationBeats": 1,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 1.0,
+          "durationBeats": 1,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "beatWithinMeasure": 2,
+          "scaleDegree": "7"
         },
         {
           "index": 2,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 2.0,
+          "durationBeats": 1,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 3,
+          "scaleDegree": "6"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 3.0,
+          "durationBeats": 1,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 5,
@@ -1111,19 +1048,17 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 7,
@@ -1133,19 +1068,17 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 8,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 9,
@@ -1155,19 +1088,17 @@
           "startBeat": 6.5,
           "startMeasure": 2,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 10,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 11,
@@ -1177,63 +1108,57 @@
           "startBeat": 7.5,
           "startMeasure": 2,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 8.0,
+          "durationBeats": 1,
+          "startBeat": 8,
           "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 13,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 9.0,
+          "durationBeats": 1,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "beatWithinMeasure": 2,
+          "scaleDegree": "7"
         },
         {
           "index": 14,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 10.0,
+          "durationBeats": 1,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 3,
+          "scaleDegree": "6"
         },
         {
           "index": 15,
           "type": "note",
           "duration": "quarter",
-          "durationBeats": 1.0,
-          "startBeat": 11.0,
+          "durationBeats": 1,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 16,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 17,
@@ -1243,19 +1168,17 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 19,
@@ -1265,19 +1188,17 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 20,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 21,
@@ -1287,19 +1208,17 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 22,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 23,
@@ -1309,19 +1228,18 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 24,
-      "authoredBeatCount": 16.0,
+      "authoredBeatCount": 16,
       "visual": {
         "routeCharacter": "steep exposed descent with tighter boulders and faster lower sections",
         "routeDirection": "descending",
         "steepness": 0.7,
         "footholdScaleRange": [
           0.75,
-          1.0
+          1
         ],
         "exposure": "high",
         "destinationTreatment": "small lower ledge at the bottom of an exposed face",
@@ -1491,12 +1409,12 @@
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 108,
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars equals the maximum, so \u2605\u2605\u2605 requires every note opportunity at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1504,7 +1422,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default; streak may still be tracked for debug/general systems."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "4": {
@@ -1522,11 +1440,10 @@
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 1,
@@ -1536,19 +1453,17 @@
           "startBeat": 0.5,
           "startMeasure": 1,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 2,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 3,
@@ -1558,19 +1473,17 @@
           "startBeat": 1.5,
           "startMeasure": 1,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 5,
@@ -1580,19 +1493,17 @@
           "startBeat": 2.5,
           "startMeasure": 1,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 3.0,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 7,
@@ -1602,19 +1513,17 @@
           "startBeat": 3.5,
           "startMeasure": 1,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         },
         {
           "index": 8,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 9,
@@ -1624,19 +1533,17 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 10,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 11,
@@ -1646,19 +1553,17 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 13,
@@ -1668,19 +1573,17 @@
           "startBeat": 6.5,
           "startMeasure": 2,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 14,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 15,
@@ -1690,19 +1593,17 @@
           "startBeat": 7.5,
           "startMeasure": 2,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         },
         {
           "index": 16,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 8.0,
+          "startBeat": 8,
           "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 17,
@@ -1712,19 +1613,17 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 19,
@@ -1734,19 +1633,17 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 20,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 21,
@@ -1756,19 +1653,17 @@
           "startBeat": 10.5,
           "startMeasure": 3,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 22,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 23,
@@ -1778,19 +1673,17 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         },
         {
           "index": 24,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1",
-          "degreeVocabularyIndex": 7
+          "beatWithinMeasure": 1,
+          "scaleDegree": "b1"
         },
         {
           "index": 25,
@@ -1800,19 +1693,17 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "7",
-          "degreeVocabularyIndex": 6
+          "scaleDegree": "7"
         },
         {
           "index": 26,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "6",
-          "degreeVocabularyIndex": 5
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
         },
         {
           "index": 27,
@@ -1822,19 +1713,17 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "5",
-          "degreeVocabularyIndex": 4
+          "scaleDegree": "5"
         },
         {
           "index": 28,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4",
-          "degreeVocabularyIndex": 3
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 29,
@@ -1844,19 +1733,17 @@
           "startBeat": 14.5,
           "startMeasure": 4,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "3",
-          "degreeVocabularyIndex": 2
+          "scaleDegree": "3"
         },
         {
           "index": 30,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2",
-          "degreeVocabularyIndex": 1
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 31,
@@ -1866,12 +1753,11 @@
           "startBeat": 15.5,
           "startMeasure": 4,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "1",
-          "degreeVocabularyIndex": 0
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 32,
-      "authoredBeatCount": 16.0,
+      "authoredBeatCount": 16,
       "visual": {
         "routeCharacter": "absurd near-vertical goat descent on tiny footholds",
         "routeDirection": "descending",
@@ -2096,12 +1982,12 @@
       },
       "stars": {
         "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds are cumulative and lock once earned.",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 144,
         "star2Threshold": 256,
         "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. Pass is 45% and two stars 80% of the all-Perfect maximum (320); three stars equals the maximum, so \u2605\u2605\u2605 requires every note opportunity at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (320); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -2109,7 +1995,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible by default; streak may still be tracked for debug/general systems."
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     }
   }

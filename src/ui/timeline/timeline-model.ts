@@ -38,7 +38,7 @@ export type PlayedNote = {
   /** Grows while the note sounds; frozen on release. */
   endBeat: number | null;
   midi: number;
-  /** Continuous lane coordinate. Null when outside the two-octave span. */
+  /** Continuous lane coordinate. Null when outside the one-octave span. */
   lanePosition: number | null;
   diatonic: boolean;
   /** Null until this played note is judged, or if it never matched a target. */
@@ -51,7 +51,7 @@ export type BassNoteView = {
   id: string;
   startBeat: number;
   durationBeats: number;
-  /** Lane of the bass note's scale degree in the lower octave. */
+  /** Lane of the bass note's scale degree, drawn on the timeline's octave. */
   lane: number;
   midi: number;
 };

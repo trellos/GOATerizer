@@ -39,20 +39,31 @@
       </section>
 
       <!-- ---------------------------------------------------------------- -->
-      <section class="screen" id="screen-pregame">
-        <header class="pregame-head">
-          <h2>Warm up</h2>
-          <p class="sub">
-            The bass is already playing. Noodle. Watch your guitar land on the
-            timeline. Nothing is scored yet.
+      <!--
+        Pregame and game are the SAME layout: a fixed-height top bar, a stage,
+        and the timeline. The timeline pane is identical in both, so it does not
+        resize when the run starts and the player's eyes do not have to
+        re-learn it. Everything the player sets up lives in the stage — the slot
+        the scenario art occupies once the run begins.
+      -->
+      <section class="screen play-screen" id="screen-pregame">
+        <header class="topbar">
+          <div class="bar-left">
+            <span class="bar-title">Warm up</span>
+            <span class="bar-key" id="pregame-key">—</span>
+          </div>
+          <p class="bar-hint">
+            The bass is already playing. Noodle. Nothing is scored yet.
           </p>
+          <div class="bar-right">
+            <span class="readout" id="pregame-detected">—</span>
+          </div>
         </header>
 
-        <div class="pregame-body">
-          <div class="controls">
+        <div class="stage setup-stage">
+          <div class="setup-row">
             <div class="control-block">
               <h3>Key</h3>
-              <p class="readout" id="pregame-key">—</p>
               <button class="secondary" id="pregame-reroll" type="button">
                 Reroll key + bass line
               </button>
@@ -74,48 +85,48 @@
             </div>
 
             <div class="control-block">
-              <h3>Fingering</h3>
-              <div class="button-row column" id="pregame-fingerings"></div>
-              <p class="note">
-                A physical reference only. Tuninator judges the pitch, not where
-                you fretted it.
-              </p>
-            </div>
-
-            <div class="control-block">
               <h3>Guitar input</h3>
-              <p class="readout small" id="pregame-input-state">Not started.</p>
+              <p class="readout" id="pregame-input-state">Not started.</p>
               <div class="meter" id="pregame-level"><span></span></div>
-              <p class="readout small" id="pregame-detected">—</p>
             </div>
-
-            <button class="primary" id="pregame-play" type="button">Play</button>
           </div>
 
-          <div class="pregame-timeline">
-            <canvas id="pregame-canvas"></canvas>
+          <div class="control-block fingering-block">
+            <h3>Fingering — where on the neck</h3>
+            <div class="fingering-row" id="pregame-fingerings"></div>
+            <p class="note">
+              One octave, root to root, in one hand position. A physical
+              reference only — Tuninator judges the pitch, not where you fretted
+              it.
+            </p>
           </div>
+
+          <button class="primary" id="pregame-play" type="button">Play</button>
+        </div>
+
+        <div class="timeline-pane">
+          <canvas id="pregame-canvas"></canvas>
         </div>
       </section>
 
       <!-- ---------------------------------------------------------------- -->
-      <section class="screen" id="screen-game">
-        <header class="hud">
-          <div class="hud-left">
+      <section class="screen play-screen" id="screen-game">
+        <header class="topbar hud">
+          <div class="bar-left">
             <span class="hud-stars" id="hud-stars">★ 0</span>
-            <span class="hud-key" id="hud-key">—</span>
+            <span class="bar-key" id="hud-key">—</span>
           </div>
           <ol class="history" id="hud-history"></ol>
-          <div class="hud-right">
+          <div class="bar-right">
             <span class="hud-score" id="hud-score">0</span>
           </div>
         </header>
 
-        <div class="scenario-strip">
+        <div class="stage scenario-strip">
           <canvas id="scenario-canvas"></canvas>
         </div>
 
-        <div class="game-timeline">
+        <div class="timeline-pane">
           <canvas id="game-canvas"></canvas>
         </div>
 

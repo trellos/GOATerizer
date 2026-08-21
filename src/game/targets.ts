@@ -20,7 +20,7 @@ export type ResolvedTarget = {
   durationBeats: number;
   duration: NoteDuration;
   degree: ScaleDegreeRef;
-  /** 0..14 in the Key View. */
+  /** 0..7 in the Key View. */
   lane: number;
   midi: number;
 };

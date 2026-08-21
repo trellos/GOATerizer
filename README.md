@@ -88,9 +88,10 @@ npm run validate:browser  # build, serve, drive real Chromium through a whole ru
 npm run art               # regenerate the placeholder pixel art
 ```
 
-`node scripts/author-rocky-ascent.mjs` re-derives the authored scenario JSON
-(prompts, star thresholds, waypoint coordinates) when a designer changes the
-curve parameters at the top of that script.
+`node scripts/author-rocky-scenarios.mjs` re-derives the authored musical
+content of all four Rocky-family scenario files (phrases, star thresholds, and
+Rocky Ascent's waypoint coordinates) when a designer changes the phrase or curve
+tables at the top of that script.
 
 ---
 
@@ -100,8 +101,10 @@ curve parameters at the top of that script.
    the microphone; nothing before it touches a protected API.
 2. **Pregame** is a live sandbox. The bass is already looping, Tuninator is
    already listening, and the timeline shows what you play. Reroll the key,
-   pick a tempo, pick Key View or Tablature View, pick a fingering. None of it
-   stops the beat.
+   pick a tempo, pick Key View or Tablature View, and pick a fingering from the
+   five-fret neck diagrams — that is where on the neck you want to practise this
+   octave. Pregame and the run are the same layout, so the timeline you warm up
+   on is the same rectangle you play on. None of it stops the beat.
 3. **Play** starts the run on the next measure boundary plus a lead-in. Targets
    slide in from the right, cross the strike line on their beat, and leave to
    the left. Hit them and a streak of good energy flies up into the scenario and
@@ -165,6 +168,9 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
   slots hold goats and boulders.
 - **The timeline has one model and two views.** Key View and Tablature View
   render the same `TimelineModel`; there is no second scoring engine.
+- **The pitch space is one octave, root to root.** Eight lanes, authored as
+  `1..7` plus `b1`. Two octaves was more than a player can hold in their head
+  and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).
 - **Timing is derived, never accumulated.** One anchor plus a linear map, so a
   tempo change is exact and a dropped frame moves nothing.
 - **Scenario data drives content.** Adding another `ClimbMinigame` scenario means

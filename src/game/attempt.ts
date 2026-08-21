@@ -32,7 +32,7 @@ export type EnergyEvent = {
   cause: EnergyCause;
   /**
    * Continuous lane coordinate the streak launches from, or null when the
-   * played note fell outside the two-octave span entirely.
+   * played note fell outside the one-octave span entirely.
    */
   lane: number | null;
   /** Attempt-relative beat the judgment happened on. */
