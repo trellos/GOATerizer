@@ -265,6 +265,30 @@ button.chip[data-selected="true"] {
   overflow: hidden;
 }
 
+/*
+ * EXPERIMENT — the overlaid timeline.
+ *
+ * The player has to watch the timeline to know what note is coming, so in the
+ * two-pane layout their eyes never reach the scenario and the whole payoff goes
+ * unseen. Here the scenario fills the play area and the timeline is drawn over
+ * it on a transparent canvas, lanes centred vertically, so one gaze covers both.
+ */
+#screen-game[data-overlay="true"] {
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+}
+
+#screen-game[data-overlay="true"] .stage,
+#screen-game[data-overlay="true"] .timeline-pane {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+#screen-game[data-overlay="true"] .timeline-pane {
+  background: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
 .timeline-pane {
   position: relative;
   min-height: 0;

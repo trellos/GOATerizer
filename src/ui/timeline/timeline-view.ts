@@ -38,6 +38,15 @@ export type TimelineViewMode = "key" | "tab";
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
 
+/**
+ * How much of an overlay canvas the eight lanes occupy, centred vertically.
+ *
+ * The overlay shares its space with the scenario art, so the lanes cannot
+ * simply spread to fill it: they need to be a band the eye can take in at once,
+ * with the goat visible above and below it.
+ */
+const OVERLAY_BAND_FRACTION = 0.5;
+
 const THEME = {
   ground: "#0d1014",
   gutter: "#12161c",
@@ -73,6 +82,8 @@ export class TimelineView {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   #mode: TimelineViewMode = "key";
+  /** Drawn over the scenario rather than in a pane of its own. */
+  #overlay = false;
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
@@ -93,6 +104,17 @@ export class TimelineView {
 
   setMode(mode: TimelineViewMode): void {
     this.#mode = mode;
+  }
+
+  /**
+   * Draw over the scenario instead of beside it.
+   *
+   * The player has to watch the timeline to know what note is coming, so in a
+   * two-pane layout their eyes never reach the scenario and the payoff is
+   * invisible. Overlaid, one gaze covers both.
+   */
+  setOverlay(overlay: boolean): void {
+    this.#overlay = overlay;
   }
 
   setKey(key: RunKey): void {
@@ -187,13 +209,30 @@ export class TimelineView {
     return this.#mode === "key" ? LANE_COUNT : STRING_NAMES.length;
   }
 
+  /** Height of the block of rows. Overlaid, that is a band; otherwise the pane. */
+  get #bandHeight(): number {
+    return this.#overlay
+      ? this.#height * OVERLAY_BAND_FRACTION
+      : this.#height * (this.#rowCount / (this.#rowCount + 1));
+  }
+
+  /** Top of the block of rows. Centred vertically when overlaid. */
+  get #bandTop(): number {
+    return this.#overlay ? (this.#height - this.#bandHeight) / 2 : this.#rowHeight;
+  }
+
   get #rowHeight(): number {
-    return this.#height / (this.#rowCount + 1);
+    return this.#overlay
+      ? (this.#height * OVERLAY_BAND_FRACTION) / this.#rowCount
+      : this.#height / (this.#rowCount + 1);
   }
 
   /** Row 0 is drawn at the bottom: higher pitch reads as higher on screen. */
   #rowY(row: number): number {
-    return this.#height - this.#rowHeight * (row + 1);
+    if (!this.#overlay) return this.#height - this.#rowHeight * (row + 1);
+    // Centred on its own cell, so the band's outer rows sit half a row inside
+    // its edges rather than on them.
+    return this.#bandTop + this.#bandHeight - this.#rowHeight * (row + 0.5);
   }
 
   /**
@@ -216,8 +255,16 @@ export class TimelineView {
   render(model: TimelineModel, nowBeat: number): void {
     this.#resize();
     const ctx = this.#ctx;
-    ctx.fillStyle = THEME.ground;
-    ctx.fillRect(0, 0, this.#width, this.#height);
+    if (this.#overlay) {
+      // The scenario is behind this canvas, so the ground is cleared rather
+      // than painted — but a scrim goes back under the lane band, because a
+      // cyan note on a pale mountain is not a readable note.
+      ctx.clearRect(0, 0, this.#width, this.#height);
+      this.#drawBandScrim();
+    } else {
+      ctx.fillStyle = THEME.ground;
+      ctx.fillRect(0, 0, this.#width, this.#height);
+    }
 
     const snapshot = model.snapshot(nowBeat, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
 
@@ -228,6 +275,32 @@ export class TimelineView {
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
+  }
+
+  /**
+   * The darkened band the lanes sit in, faded out at top and bottom.
+   *
+   * A hard-edged panel would just be the two-pane layout with the art peeking
+   * round it. Fading the edges lets the scenario continue through the overlay,
+   * so the goat is climbing *behind* the notes rather than in a separate box.
+   */
+  #drawBandScrim(): void {
+    const ctx = this.#ctx;
+    const top = this.#bandTop;
+    const height = this.#bandHeight;
+    const fade = Math.min(height * 0.35, this.#rowHeight * 2.2);
+
+    const gradient = ctx.createLinearGradient(0, top - fade, 0, top + height + fade);
+    // Light enough that the route still reads through it. The notes carry
+    // their own contrast (saturated fills with a dark edge); the scrim only has
+    // to stop a pale sky washing out a cyan bar.
+    gradient.addColorStop(0, "rgba(7,10,13,0)");
+    gradient.addColorStop(0.5 - height / (2 * (height + 2 * fade)), "rgba(7,10,13,0.46)");
+    gradient.addColorStop(0.5 + height / (2 * (height + 2 * fade)), "rgba(7,10,13,0.46)");
+    gradient.addColorStop(1, "rgba(7,10,13,0)");
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, top - fade, this.#width, height + fade * 2);
   }
 
   #resize(): void {
@@ -249,6 +322,11 @@ export class TimelineView {
     const ctx = this.#ctx;
     const from = Math.floor(nowBeat - TIMELINE_HISTORY_BEATS);
     const to = Math.ceil(nowBeat + TIMELINE_FUTURE_BEATS);
+    // Overlaid, the grid stops at the band: full-height beat lines would rule
+    // the scenario art into columns.
+    const gridTop = this.#overlay ? this.#bandTop : 0;
+    const gridBottom = this.#overlay ? this.#bandTop + this.#bandHeight : this.#height;
+
     for (let beat = from; beat <= to; beat += 1) {
       const x = this.#x(beat, nowBeat);
       if (x < this.#playLeft) continue;
@@ -256,8 +334,8 @@ export class TimelineView {
       ctx.strokeStyle = isMeasure ? THEME.measureLine : THEME.beatLine;
       ctx.lineWidth = isMeasure ? 2 : 1;
       ctx.beginPath();
-      ctx.moveTo(Math.round(x) + 0.5, 0);
-      ctx.lineTo(Math.round(x) + 0.5, this.#height);
+      ctx.moveTo(Math.round(x) + 0.5, gridTop);
+      ctx.lineTo(Math.round(x) + 0.5, gridBottom);
       ctx.stroke();
     }
   }
@@ -299,12 +377,16 @@ export class TimelineView {
 
   #drawGutter(): void {
     const ctx = this.#ctx;
-    ctx.fillStyle = THEME.gutter;
-    ctx.fillRect(0, 0, this.#gutterWidth, this.#height);
+    // Overlaid, the gutter is a panel over the band only — the labels still
+    // need a solid ground to sit on, but not a column down the whole scene.
+    const top = this.#overlay ? this.#bandTop : 0;
+    const height = this.#overlay ? this.#bandHeight : this.#height;
+    ctx.fillStyle = this.#overlay ? "rgba(11,15,20,0.9)" : THEME.gutter;
+    ctx.fillRect(0, top, this.#gutterWidth, height);
     ctx.strokeStyle = THEME.laneLineRoot;
     ctx.beginPath();
-    ctx.moveTo(this.#gutterWidth + 0.5, 0);
-    ctx.lineTo(this.#gutterWidth + 0.5, this.#height);
+    ctx.moveTo(this.#gutterWidth + 0.5, top);
+    ctx.lineTo(this.#gutterWidth + 0.5, top + height);
     ctx.stroke();
 
     ctx.textBaseline = "middle";
@@ -349,6 +431,13 @@ export class TimelineView {
     }
   }
 
+  /**
+   * The strike line runs the full height even when overlaid.
+   *
+   * It is the one mark that has to be found instantly, and letting it cross the
+   * scenario is what ties the two together: the note reaching it and the goat
+   * taking a step are visibly the same instant.
+   */
   #drawStrikeLine(): void {
     const ctx = this.#ctx;
     const x = Math.round(this.#strikeX) + 0.5;
@@ -356,10 +445,19 @@ export class TimelineView {
     ctx.fillRect(x - 5, 0, 10, this.#height);
     ctx.strokeStyle = THEME.strike;
     ctx.lineWidth = 2;
+    ctx.globalAlpha = this.#overlay ? 0.55 : 1;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, this.#height);
     ctx.stroke();
+    // Solid through the band, ghosted over the art.
+    ctx.globalAlpha = 1;
+    if (this.#overlay) {
+      ctx.beginPath();
+      ctx.moveTo(x, this.#bandTop);
+      ctx.lineTo(x, this.#bandTop + this.#bandHeight);
+      ctx.stroke();
+    }
   }
 
   /* ------------------------------------------------------------------ */

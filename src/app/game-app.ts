@@ -138,6 +138,8 @@ export class GameApp {
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
   #devMode = false;
+  /** EXPERIMENT: draw the run's timeline over the scenario. */
+  #overlayTimeline = true;
   /**
    * Dev-only: forces every slot to one difficulty level. `?dev=1&level=4`.
    *
@@ -156,6 +158,10 @@ export class GameApp {
   async start(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.#devMode = params.get("dev") === "1";
+    // EXPERIMENT (see `styles.css`): the timeline drawn over the scenario
+    // rather than beside it. On by default on this branch; `?overlay=0` gives
+    // the two-pane layout back for an A/B in the same build.
+    this.#overlayTimeline = params.get("overlay") !== "0";
 
     this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
     this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
@@ -169,6 +175,14 @@ export class GameApp {
     if (this.#assets.failed.length > 0) {
       console.warn("[goaterizer] assets failed to load:", this.#assets.failed);
     }
+
+    // The overlay is a run-screen treatment: pregame has no scenario to sit
+    // over, so its timeline stays in a pane of its own.
+    const gameScreen = document.getElementById("screen-game");
+    if (gameScreen instanceof HTMLElement) {
+      gameScreen.dataset["overlay"] = String(this.#overlayTimeline);
+    }
+    this.#gameView?.setOverlay(this.#overlayTimeline);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -310,7 +324,7 @@ export class GameApp {
         const mode = button.dataset["view"] === "tab" ? "tab" : "key";
         this.#setup.viewMode = mode;
         this.#pregameView?.setMode(mode);
-        this.#gameView?.setMode(mode);
+        this.#applyGameViewMode();
         for (const other of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
           other.dataset["selected"] = String(other.dataset["view"] === mode);
         }
@@ -396,7 +410,7 @@ export class GameApp {
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
     this.#pregameView?.setMode(this.#setup.viewMode);
-    this.#gameView?.setMode(this.#setup.viewMode);
+    this.#applyGameViewMode();
     this.#updateKeyReadouts();
 
     await this.#switchProvider(this.#initialInputKind);
@@ -436,6 +450,18 @@ export class GameApp {
    * The key, twice: the chart-style short name to read at a glance, and the
    * long name on the tooltip for anyone who wants it spelled out.
    */
+  /**
+   * The run screen's view mode.
+   *
+   * The overlay is Key View only: tablature's six string rows carry no pitch
+   * contour, so laid over a scenario they read as a grille rather than as a
+   * melody. Pregame still offers both, and turning the overlay off
+   * (`?overlay=0`) restores the choice in the run too.
+   */
+  #applyGameViewMode(): void {
+    this.#gameView?.setMode(this.#overlayTimeline ? "key" : this.#setup.viewMode);
+  }
+
   #updateKeyReadouts(): void {
     const short = keyShortName(this.#setup.key);
     const long = keyDisplayName(this.#setup.key);
