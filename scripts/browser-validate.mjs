@@ -163,6 +163,71 @@ async function waitForDev(page, label, predicate, timeoutMs = 30000) {
   return last;
 }
 
+/**
+ * Replaces `AudioContext.destination` with a tap, so the suite can measure what
+ * the game actually puts out rather than trusting that scheduling a hit means
+ * hearing one.
+ *
+ * Two meters. The full-band peak catches clipping. The second is high-passed at
+ * 800 Hz, because that is roughly where a laptop or phone speaker starts
+ * reproducing: a kick's fundamental is real energy that most players never
+ * hear, and a mix can measure loud while sounding like nothing.
+ */
+const MASTER_TAP = () => {
+  const Real = window.AudioContext;
+  window.AudioContext = class extends Real {
+    constructor(...args) {
+      super(...args);
+      const realDestination = super.destination;
+      const tap = this.createGain();
+      const full = this.createAnalyser();
+      const highpass = this.createBiquadFilter();
+      highpass.type = "highpass";
+      highpass.frequency.value = 800;
+      const small = this.createAnalyser();
+      tap.connect(realDestination);
+      tap.connect(full);
+      tap.connect(highpass);
+      highpass.connect(small);
+      Object.defineProperty(this, "destination", { get: () => tap });
+      window.__masterTap = { full, small };
+    }
+  };
+};
+
+/** Samples the tap for `ms`, returning peak levels and transients per second. */
+async function measureOutput(page, ms) {
+  return page.evaluate(async (windowMs) => {
+    const taps = window.__masterTap;
+    if (!taps) return null;
+    const bufFull = new Float32Array(taps.full.fftSize);
+    const bufSmall = new Float32Array(taps.small.fftSize);
+    const peaks = { full: 0, small: 0 };
+    const series = [];
+    const started = performance.now();
+    while (performance.now() - started < windowMs) {
+      taps.full.getFloatTimeDomainData(bufFull);
+      taps.small.getFloatTimeDomainData(bufSmall);
+      let pf = 0;
+      let ps = 0;
+      for (let i = 0; i < bufFull.length; i += 1) {
+        pf = Math.max(pf, Math.abs(bufFull[i]));
+        ps = Math.max(ps, Math.abs(bufSmall[i]));
+      }
+      peaks.full = Math.max(peaks.full, pf);
+      peaks.small = Math.max(peaks.small, ps);
+      series.push(ps);
+      await new Promise((resolve) => setTimeout(resolve, 16));
+    }
+    const onsets = series.filter((v, i) => i > 0 && v > 0.05 && series[i - 1] <= 0.05).length;
+    return {
+      peakFull: peaks.full,
+      peakAudible: peaks.small,
+      onsetsPerSecond: onsets / (windowMs / 1000),
+    };
+  }, ms);
+}
+
 /** A canvas's on-screen rectangle, in CSS pixels. */
 async function canvasBox(page, id) {
   return page.evaluate((canvasId) => {
@@ -221,6 +286,8 @@ try {
     if (response.status() >= 400) failedRequests.push(`${response.status()} ${response.url()}`);
   });
 
+  await page.addInitScript(MASTER_TAP);
+
   await page.goto(`${BASE}/?dev=1&input=test`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(SHOTS, "01-start.png") });
   check("start screen renders", await page.isVisible("#start-play"));
@@ -267,6 +334,22 @@ try {
 
   check("pregame timeline is drawing", (await canvasHasInk(page, "pregame-canvas")) > 40);
   await page.screenshot({ path: path.join(SHOTS, "02-pregame.png") });
+
+  // The pulse, measured rather than assumed. `onsetsPerSecond` should match the
+  // tempo — 120bpm here after the tempo change above — and the audible-band
+  // peak has to clear a floor, or the beat is only loud on paper.
+  const output = await measureOutput(page, 3000);
+  check("the master output is not clipping", output !== null && output.peakFull < 1, `peak ${output?.peakFull.toFixed(3)}`);
+  check(
+    "the drum pulse is audible on a small speaker, not just in the sub-bass",
+    output !== null && output.peakAudible > 0.25,
+    `peak above 800Hz ${output?.peakAudible.toFixed(3)}`
+  );
+  check(
+    "one transient per beat at the selected tempo",
+    output !== null && Math.abs(output.onsetsPerSecond - 2) < 0.5,
+    `${output?.onsetsPerSecond.toFixed(2)}/s at 120bpm`
+  );
 
   check(
     "the fingering picker offers more than one place on the neck, with diagrams",

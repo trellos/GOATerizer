@@ -42,8 +42,10 @@ export class DrumPlayer {
     this.#context = context;
     this.#transport = transport;
     this.#output = context.createGain();
-    // Subordinate to the guitar, like the bass: this is a pulse, not a part.
-    this.#output.gain.value = 0.5;
+    // Subordinate to the guitar, like the bass — but the pulse is the one thing
+    // the player cannot afford to lose, and at 0.5 it measured 0.14 peak above
+    // 800 Hz, which is where a laptop or phone speaker starts reproducing.
+    this.#output.gain.value = 0.85;
     this.#output.connect(destination);
 
     const frames = Math.floor(context.sampleRate);
@@ -156,17 +158,17 @@ export class DrumPlayer {
     osc.stop(at + 0.32);
     this.#voices.push({ startTime: at, source: osc, gain });
 
-    this.#noiseBurst(at, 0.02, velocity * 0.35, { type: "bandpass", frequency: 1400, Q: 0.8 });
+    this.#noiseBurst(at, 0.02, velocity * 0.5, { type: "bandpass", frequency: 1400, Q: 0.8 });
   }
 
   /** Band-passed noise, wide and short: the backbeat, in the midrange. */
   #snare(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.16, velocity * 0.5, { type: "bandpass", frequency: 1900, Q: 0.55 });
+    this.#noiseBurst(at, 0.16, velocity * 0.7, { type: "bandpass", frequency: 1900, Q: 0.55 });
   }
 
   /** Very short high-passed noise. Marks the eighths without masking anything. */
   #hat(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.045, velocity * 0.22, { type: "highpass", frequency: 7000, Q: 0.7 });
+    this.#noiseBurst(at, 0.045, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
   }
 
   /**

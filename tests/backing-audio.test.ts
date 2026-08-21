@@ -81,12 +81,30 @@ describe("backbeat pattern", () => {
     expect(at(3)).toContain("snare");
   });
 
-  it("is quarter notes and nothing else when no subdivision is signalled", () => {
+  it("sounds nothing between the beats when no subdivision is signalled", () => {
     // The pulse has to be unambiguous. Anything between the beats is a
     // *signal*, so an unsignalled bar must not contain one.
-    expect(BACKBEAT_PATTERN.hits.map((hit) => hit.startBeat).sort((a, b) => a - b)).toEqual([
-      0, 1, 2, 3,
-    ]);
+    const beats = [...new Set(BACKBEAT_PATTERN.hits.map((hit) => hit.startBeat))];
+    expect(beats.sort((a, b) => a - b)).toEqual([0, 1, 2, 3]);
+  });
+
+  it("puts a hat on every beat, so the pulse survives a small speaker", () => {
+    // A kick is mostly sub-bass and a laptop throws that away. Measured on the
+    // real output, dropping the on-beat hat took the peak above 800 Hz — where
+    // small speakers start reproducing — from 0.49 down to 0.14: loud by the
+    // numbers, inaudible in the room.
+    const hats = BACKBEAT_PATTERN.hits
+      .filter((hit) => hit.voice === "hat")
+      .map((hit) => hit.startBeat)
+      .sort((a, b) => a - b);
+    expect(hats).toEqual([0, 1, 2, 3]);
+  });
+
+  it("accents the on-beat hat over the offbeat, so eighths group by ear", () => {
+    const pattern = drumPatternFor(new Set(["eighth"]));
+    const hat = (beat: number) =>
+      pattern.hits.find((hit) => hit.voice === "hat" && hit.startBeat === beat);
+    expect(hat(0)!.velocity).toBeGreaterThan(hat(0.5)!.velocity);
   });
 
   it("keeps every hit inside the loop and at a usable level", () => {
@@ -114,12 +132,12 @@ describe("backbeat pattern", () => {
     }
   });
 
-  it("marks the ands with a hat when eighths are signalled", () => {
+  it("adds the ands to the hat line when eighths are signalled", () => {
     const hats = drumPatternFor(new Set(["eighth"]))
       .hits.filter((hit) => hit.voice === "hat")
       .map((hit) => hit.startBeat)
       .sort((a, b) => a - b);
-    expect(hats).toEqual([0.5, 1.5, 2.5, 3.5]);
+    expect(hats).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]);
   });
 
   it("marks the e and the a — not the and — when sixteenths are signalled", () => {

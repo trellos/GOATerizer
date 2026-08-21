@@ -12,9 +12,11 @@
  *
  * Two jobs, and they are deliberately different voices:
  *
- *   1. **The pulse.** Kick on 1 and 3, snare on 2 and 4 — quarter notes and
- *      nothing else. Unambiguous, and the same in every scenario, so the player
- *      never has to work out where the beat is.
+ *   1. **The pulse.** Kick on 1 and 3, snare on 2 and 4, and a hat on every
+ *      beat with them — quarter notes and nothing else. Unambiguous, and the
+ *      same in every scenario, so the player never has to work out where the
+ *      beat is. The hat is load-bearing rather than decorative: see the note in
+ *      {@link drumPatternFor}.
  *   2. **The grid ahead.** Extra hits marking whatever subdivision the current
  *      and *upcoming* phrases sit on (`game/subdivisions.ts`). A sixteenth run
  *      is unplayable if the first sixteenth is also the first warning, so the
@@ -74,7 +76,15 @@ export function drumPatternFor(subdivisions: SubdivisionSet = NO_SUBDIVISIONS): 
     const onBeat = beat % 2 === 0;
     hits.push({ startBeat: beat, voice: onBeat ? "kick" : "snare", velocity: onBeat ? 1 : 0.9 });
 
+    // ...and a hat on the beat with it. This is not decoration: a kick is
+    // mostly sub-bass and a laptop or phone speaker throws that away, so
+    // without a high transient on every beat the pulse measures loud and
+    // sounds like nothing. The hat is what actually gets heard.
+    hits.push({ startBeat: beat, voice: "hat", velocity: 0.9 });
+
     if (subdivisions.has("eighth")) {
+      // Softer than the on-beat hat, so eighths group into beats by ear
+      // instead of arriving as an undifferentiated tick.
       hits.push({ startBeat: beat + 0.5, voice: SUBDIVISION_VOICE.eighth, velocity: 0.5 });
     }
     if (subdivisions.has("sixteenth")) {
