@@ -19,8 +19,13 @@
   --perfect: #ffd34d;
   --bad: #ff5b5b;
   --radius: 6px;
-  /* Fixed, and shared by both play screens — see `.play-screen`. */
-  --topbar-height: 2.6rem;
+  /*
+   * The top bar's height is fixed and shared by both play screens (see
+   * `.play-screen`), so it is driven by the key rather than the other way
+   * round: the key is the one thing in it that is meant to dominate.
+   */
+  --key-size: 4rem;
+  --topbar-height: 4.4rem;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -237,9 +242,9 @@ button.chip[data-selected="true"] {
  */
 .bar-key {
   color: var(--accent-strong);
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: var(--key-size);
+  font-weight: 800;
+  letter-spacing: -0.03em;
   line-height: 1;
 }
 

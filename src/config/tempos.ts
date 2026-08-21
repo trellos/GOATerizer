@@ -22,7 +22,11 @@ export const TEMPOS: readonly Tempo[] = [
   { id: "markhor-goat", name: "Markhor GOAT", bpm: 140 },
 ];
 
-export const DEFAULT_TEMPO_ID: TempoId = "ibex";
+/**
+ * Billy Goat, 90bpm. Slow enough to read the timeline and find the note, fast
+ * enough that the backing feels like music rather than a metronome.
+ */
+export const DEFAULT_TEMPO_ID: TempoId = "billy-goat";
 
 export function tempoById(id: TempoId): Tempo {
   const tempo = TEMPOS.find((entry) => entry.id === id);

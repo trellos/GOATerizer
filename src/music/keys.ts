@@ -59,6 +59,23 @@ export function keyDisplayName(key: RunKey): string {
   return `${names[key.tonic]} ${key.mode}`;
 }
 
+/**
+ * The chart-style short name: `"Bb"`, `"Bbm"`, `"F#"`, `"F#m"`.
+ *
+ * For the one place the key is read at a glance mid-run. Major is unmarked
+ * because major is the default a musician assumes; minor gets a lowercase `m`,
+ * as it does on any chord chart.
+ *
+ * Spelled by the same flat/sharp convention as everything else
+ * ({@link usesFlats}) rather than forced to sharps. The lanes are already
+ * labelled `Bb` in Bb major, and a header reading `A#` over them would be the
+ * UI disagreeing with itself about what note the player is looking at.
+ */
+export function keyShortName(key: RunKey): string {
+  const names = usesFlats(key) ? FLAT_NAMES : SHARP_NAMES;
+  return `${names[key.tonic]}${key.mode === "minor" ? "m" : ""}`;
+}
+
 /** Stable, spelling-independent id for persistence and tests. */
 export function keyId(key: RunKey): string {
   return `${SHARP_NAMES[key.tonic]}-${key.mode}`;

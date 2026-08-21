@@ -213,6 +213,15 @@ Gameplay targets are diatonic to the run key unless a future scenario explicitly
 
 ## 3.3 Bass Line
 
+> **Percussion, added 2026-08-21.** The design does not specify drums; the
+> implementation adds them because the bass alone did not read as a pulse. The
+> kit plays quarter notes and nothing else by default, and adds one layer per
+> subdivision present in the current *or upcoming* attempt — hats on the ands
+> for eighths, a bright tick for sixteenths, a pitched click for triplets — so a
+> hard rhythm announces itself an attempt before it arrives and keeps being
+> marked while it is played. Provisional tuning; see `DECISION_LOG.md`
+> (DECISION-016) and `src/audio/drum-pattern.ts`.
+
 One four-measure bass line is generated in the selected key during pregame.
 
 That same bass line loops throughout the entire run.
@@ -762,6 +771,8 @@ The two endpoint roots are one octave apart.
 
 The layout direction on screen may be chosen for readability; the important invariant is an ordered one-octave diatonic pitch space.
 
+A note fills its lane — from halfway to the lane above to halfway to the lane below — so a step between adjacent degrees reads as two blocks whose corners meet, and the contour of a phrase is legible as a silhouette before any label is read.
+
 > **Revised 2026-08-21.** This was a two-octave, fifteen-lane space. Two octaves
 > is more than a player can hold in their head and answer on a guitar in real
 > time: fifteen thin lanes are hard to read at a glance, and the exercise makes
@@ -856,6 +867,8 @@ Target notes use conventional tablature-like fret numbers and rhythmic notation 
 - bends / expressive gestures.
 
 A bend should visibly communicate movement toward the destination pitch rather than looking like two unrelated plucks.
+
+Each string row draws a thin string line; a target or played note is a filled bar spanning that row, from halfway to the string above to halfway to the string below, with the fret number set on the bar itself. This is the same bar geometry Key View uses (§13.1), so the two views differ only in what the vertical axis means.
 
 ## 14.3 Fingering Selection
 

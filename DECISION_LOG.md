@@ -4,6 +4,39 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-018: The key is spelled conventionally, not forced to sharps
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The run key needed a short form to be readable at a glance mid-run — `Bbm`, not `Bb minor` — and that raised whether the header should always spell with sharps rather than following each key's conventional accidental.
+* **Decision:** Keep the existing `usesFlats` convention. `keyShortName` gives `Bb`, `Bbm`, `F#`, `F#m`: major unmarked, minor lowercase `m`, spelled the way a chord chart would. The long name (`Bb minor`) moves to the element's tooltip.
+* **Alternatives Considered:** Always sharps. Rejected: the pitch lanes are already labelled by the same convention, so a header reading `A#` above lanes labelled `Bb` would be the UI disagreeing with itself about what note the player is looking at — and the game is explicitly teaching note names alongside degrees (GDD §13.2). A test pins the header's spelling to lane 0's, so the two cannot drift apart.
+* **Consequences:** Positive — one spelling authority for the whole UI, and the short name is what a guitarist already reads on a chart. Negative — enharmonic keys still look unrelated at a glance (`A#m` never appears; it is `Bbm`), which is correct notation but occasionally surprising.
+
+---
+
+#### DECISION-017: Note bars fill their row, in both timeline views
+* **Date:** 2026-08-21
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Targets were drawn at roughly half a row's height, so a step from one scale degree to the next left a visible gutter between the two bars and the shape of a phrase did not read as a contour. Tablature had a different problem and the same cause: it drew a fret number and a thin duration line, so a row's note had no body at all.
+* **Decision:** One bar geometry for both views — `rowHeight - 2`, from halfway to the row above to halfway to the row below, with a 2px corner radius. Adjacent notes' corners meet within a hairline. Tablature draws its fret number *on* that bar (dark ink while it fits, alongside in the note's colour when the bar is too short), and the played-note overlay is an inset bar in both views rather than a second number.
+* **Alternatives Considered:** Bars that touch exactly, with no gap. Rejected: two consecutive notes on adjacent rows would merge into one block, losing the note boundary that the rhythm is read from.
+* **Consequences:** Positive — the phrase's contour is the silhouette, before any label is read, and the two views now differ only in what the vertical axis means. Negative — a sustained wrong note is now a large block rather than a thin line, so mistakes are considerably louder visually; that is arguably correct but it is a real change in emphasis.
+
+---
+
+#### DECISION-016: The drums mark the pulse, and signal the grid one attempt ahead
+* **Date:** 2026-08-21
+* **Status:** Accepted (extends the provisional percussion of `src/audio/drum-pattern.ts`)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The backbeat was a fixed one-measure pattern with eighth-note hats always on. Two problems: the constant eighths blurred the quarter-note pulse the player actually needs to find beat 1, and nothing anywhere told the player that the *next* four measures were sixteenths. By the time the first sixteenth arrives it is far too late to start counting it.
+* **Decision:** Split the kit's two jobs. The pulse is quarter notes only — kick on 1 and 3, snare on 2 and 4, unchanging. Over it, one layer per subdivision present in the current **or next** attempt: hats on the ands for eighths, a bright tick on the `e` and `a` for sixteenths, a pitched woodblock click for triplets. `game/subdivisions.ts` reads the grid off note *positions* rather than duration names, so it stays true for any phrase and works for triplets, which have no `NoteDuration` of their own.
+* **Alternatives Considered:** (a) Signalling only the upcoming attempt. Rejected: the marking would stop at the moment it is most needed. Taking the union of current and next means a grid announced early keeps being marked through the phrase that needs it. (b) One voice at different velocities for all three grids. Rejected: sixteenths and triplets can be signalled in the same bar, and telling them apart is the entire point — they are separated by timbre, not volume.
+* **Consequences:** Positive — the pulse is unambiguous again, and a hard rhythm announces itself a full attempt before it arrives. The triplet channel is implemented and unit-tested but dormant: no shipped scenario authors a triplet, pinned by a test so the first one that does shows up as a deliberate change. Negative — `setPattern` re-schedules the queued tail on every grid change, so the kit restates itself at some attempt transitions; guarded on a set key so it only happens when the grid actually changes.
+
+---
+
 #### DECISION-015: The pregame and game screens are one geometry, not two layouts
 * **Date:** 2026-08-21
 * **Status:** Accepted

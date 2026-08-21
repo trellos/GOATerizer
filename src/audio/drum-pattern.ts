@@ -10,17 +10,31 @@
  * reproduces. Percussion carries the pulse in a register that any speaker can
  * actually produce, which is what a rhythm game needs its backing to do.
  *
+ * Two jobs, and they are deliberately different voices:
+ *
+ *   1. **The pulse.** Kick on 1 and 3, snare on 2 and 4 — quarter notes and
+ *      nothing else. Unambiguous, and the same in every scenario, so the player
+ *      never has to work out where the beat is.
+ *   2. **The grid ahead.** Extra hits marking whatever subdivision the current
+ *      and *upcoming* phrases sit on (`game/subdivisions.ts`). A sixteenth run
+ *      is unplayable if the first sixteenth is also the first warning, so the
+ *      kit starts counting it one attempt early and keeps counting through it.
+ *
+ * Each grid gets its own voice rather than a louder version of the same one,
+ * because sixteenths and triplets can be signalled at the same time and the
+ * whole point is being able to tell them apart by ear.
+ *
  * Per `AGENTS.md` §17 this is tuning data, labelled provisional, not presented
- * as canonical design. It is deliberately the plainest possible backbeat: its
- * job is to mark time unambiguously, not to be interesting. If the design later
- * specifies percussion, this is the file that changes.
+ * as canonical design. If the design later specifies percussion, this is the
+ * file that changes.
  *
  * Pure — no audio, no DOM — so the grid is testable on its own.
  */
 
 import { BEATS_PER_MEASURE } from "../config/tuning.js";
+import { NO_SUBDIVISIONS, type SubdivisionSet } from "../game/subdivisions.js";
 
-export type DrumVoice = "kick" | "snare" | "hat";
+export type DrumVoice = "kick" | "snare" | "hat" | "tick" | "trip";
 
 export type DrumHit = {
   /** Beats from the start of the loop. */
@@ -35,27 +49,48 @@ export type DrumPattern = {
   loopBeats: number;
 };
 
+/** Which voice marks which grid. One timbre each, so two can sound at once. */
+const SUBDIVISION_VOICE = {
+  eighth: "hat",
+  sixteenth: "tick",
+  triplet: "trip",
+} as const;
+
 /**
- * A one-measure backbeat: kick on 1 and 3, snare on 2 and 4, eighth-note hats.
+ * Builds a one-measure pattern: the pulse, plus a layer per signalled grid.
  *
  * One measure rather than the bass's four: the pattern's job is to say where
  * the beat is, and repeating every measure states that more often. Four divides
  * the bass's sixteen exactly, so the two loops never drift out of phase.
  *
- * Hats alternate loud/soft so the eighths group into beats by ear instead of
- * arriving as an undifferentiated tick.
+ * Every layer accents its first hit within the beat, so a subdivision groups
+ * into beats by ear instead of arriving as an undifferentiated tick.
  */
-function buildBackbeat(): DrumPattern {
+export function drumPatternFor(subdivisions: SubdivisionSet = NO_SUBDIVISIONS): DrumPattern {
   const hits: DrumHit[] = [];
 
   for (let beat = 0; beat < BEATS_PER_MEASURE; beat += 1) {
+    // The pulse. Quarter notes, always, whatever is being signalled over it.
     const onBeat = beat % 2 === 0;
     hits.push({ startBeat: beat, voice: onBeat ? "kick" : "snare", velocity: onBeat ? 1 : 0.9 });
-    hits.push({ startBeat: beat, voice: "hat", velocity: 0.75 });
-    hits.push({ startBeat: beat + 0.5, voice: "hat", velocity: 0.45 });
+
+    if (subdivisions.has("eighth")) {
+      hits.push({ startBeat: beat + 0.5, voice: SUBDIVISION_VOICE.eighth, velocity: 0.5 });
+    }
+    if (subdivisions.has("sixteenth")) {
+      // Only the `e` and the `a`: the `and` is already the eighth layer's, and
+      // a sixteenth grid always brings its eighths with it.
+      hits.push({ startBeat: beat + 0.25, voice: SUBDIVISION_VOICE.sixteenth, velocity: 0.34 });
+      hits.push({ startBeat: beat + 0.75, voice: SUBDIVISION_VOICE.sixteenth, velocity: 0.34 });
+    }
+    if (subdivisions.has("triplet")) {
+      hits.push({ startBeat: beat + 1 / 3, voice: SUBDIVISION_VOICE.triplet, velocity: 0.42 });
+      hits.push({ startBeat: beat + 2 / 3, voice: SUBDIVISION_VOICE.triplet, velocity: 0.42 });
+    }
   }
 
   return { hits, loopBeats: BEATS_PER_MEASURE };
 }
 
-export const BACKBEAT_PATTERN: DrumPattern = buildBackbeat();
+/** The pulse on its own: what plays in pregame, and under quarter-note content. */
+export const BACKBEAT_PATTERN: DrumPattern = drumPatternFor();

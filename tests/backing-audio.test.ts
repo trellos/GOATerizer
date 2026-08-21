@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { generateBassLine } from "../src/audio/bass-line.js";
-import { BACKBEAT_PATTERN, type DrumVoice } from "../src/audio/drum-pattern.js";
+import { BACKBEAT_PATTERN, drumPatternFor, type DrumVoice } from "../src/audio/drum-pattern.js";
 import { forEachLoopEvent } from "../src/audio/loop-scheduling.js";
 import { BEATS_PER_MEASURE } from "../src/config/tuning.js";
 import type { RunKey } from "../src/music/keys.js";
@@ -81,26 +81,73 @@ describe("backbeat pattern", () => {
     expect(at(3)).toContain("snare");
   });
 
-  it("marks every eighth with a hat", () => {
-    const hats = BACKBEAT_PATTERN.hits
-      .filter((hit) => hit.voice === "hat")
-      .map((hit) => hit.startBeat)
-      .sort((a, b) => a - b);
-    expect(hats).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5]);
-  });
-
-  it("accents downbeat hats over offbeat ones, so eighths group by ear", () => {
-    const hat = (beat: number) =>
-      BACKBEAT_PATTERN.hits.find((hit) => hit.voice === "hat" && hit.startBeat === beat);
-    expect(hat(0)!.velocity).toBeGreaterThan(hat(0.5)!.velocity);
+  it("is quarter notes and nothing else when no subdivision is signalled", () => {
+    // The pulse has to be unambiguous. Anything between the beats is a
+    // *signal*, so an unsignalled bar must not contain one.
+    expect(BACKBEAT_PATTERN.hits.map((hit) => hit.startBeat).sort((a, b) => a - b)).toEqual([
+      0, 1, 2, 3,
+    ]);
   });
 
   it("keeps every hit inside the loop and at a usable level", () => {
-    for (const hit of BACKBEAT_PATTERN.hits) {
-      expect(hit.startBeat).toBeGreaterThanOrEqual(0);
-      expect(hit.startBeat).toBeLessThan(BACKBEAT_PATTERN.loopBeats);
-      expect(hit.velocity).toBeGreaterThan(0);
-      expect(hit.velocity).toBeLessThanOrEqual(1);
+    for (const pattern of [
+      BACKBEAT_PATTERN,
+      drumPatternFor(new Set(["eighth", "sixteenth", "triplet"])),
+    ]) {
+      for (const hit of pattern.hits) {
+        expect(hit.startBeat).toBeGreaterThanOrEqual(0);
+        expect(hit.startBeat).toBeLessThan(pattern.loopBeats);
+        expect(hit.velocity).toBeGreaterThan(0);
+        expect(hit.velocity).toBeLessThanOrEqual(1);
+      }
     }
+  });
+
+  it("keeps the quarter-note pulse whatever grid is signalled over it", () => {
+    for (const grid of [["eighth"], ["sixteenth"], ["triplet"], ["sixteenth", "triplet"]] as const) {
+      const pattern = drumPatternFor(new Set(grid));
+      const pulse = pattern.hits
+        .filter((hit) => hit.voice === "kick" || hit.voice === "snare")
+        .map((hit) => hit.startBeat)
+        .sort((a, b) => a - b);
+      expect(pulse).toEqual([0, 1, 2, 3]);
+    }
+  });
+
+  it("marks the ands with a hat when eighths are signalled", () => {
+    const hats = drumPatternFor(new Set(["eighth"]))
+      .hits.filter((hit) => hit.voice === "hat")
+      .map((hit) => hit.startBeat)
+      .sort((a, b) => a - b);
+    expect(hats).toEqual([0.5, 1.5, 2.5, 3.5]);
+  });
+
+  it("marks the e and the a — not the and — when sixteenths are signalled", () => {
+    // The `and` belongs to the eighth layer, which a sixteenth grid always
+    // brings with it. Doubling it up would just make it louder, not clearer.
+    const pattern = drumPatternFor(new Set(["eighth", "sixteenth"]));
+    const ticks = pattern.hits
+      .filter((hit) => hit.voice === "tick")
+      .map((hit) => hit.startBeat)
+      .sort((a, b) => a - b);
+    expect(ticks).toEqual([0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.25, 3.75]);
+  });
+
+  it("puts triplets on their own grid and their own voice", () => {
+    const pattern = drumPatternFor(new Set(["triplet"]));
+    const trips = pattern.hits
+      .filter((hit) => hit.voice === "trip")
+      .map((hit) => hit.startBeat)
+      .sort((a, b) => a - b);
+    expect(trips).toHaveLength(8);
+    expect(trips[0]).toBeCloseTo(1 / 3, 9);
+    expect(trips[1]).toBeCloseTo(2 / 3, 9);
+  });
+
+  it("sounds sixteenths and triplets together, without either losing its voice", () => {
+    // They do not share a grid, so the only way to tell them apart is timbre.
+    const pattern = drumPatternFor(new Set(["eighth", "sixteenth", "triplet"]));
+    const voices = new Set(pattern.hits.map((hit) => hit.voice));
+    expect(voices).toEqual(new Set(["kick", "snare", "hat", "tick", "trip"]));
   });
 });

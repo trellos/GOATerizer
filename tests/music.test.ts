@@ -17,6 +17,7 @@ import {
   keyId,
   laneLabel,
   laneMidiNotes,
+  keyShortName,
   laneOfMidi,
   lanePositionOfMidi,
   tonicMidi,
@@ -140,6 +141,22 @@ describe("lane labels", () => {
     expect(keyDisplayName({ tonic: 10, mode: "major" })).toBe("Bb major");
     expect(keyDisplayName({ tonic: 6, mode: "major" })).toBe("F# major");
     expect(keyDisplayName(G_MINOR)).toBe("G minor");
+  });
+
+  it("writes the short name the way a chart does: major unmarked, minor `m`", () => {
+    expect(keyShortName({ tonic: 10, mode: "major" })).toBe("Bb");
+    expect(keyShortName({ tonic: 10, mode: "minor" })).toBe("Bbm");
+    expect(keyShortName({ tonic: 6, mode: "major" })).toBe("F#");
+    expect(keyShortName(G_MINOR)).toBe("Gm");
+  });
+
+  it("spells the short name the same way the lanes do", () => {
+    // A header reading `A#` over lanes labelled `Bb` would be the UI
+    // disagreeing with itself about what note the player is looking at.
+    for (const { key } of KEY_WEIGHTS) {
+      const tonicLane = laneLabel(0, key);
+      expect(keyShortName(key).replace(/m$/, "")).toBe(tonicLane.note);
+    }
   });
 });
 

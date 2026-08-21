@@ -138,6 +138,22 @@ export class TimelineView {
     return Math.round(Math.max(14, Math.min(28, this.#rowHeight * 0.48)));
   }
 
+  /**
+   * A note bar's thickness: the full row, less a hairline.
+   *
+   * Adjacent rows are exactly `rowHeight` apart, so a bar this tall stops two
+   * pixels short of the next one's — near enough that a step reads as a
+   * continuous contour, far enough that two notes never merge into one block.
+   */
+  get #noteHeight(): number {
+    return Math.max(4, this.#rowHeight - 2);
+  }
+
+  /** The player's own note, inset inside the target it is sitting on. */
+  get #playedHeight(): number {
+    return Math.max(3, this.#rowHeight * 0.4);
+  }
+
   get #gutterWidth(): number {
     // Sized from the widest label each mode actually draws: `b3 (Bb)` in Key
     // View, and in Tablature the string name plus the whole selected shape
@@ -395,59 +411,75 @@ export class TimelineView {
     ctx.restore();
   }
 
+  /**
+   * A target: one bar, the same shape in both views.
+   *
+   * It fills its row from halfway to the row above to halfway to the row below,
+   * so a step from one note to the next reads as two blocks whose corners meet
+   * — the contour of the phrase is the silhouette, before you read a single
+   * label. Only a hairline separates adjacent rows, and the corner radius is
+   * small for the same reason: rounded ends would open a visible gap exactly
+   * where the eye is tracking the line.
+   *
+   * Tablature draws its fret number on top of that bar rather than instead of
+   * it, so the two views differ only in what the vertical axis means.
+   */
   #drawTarget(note: TargetNote, nowBeat: number): void {
     const ctx = this.#ctx;
     const x = this.#x(note.startBeat, nowBeat);
-    const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 4);
-    const height = this.#rowHeight * 0.52;
+    const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
+    const height = this.#noteHeight;
+    const y = this.#rowY(this.#rowForLane(note.lane));
     const colour = this.#outcomeColour(note);
 
     ctx.save();
     this.#clipPlayfield();
 
-    if (this.#mode === "key") {
-      const y = this.#rowY(note.lane);
-      ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
-      ctx.fillStyle = colour;
-      this.#roundRect(x, y - height / 2, width, height, 3);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
-      ctx.lineWidth = 1;
-      this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 3);
-      ctx.stroke();
-    } else {
-      const position = this.#fingering?.positions[note.lane];
-      const y = this.#rowY(this.#rowForLane(note.lane));
-      const text = position ? String(position.fret) : "?";
-      // Tablature: a fret number sitting on its string, with the note's
-      // duration drawn along the string line the way a sustain is written. The
-      // number is the target — it is set as large as the row allows and is
-      // never abbreviated away.
-      const size = this.#tabFontPx;
-      ctx.font = `800 ${size}px ${MONO}`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      const textWidth = ctx.measureText(text).width;
+    ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
+    ctx.fillStyle = colour;
+    this.#roundRect(x, y - height / 2, width, height, 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
+    ctx.lineWidth = 1;
+    this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
+    ctx.stroke();
 
-      ctx.globalAlpha = note.outcome === "miss" ? 0.45 : 1;
-      ctx.fillStyle = colour;
-      ctx.fillRect(x, y - 1, width, Math.max(2, this.#rowHeight * 0.07));
-
-      // Knock the duration bar out from behind the digits, so the number reads
-      // as a number rather than a number with a line through it — and so the
-      // row below stays free for the note the player actually played.
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = THEME.ground;
-      ctx.fillRect(x - 3, y - size * 0.62, textWidth + 6, size * 1.24);
-
-      ctx.globalAlpha = note.outcome === "miss" ? 0.45 : 1;
-      ctx.fillStyle = colour;
-      ctx.fillText(text, x, y);
-      ctx.globalAlpha = 1;
+    if (this.#mode === "tab") {
+      this.#drawTabFret(note, x, width, y, colour);
     }
 
     ctx.restore();
+  }
+
+  /**
+   * The fret number, on the target's own bar.
+   *
+   * Dark ink on the bright bar while it fits; a short note whose bar is
+   * narrower than its digits gets them alongside in the note's own colour
+   * instead. Never abbreviated and never dropped — in tablature the number *is*
+   * the note.
+   */
+  #drawTabFret(note: TargetNote, x: number, width: number, y: number, colour: string): void {
+    const ctx = this.#ctx;
+    const position = this.#fingering?.positions[note.lane];
+    const text = position ? String(position.fret) : "?";
+    const size = this.#tabFontPx;
+
+    ctx.font = `800 ${size}px ${MONO}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.globalAlpha = note.outcome === "miss" ? 0.55 : 1;
+
+    const textWidth = ctx.measureText(text).width;
+    if (textWidth + 8 <= width) {
+      ctx.fillStyle = THEME.ground;
+      ctx.fillText(text, x + 4, y);
+    } else {
+      ctx.fillStyle = colour;
+      ctx.fillText(text, x + width + 3, y);
+    }
+    ctx.globalAlpha = 1;
   }
 
   #drawPlayed(note: PlayedNote, nowBeat: number): void {
@@ -462,7 +494,7 @@ export class TimelineView {
 
     if (this.#mode === "key" && note.lanePosition !== null) {
       const y = this.#rowY(note.lanePosition);
-      const height = this.#rowHeight * 0.26;
+      const height = this.#playedHeight;
       if (note.diatonic) {
         ctx.fillStyle = colour;
         ctx.fillRect(x, y - height / 2, width, height);
@@ -497,23 +529,38 @@ export class TimelineView {
     ctx.restore();
   }
 
+  /**
+   * The player's own note in tablature: an inset bar on the string they
+   * actually sounded, matching Key View's treatment exactly.
+   *
+   * No fret number on a note that hit its target — the target's own number
+   * already says which fret, and two numbers in one row is noise. A *wrong*
+   * note gets one, because that is precisely the case where "what did I just
+   * play?" is the question and there is no target underneath answering it.
+   */
   #drawPlayedTab(note: PlayedNote, x: number, width: number, colour: string): void {
     const ctx = this.#ctx;
-    // A shade under the target's size, so the player's own note reads as an
-    // overlay on the target rather than a second, competing target.
-    const size = Math.round(this.#tabFontPx * 0.75);
+    const size = Math.round(this.#tabFontPx * 0.72);
     const mapped = this.#tabPositionFor(note.midi);
     ctx.font = `700 ${size}px ${MONO}`;
     ctx.textAlign = "left";
 
     if (mapped) {
-      // Below the string line, where the target's number is centred on it:
-      // two numbers stacked is what makes "you played 7, it wanted 9" legible.
-      const y = this.#rowY(mapped.stringIndex) + this.#rowHeight * 0.36;
+      const y = this.#rowY(mapped.stringIndex);
+      const height = this.#playedHeight;
       ctx.fillStyle = colour;
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(mapped.fret), x, y);
-      ctx.fillRect(x, y + size * 0.66, width, 2);
+      ctx.fillRect(x, y - height / 2, width, height);
+      // A dark hairline, so a white bar inside a coloured target still reads as
+      // two separate things at a glance.
+      ctx.strokeStyle = "rgba(8,10,14,0.85)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y - height / 2 + 0.5, Math.max(1, width - 1), height - 1);
+
+      if (note.wrong) {
+        ctx.fillStyle = colour;
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(mapped.fret), x + width + 3, y);
+      }
       return;
     }
     // A pitch the chosen shape cannot express still has to appear. It is drawn

@@ -20,6 +20,7 @@
 import { AudioEngine } from "../audio/audio-engine.js";
 import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
+import { drumPatternFor } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { Transport } from "../audio/transport.js";
 import { SyntheticGuitarSource } from "../dev/synthetic-guitar.js";
@@ -33,13 +34,14 @@ import {
 } from "../config/tuning.js";
 import { AttemptRuntime, type AttemptEvent, type EnergyEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
+import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
 import { TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
 import { LANE_COUNT } from "../music/degrees.js";
 import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingering.js";
-import { keyDisplayName, type RunKey } from "../music/keys.js";
+import { keyDisplayName, keyShortName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
 import { SCENARIOS } from "../scenario/registry.js";
@@ -84,6 +86,8 @@ export class GameApp {
   #bass: BassPlayer | null = null;
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
+  /** Which subdivision grid the kit is currently marking. See `#refreshDrumGrid`. */
+  #drumGridKey = "";
 
   /* Input ------------------------------------------------------------ */
   #provider: GuitarInputProvider | null = null;
@@ -428,10 +432,18 @@ export class GameApp {
     }
   }
 
+  /**
+   * The key, twice: the chart-style short name to read at a glance, and the
+   * long name on the tooltip for anyone who wants it spelled out.
+   */
   #updateKeyReadouts(): void {
-    const name = keyDisplayName(this.#setup.key);
-    must("pregame-key", HTMLElement).textContent = name;
-    must("hud-key", HTMLElement).textContent = name;
+    const short = keyShortName(this.#setup.key);
+    const long = keyDisplayName(this.#setup.key);
+    for (const id of ["pregame-key", "hud-key"]) {
+      const element = must(id, HTMLElement);
+      element.textContent = short;
+      element.title = long;
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -623,9 +635,35 @@ export class GameApp {
     const current = this.#current;
     if (!run || !current) {
       this.#next = null;
+      this.#refreshDrumGrid();
       return;
     }
     this.#next = this.#createAttempt(run.nextSlot, current.runtime.endBeat + TRANSITION_BEATS);
+    this.#refreshDrumGrid();
+  }
+
+  /**
+   * Points the kit at the rhythmic grid of what is being played *and* what is
+   * coming next.
+   *
+   * The union of the two is what makes the signal useful: a sixteenth run
+   * announces itself during the attempt before it, and — because that attempt
+   * then becomes the current one — the marking carries on underneath it rather
+   * than stopping at the moment it is needed most.
+   *
+   * Guarded on the resulting key: `setPattern` re-schedules the queued tail, so
+   * calling it when nothing changed would restate the kit every transition.
+   */
+  #refreshDrumGrid(): void {
+    const grids = [this.#current, this.#next]
+      .filter((attempt): attempt is ActiveAttempt => attempt !== null)
+      .map((attempt) => subdivisionsOf(attempt.runtime.level.prompt));
+    const combined = unionSubdivisions(...grids);
+    const key = subdivisionKey(combined);
+    if (key === this.#drumGridKey) return;
+
+    this.#drumGridKey = key;
+    this.#drums?.setPattern(drumPatternFor(combined));
   }
 
   #onAttemptEvent(attempt: ActiveAttempt, event: AttemptEvent): void {
@@ -820,6 +858,8 @@ export class GameApp {
     this.#current = null;
     this.#next = null;
     this.#timeline.clearTargets();
+    // Back to the bare pulse: there is no upcoming phrase to warn about.
+    this.#refreshDrumGrid();
 
     const summary = run.summary;
     const tempo = tempoById(this.#setup.tempoId);

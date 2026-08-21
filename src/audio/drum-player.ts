@@ -112,9 +112,23 @@ export class DrumPlayer {
 
   #scheduleHit(hit: DrumHit, atBeat: number): void {
     const at = this.#transport.contextTimeAt(atBeat);
-    if (hit.voice === "kick") this.#kick(at, hit.velocity);
-    else if (hit.voice === "snare") this.#snare(at, hit.velocity);
-    else this.#hat(at, hit.velocity);
+    switch (hit.voice) {
+      case "kick":
+        this.#kick(at, hit.velocity);
+        break;
+      case "snare":
+        this.#snare(at, hit.velocity);
+        break;
+      case "tick":
+        this.#sixteenthTick(at, hit.velocity);
+        break;
+      case "trip":
+        this.#tripletClick(at, hit.velocity);
+        break;
+      default:
+        this.#hat(at, hit.velocity);
+        break;
+    }
   }
 
   /**
@@ -153,6 +167,28 @@ export class DrumPlayer {
   /** Very short high-passed noise. Marks the eighths without masking anything. */
   #hat(at: number, velocity: number): void {
     this.#noiseBurst(at, 0.045, velocity * 0.22, { type: "highpass", frequency: 7000, Q: 0.7 });
+  }
+
+  /**
+   * The sixteenth marker: brighter and shorter than the hat.
+   *
+   * Sixteenths arrive twice as often as the hats they sit between, so this has
+   * to be small enough not to become the loudest thing in the mix while still
+   * being clearly a *different* sound — separated by timbre, not volume.
+   */
+  #sixteenthTick(at: number, velocity: number): void {
+    this.#noiseBurst(at, 0.022, velocity * 0.16, { type: "highpass", frequency: 11000, Q: 0.7 });
+  }
+
+  /**
+   * The triplet marker: a short pitched click, deliberately woody.
+   *
+   * Triplets and sixteenths can be signalled in the same bar, and two noise
+   * bursts an octave apart would just blur. Pitching this one down into the
+   * midrange makes the two grids separable even when they overlap.
+   */
+  #tripletClick(at: number, velocity: number): void {
+    this.#noiseBurst(at, 0.03, velocity * 0.3, { type: "bandpass", frequency: 2600, Q: 5 });
   }
 
   #noiseBurst(
