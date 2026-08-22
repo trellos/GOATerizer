@@ -96,9 +96,18 @@ export type ScenarioLevelData = {
   stars: StarThresholds;
   scoring: { streakBonusEligible: boolean };
   /**
-   * The climber's authored path. `ClimbMinigame` only — a class with no route
-   * (`RepeatMinigame`, whose performer stands still) authors none, and the
-   * loader does not invent one for it.
+   * The climber's authored path, in the scenario art panel.
+   *
+   * **Authored, validated, and no longer drawn.** The actors moved onto the
+   * note bars and the art panel became a backdrop
+   * (`docs/game-design/PROPOSED_Timeline_Actors.md`), so nothing reads these
+   * coordinates at runtime any more. They stay because they are the authored
+   * record of each route's shape and the loader still checks the invariant they
+   * encode — one waypoint per note opportunity — which is a real authoring
+   * check on the *musical* content whatever draws it.
+   *
+   * Null for a class that never had one: a `RepeatMinigame` performer stands
+   * still, and the loader does not invent a path for him.
    */
   route: RouteData | null;
   /** Free-form per-level visual character, passed to the class as parameters. */
@@ -108,6 +117,12 @@ export type ScenarioLevelData = {
 /**
  * Asset slots are named by the *class*, never by the scenario. `ClimbMinigame`
  * asks for `climberPoses`; Rocky Ascent decides those are goats.
+ *
+ * Only `background` is drawn today — the scenario panel is a backdrop and the
+ * goat is drawn from primitives on the timeline. The rest stay bound: they are
+ * the canonical slots from `GOATerizer_Scenario_Asset_Slot_Bindings.md`, the
+ * files exist, and they are what the actor layer should draw once it stops
+ * being a prototype.
  */
 export type ClimbAssetBindings = {
   background: string;
@@ -118,6 +133,11 @@ export type ClimbAssetBindings = {
   stepEffects: readonly string[];
 };
 
+/**
+ * Authored, and — like the route — no longer read at runtime: `badNotePolicy`
+ * described a wobble in the art panel, and `showDestinationFromStart` a summit
+ * cairn nothing draws now. Kept as authored scenario data.
+ */
 export type ClimbClassParameters = {
   visualSpanMeasures: number;
   resetBetweenMeasures: boolean;

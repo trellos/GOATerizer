@@ -218,10 +218,9 @@ describe("Can Crushing, played", () => {
     return { attempt, advanceTo, playAt };
   }
 
-  it("builds a repeat performer and no climber", () => {
+  it("builds a repeat performer", () => {
     const { attempt } = harness(1);
     expect(attempt.repeat).not.toBeNull();
-    expect(attempt.climb).toBeNull();
   });
 
   it("stations the performer on the lane the material repeats on", () => {

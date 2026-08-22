@@ -224,7 +224,9 @@ function parseLevel(raw: unknown, where: string, needsRoute: boolean): ScenarioL
     scoring: { streakBonusEligible: bool(scoring["streakBonusEligible"], `${where}.scoring.streakBonusEligible`) },
     // A route is required of route-having classes and refused from the rest —
     // a `RepeatMinigame` performer stands still, so authoring a path for one
-    // would be authoring data that means nothing.
+    // would be authoring data that means nothing. Nothing draws a route any
+    // more (see `ScenarioLevelData.route`), but the one-waypoint-per-note check
+    // it carries is a musical-content invariant worth keeping.
     route: needsRoute ? parseRoute(visual["route"], `${where}.visual.route`, noteCount) : null,
     visual,
   };

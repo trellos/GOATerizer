@@ -323,12 +323,10 @@ try {
 
   await page.addInitScript(MASTER_TAP);
 
-  // The main walkthrough is a walkthrough of the *climb* path — waypoints, the
-  // goat, one foothold per note — so it pins a climb scenario rather than
-  // taking whatever `scenariosForDifficulty` rolls. The library now holds two
-  // minigame classes at L1-4, and asserting climb behaviour against a scenario
-  // that might be Can Crushing would be asserting nothing. Can Crushing gets
-  // its own pinned section further down.
+  // The main walkthrough pins one scenario rather than taking whatever
+  // `scenariosForDifficulty` rolls, so its assertions are about a known
+  // exercise with a known note count. Can Crushing — the other minigame class —
+  // gets its own pinned section further down.
   await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(SHOTS, "01-start.png") });
   check("start screen renders", await page.isVisible("#start-play"));
@@ -442,34 +440,33 @@ try {
   // the run put an L1 in the first slot.
   const scenarioL1 = await dev(page, "scenario");
   check(
-    "the pinned climb scenario fills the first slot",
+    "the pinned scenario fills the first slot",
     scenarioL1 === "Rocky Ascent L1",
     scenarioL1 ?? ""
   );
 
   await page.click("#dev-autoplay-perfect");
 
-  // Wait for the goat to be a few footholds up rather than for a wall-clock
-  // guess: the attempt starts on the next measure boundary plus a lead-in.
-  const waypointMid = await waitForDev(
+  // Wait for the goat to be a few bars up rather than for a wall-clock guess:
+  // the attempt starts on the next measure boundary plus a lead-in.
+  const actorMid = await waitForDev(
     page,
-    "waypoint",
-    (value) => Number((value ?? "0/0").split("/")[0]) >= 3
+    "actor lane/streak",
+    (value) => Number((value ?? "—/0").split("/")[1]) >= 3
   );
   await page.screenshot({ path: path.join(SHOTS, "04-playing.png") });
 
   check(
-    "the goat advances while notes are being hit",
-    Number((waypointMid ?? "0/0").split("/")[0]) >= 3,
-    `waypoint ${waypointMid}`
+    "the goat rides the note bars while notes are being hit",
+    Number((actorMid ?? "—/0").split("/")[1]) >= 3,
+    `lane/streak ${actorMid}`
   );
   check(
-    "one successful note is exactly one waypoint",
-    (await dev(page, "perfect/good/miss"))?.split("/")[0] ===
-      (waypointMid ?? "0/0").split("/")[0],
-    `${await dev(page, "perfect/good/miss")} judged, waypoint ${waypointMid}`
+    "one successful note is exactly one step of the streak",
+    (await dev(page, "perfect/good/miss"))?.split("/")[0] === (actorMid ?? "—/0").split("/")[1],
+    `${await dev(page, "perfect/good/miss")} judged, lane/streak ${actorMid}`
   );
-  check("scenario strip is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
+  check("the scenario backdrop is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
@@ -479,7 +476,6 @@ try {
   const ROCKY_L2 = /^Rocky Ascent L2$/;
   await waitForDev(page, "scenario", (value) => ROCKY_L2.test(value ?? ""));
   const afterFirst = {
-    waypoint: await dev(page, "waypoint"),
     scenario: await dev(page, "scenario"),
     stars: await page.textContent("#hud-stars"),
   };
@@ -561,12 +557,6 @@ try {
     await crush.click("#pregame-play");
 
     check("the repeat scenario fills a slot", (await dev(crush, "scenario")) === "Can Crushing L2");
-    check(
-      "a repeat scenario reports no waypoint, because it has no route",
-      (await dev(crush, "waypoint")) === "0/0",
-      (await dev(crush, "waypoint")) ?? ""
-    );
-
     await crush.click("#dev-autoplay-perfect");
     const crushed = await waitForDev(
       crush,
@@ -599,21 +589,20 @@ try {
   }
 
   /* ==================================================================== */
-  /* Part 2 — L4 looks much more ridiculous than L1                       */
+  /* Part 2 — L4 is visibly denser than L1                                */
   /* ==================================================================== */
 
-  // `?dev=1&level=N` forces every slot to difficulty N, and `?scenario=` pins
-  // which scenario fills it. Both are needed here: the point of this part is a
-  // side-by-side of the *same* route authored easy and authored absurd, so the
-  // two screenshots have to be the same scenario at two difficulties rather
-  // than whatever `scenariosForDifficulty` rolled that run. The other three
-  // Rocky routes are checked in `tests/scenario-data.test.ts`, which asserts
-  // one waypoint per note opportunity for every level of every climb scenario.
-  const routeSteps = {};
-  const routeScenario = {};
+  // This used to compare two authored climb routes side by side, because the
+  // route was what escalated with difficulty on screen. The scenario is a
+  // backdrop now and the exercise happens on the timeline, so what escalates is
+  // note density — and that is what is measured here.
+  //
+  // Both runs are pinned to the same scenario at two difficulties, so the only
+  // difference between the two screenshots is the authored rhythm.
+  const beatsToEightNotes = {};
   for (const [level, file] of [
-    [1, "09-route-l1.png"],
-    [4, "10-route-l4.png"],
+    [1, "09-timeline-l1.png"],
+    [4, "10-timeline-l4.png"],
   ]) {
     const shot = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await shot.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent&level=${level}`, {
@@ -623,30 +612,33 @@ try {
     await shot.waitForTimeout(1500);
     await shot.click("#pregame-play");
     await shot.click("#dev-autoplay-perfect");
-    // Part way up, so the route and the goat's place on it are both visible.
-    const waypoint = await waitForDev(shot, "waypoint", (value) => {
-      const [at, of] = (value ?? "0/0").split("/").map(Number);
-      return of > 0 && at >= Math.ceil(of * 0.55);
-    });
-    routeSteps[level] = Number((waypoint ?? "0/0").split("/")[1]);
-    routeScenario[level] = await dev(shot, "scenario");
-    // Hide the dev panel so it does not cover the right-hand panel.
+    // How long the same eight notes take to arrive is the density, measured
+    // rather than counted: L1's are quarters, L4's are eighths.
+    await waitForDev(shot, "perfect/good/miss", (value) => Number((value ?? "0").split("/")[0]) >= 8);
+    beatsToEightNotes[level] = Number(await dev(shot, "attempt beat"));
     await shot.evaluate(() => document.getElementById("dev-panel")?.setAttribute("hidden", ""));
     await shot.waitForTimeout(150);
     await shot.screenshot({ path: path.join(SHOTS, file) });
     await shot.close();
   }
 
-  note(`L1 route: ${routeScenario[1]} (${routeSteps[1]} footholds)`);
-  note(`L4 route: ${routeScenario[4]} (${routeSteps[4]} footholds)`);
-  check("L1 authors Rocky Ascent's 15 footholds", routeSteps[1] === 15, String(routeSteps[1]));
-  check("L4 authors Rocky Ascent's 30 footholds", routeSteps[4] === 30, String(routeSteps[4]));
+  note(`eight notes took ${beatsToEightNotes[1]} beats at L1, ${beatsToEightNotes[4]} at L4`);
   check(
-    "L4's climb is denser than L1's",
-    routeSteps[4] > routeSteps[1],
-    `${routeSteps[1]} → ${routeSteps[4]}`
+    "L1's eight quarter notes take about eight beats",
+    beatsToEightNotes[1] >= 6.5 && beatsToEightNotes[1] <= 9,
+    String(beatsToEightNotes[1])
   );
-  note("compare 09-route-l1.png and 10-route-l4.png for the visual escalation");
+  check(
+    "L4's eight eighth notes take about four",
+    beatsToEightNotes[4] >= 3 && beatsToEightNotes[4] <= 5.5,
+    String(beatsToEightNotes[4])
+  );
+  check(
+    "L4 is denser than L1",
+    beatsToEightNotes[4] < beatsToEightNotes[1],
+    `${beatsToEightNotes[1]} → ${beatsToEightNotes[4]} beats`
+  );
+  note("compare 09-timeline-l1.png and 10-timeline-l4.png for the visual escalation");
 
   /* ==================================================================== */
   /* Part 3 — the production path really is Tuninator                     */

@@ -10,11 +10,15 @@
  *                                   └── TuninatorGuitarInputProvider
  *                                            │ normalised guitar events
  *                                            ▼
- *                                   AttemptRuntime (judge, score, stars, climb)
- *                                            │ judgment + energy
+ *                              AttemptRuntime (judge, score, stars, actors)
+ *                                            │ judgment
  *                        ┌───────────────────┼───────────────────┐
  *                        ▼                   ▼                   ▼
- *                  TimelineModel        EnergyLayer        ScenarioStripView
+ *                  TimelineModel        TimelineView      ScenarioBackdropView
+ *                                     (notes + actors)      (background only)
+ *
+ * `EnergyLayer` hangs off the run rather than the attempt: it flies a trophy
+ * from the scenario to the shelf when an attempt ends, and nothing else.
  */
 
 import { AudioEngine } from "../audio/audio-engine.js";
@@ -32,7 +36,7 @@ import {
   RUN_LEAD_IN_BEATS,
   TRANSITION_BEATS,
 } from "../config/tuning.js";
-import { AttemptRuntime, type AttemptEvent, type EnergyEvent } from "../game/attempt.js";
+import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
 import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
 import { TimingDeltaLog } from "../game/timing-log.js";
@@ -48,7 +52,7 @@ import { AssetStore } from "../ui/assets.js";
 import { DebugPanel, type AutoplayMode } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
-import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
+import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import {
@@ -152,7 +156,7 @@ export class GameApp {
   readonly #timeline = new TimelineModel(this.#setup.key);
   #pregameView: TimelineView | null = null;
   #gameView: TimelineView | null = null;
-  #strip: ScenarioStripView | null = null;
+  #strip: ScenarioBackdropView | null = null;
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
   #devMode = false;
@@ -184,7 +188,7 @@ export class GameApp {
 
     this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
     this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
-    this.#strip = new ScenarioStripView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
+    this.#strip = new ScenarioBackdropView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
     // Every registered scenario, not just one: a run can draw any of them into
@@ -770,9 +774,6 @@ export class GameApp {
         this.#updateHud();
         break;
       }
-      case "energy":
-        this.#launchEnergy(attempt, event.energy);
-        break;
       case "starEarned":
         this.#updateHud();
         break;
@@ -782,23 +783,6 @@ export class GameApp {
       default:
         break;
     }
-  }
-
-  /**
-   * Delivers the energy to the scenario immediately.
-   *
-   * This used to launch a streak from the note to the scenario panel and let
-   * its *arrival* trigger the step, so the causal chain was legible. Overlaying
-   * the timeline on the scenario put source and destination in the same place,
-   * leaving the streak nothing to travel — so it is gone, and the goat now
-   * steps on the beat the note is judged. Immediate is the better feel anyway:
-   * the response is the player's own timing, not an animation's flight time.
-   */
-  #launchEnergy(attempt: ActiveAttempt, energy: EnergyEvent): void {
-    attempt.runtime.deliverEnergy(
-      energy,
-      attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
-    );
   }
 
   /** Canvas-local point -> the energy overlay's coordinate space. */
@@ -998,21 +982,18 @@ export class GameApp {
         : Math.min(1, (beat - this.#slideStartBeat) / TRANSITION_BEATS) - 1;
     if (slide >= 0) this.#slideStartBeat = null;
 
-    const panelFor = (slot: RunSlot | null, attempt: ActiveAttempt | null): StripPanel | null => {
+    const panelFor = (slot: RunSlot | null, attempt: ActiveAttempt | null): BackdropPanel | null => {
       if (!slot) return null;
-      // Only the attempt that actually belongs to this slot may drive it.
+      // Only the attempt that actually belongs to this slot may drive its meter.
       const runtime = attempt?.slotOrdinal === slot.ordinal ? attempt.runtime : null;
       return {
         scenario: slot.scenario,
-        route: slot.scenario?.levels.get(slot.difficulty)?.route ?? null,
-        climb: runtime?.climb ? runtime.climb.state : null,
         stars: runtime ? runtime.starMeter.stars : slot.result?.stars ?? 0,
         starProgress: runtime ? runtime.starMeter.progressToNextStar : 0,
         difficulty: slot.difficulty,
         label: slot.scenario
           ? `${slot.scenario.displayName} · L${slot.difficulty}`
           : `L${slot.difficulty}`,
-        beat: runtime ? runtime.toAttemptBeat(beat) : 0,
       };
     };
 
@@ -1100,9 +1081,6 @@ export class GameApp {
       "attempt score": score ? String(score.score) : "—",
       "judgment points": score ? String(score.judgmentPoints) : "—",
       stars: attempt ? String(attempt.starMeter.stars) : "—",
-      waypoint: attempt
-        ? `${(attempt.climb?.state.waypointIndex ?? -1) + 1}/${attempt.climb?.waypointCount ?? 0}`
-        : "—",
       // One readout per class, so the panel says "—" for the one this scenario
       // is not rather than quietly reporting a zero that means nothing.
       "cans crushed/missed": attempt?.repeat

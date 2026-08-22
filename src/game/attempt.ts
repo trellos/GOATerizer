@@ -4,19 +4,23 @@
  * This is the join between the systems, and it is where the causal chain the
  * whole game rests on actually happens:
  *
- *     guitar event -> beat -> judgment -> energy -> scenario
+ *     guitar event -> beat -> judgment -> actor
  *
- * It owns the judge, the score, the star meter and the minigame class instance,
- * and it is free of DOM and audio so the entire chain is testable with injected
- * input. The one thing it does *not* do is decide when energy reaches the
- * scenario: the caller delivers that, so the visual streak flying up from the
- * timeline is what triggers the goat rather than a coincidence beside it.
+ * It owns the judge, the score, the star meter, and whatever characters this
+ * scenario puts on the timeline. It is free of DOM and audio, so the entire
+ * chain is testable with injected input.
+ *
+ * The chain used to run `judgment -> energy -> scenario`, with the caller
+ * deciding when energy arrived so a streak flying from the note to the scenario
+ * panel was what triggered the goat. There is no scenario panel to fly to any
+ * more — the actors live on the note bars and the panel is a backdrop
+ * (`docs/game-design/PROPOSED_Timeline_Actors.md`) — so a judgment now moves its
+ * actor directly, on the beat it is judged.
  */
 
 import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
 import { laneOfMidi, type RunKey } from "../music/keys.js";
-import { ClimbMinigame, type ClimbEnergy } from "../scenario/minigames/climb-minigame.js";
 import { RepeatMinigame } from "../scenario/minigames/repeat-minigame.js";
 import { TimelineActor } from "../scenario/minigames/timeline-actor.js";
 import type { ScenarioDefinition, ScenarioLevelData } from "../scenario/types.js";
@@ -24,8 +28,6 @@ import { TargetJudge, type JudgmentEvent } from "./judgment.js";
 import { AttemptScore, type ScoreSnapshot } from "./scoring.js";
 import { StarMeter } from "./stars.js";
 import { resolveTargets, type ResolvedTarget } from "./targets.js";
-
-export type EnergyCause = "perfect" | "good" | "miss" | "wrong";
 
 /**
  * Where a `RepeatMinigame` performer stands: the lane the exercise sits on most
@@ -51,20 +53,6 @@ function repeatPerformerLane(targets: readonly ResolvedTarget[]): number {
   return best;
 }
 
-/** A judged note's energy, on its way from the timeline into the scenario. */
-export type EnergyEvent = {
-  id: number;
-  polarity: "good" | "bad";
-  cause: EnergyCause;
-  /**
-   * Continuous lane coordinate the streak launches from, or null when the
-   * played note fell outside the one-octave span entirely.
-   */
-  lane: number | null;
-  /** Attempt-relative beat the judgment happened on. */
-  beat: number;
-};
-
 export type AttemptResult = {
   scenarioId: string;
   difficulty: number;
@@ -74,7 +62,6 @@ export type AttemptResult = {
 
 export type AttemptEvent =
   | { type: "judgment"; judgment: JudgmentEvent }
-  | { type: "energy"; energy: EnergyEvent }
   | { type: "starEarned"; stars: number }
   | { type: "measureComplete"; measureIndex: number }
   | { type: "complete"; result: AttemptResult };
@@ -102,21 +89,17 @@ export class AttemptRuntime {
   readonly judge: TargetJudge;
   readonly score: AttemptScore;
   readonly starMeter: StarMeter;
-  /** The climb, when this scenario is a `ClimbMinigame`. Null otherwise. */
-  readonly climb: ClimbMinigame | null;
   /** The repeat performer, when this scenario is a `RepeatMinigame`. */
   readonly repeat: RepeatMinigame | null;
-  /**
+/**
    * PROTOTYPE: the actor that lives on the timeline itself
-   * (`docs/game-design/PROPOSED_Timeline_Actors.md`). Runs alongside the climb
-   * rather than replacing it, so the two presentations can be compared in the
-   * same build.
+   * (`docs/game-design/PROPOSED_Timeline_Actors.md`). Every scenario has one;
+   * a `RepeatMinigame` draws its performer instead, from `repeat` below.
    */
   readonly actor = new TimelineActor();
 
   readonly #toBeat: (contextTime: number) => number;
   readonly #listeners: ((event: AttemptEvent) => void)[] = [];
-  #nextEnergyId = 1;
   #measuresCompleted = 0;
   #complete = false;
   #result: AttemptResult | null = null;
@@ -143,14 +126,8 @@ export class AttemptRuntime {
     this.starMeter = new StarMeter(level.stars);
     // One class per scenario, chosen by the scenario's own declaration. The
     // runtime never guesses: a class whose data is absent is simply not built.
-    const bindings = options.scenario.assetBindings;
-    const parameters = options.scenario.classParameters;
-    this.climb =
-      bindings.kind === "climb" && parameters.kind === "climb" && level.route
-        ? new ClimbMinigame({ route: level.route, bindings, parameters })
-        : null;
     this.repeat =
-      bindings.kind === "repeat"
+      options.scenario.assetBindings.kind === "repeat"
         ? new RepeatMinigame({ performerLane: repeatPerformerLane(this.targets) })
         : null;
 
@@ -209,14 +186,12 @@ export class AttemptRuntime {
   /** Drives expiry, effect decay and completion. Safe to call every frame. */
   update(absoluteBeat: number): void {
     if (this.#complete) {
-      this.climb?.update(this.toAttemptBeat(absoluteBeat));
       this.repeat?.update(this.toAttemptBeat(absoluteBeat));
       return;
     }
 
     const beat = this.toAttemptBeat(absoluteBeat);
     this.judge.tick(beat);
-    this.climb?.update(beat);
     this.repeat?.update(beat);
     // What the actor should be leaning at. At 60bpm there is most of a second
     // between quarter notes, and an idle actor there is dead air; aimed at the
@@ -230,26 +205,10 @@ export class AttemptRuntime {
     while (this.#measuresCompleted < measures) {
       const index = this.#measuresCompleted;
       this.#measuresCompleted += 1;
-      this.climb?.onMeasureComplete(index, beat);
       this.#emit({ type: "measureComplete", measureIndex: index });
     }
 
     if (beat >= ATTEMPT_BEATS) this.#finish(beat);
-  }
-
-  /**
-   * Hands one energy event to the scenario.
-   *
-   * Called by the presentation layer when the visual streak arrives, so the
-   * player sees their note cause the step rather than merely accompany it. A
-   * headless caller delivers immediately.
-   */
-  deliverEnergy(energy: EnergyEvent, atBeat: number): void {
-    const payload: ClimbEnergy =
-      energy.polarity === "good"
-        ? { polarity: "good", strength: energy.cause === "perfect" ? "perfect" : "good" }
-        : { polarity: "bad", cause: energy.cause === "miss" ? "miss" : "wrong" };
-    this.climb?.applyEnergy(payload, atBeat);
   }
 
   /* ------------------------------------------------------------------ */
@@ -263,9 +222,6 @@ export class AttemptRuntime {
     const before = this.starMeter.stars;
     const after = this.starMeter.update(this.score.judgmentPoints, this.score.consistencyPoints);
     if (after > before) this.#emit({ type: "starEarned", stars: after });
-
-    const energy = this.#energyFor(judgment);
-    if (energy) this.#emit({ type: "energy", energy });
   }
 
   /**
@@ -322,30 +278,6 @@ export class AttemptRuntime {
     }
   }
 
-  #energyFor(judgment: JudgmentEvent): EnergyEvent | null {
-    switch (judgment.type) {
-      case "PerfectNote":
-        return this.#energy("good", "perfect", judgment.target.lane, judgment.target.startBeat);
-      case "GoodNote":
-        return this.#energy("good", "good", judgment.target.lane, judgment.target.startBeat);
-      case "MissedNote":
-        return this.#energy("bad", "miss", judgment.target.lane, judgment.target.startBeat);
-      case "WrongNote":
-        return this.#energy("bad", "wrong", judgment.lanePosition, judgment.atBeat);
-      default:
-        return null;
-    }
-  }
-
-  #energy(
-    polarity: "good" | "bad",
-    cause: EnergyCause,
-    lane: number | null,
-    beat: number
-  ): EnergyEvent {
-    return { id: this.#nextEnergyId++, polarity, cause, lane, beat };
-  }
-
   #finish(beat: number): void {
     if (this.#complete) return;
     // Expire anything whose window closed exactly on the boundary.
@@ -354,7 +286,6 @@ export class AttemptRuntime {
 
     const stars = this.starMeter.update(this.score.judgmentPoints, this.score.consistencyPoints);
     const passed = stars >= 1;
-    this.climb?.complete(passed, beat);
     this.repeat?.complete(passed, beat);
 
     this.#result = {

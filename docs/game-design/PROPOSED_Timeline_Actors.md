@@ -5,9 +5,13 @@
 This is the design agreed in the goat-on-the-bars conversation, scoped down to a
 rough draft: the existing scale runs, plus one easy REPEAT scenario.
 
-Everything under "In" in §1 is now built on that branch and playable. What is
-built differs from the design as first written in three places, each noted
-inline below and in `DECISION_LOG.md` (DECISION-019 to 021):
+Everything under "In" in §1 is now built on that branch and playable, and the
+scenario panel has since been reduced to a backdrop — the mechanic replaced it,
+so the climb's route, footholds, climber and effects are no longer drawn at all
+(§6, DECISION-022).
+
+What is built differs from the design as first written in three places, each
+noted inline below and in `DECISION_LOG.md` (DECISION-019 to 021):
 
 1. **Can Crushing's material is one pitch.** §5 assumed a can could be authored
    on any lane. It cannot while the performer is stationary — see §5.
@@ -48,6 +52,7 @@ and becomes the place the scenario happens.
 | Theme-specific ornaments beyond the goat | Only GOATS has art. A crown on a can-crusher is a later art decision. |
 | The other four minigame classes | TRAVERSE/THREE-STEP/PERFORM/BATTLE have no built scenarios at all. |
 | Deleting the waypoint routes | See §6 — they stay, unused, behind the class switch. |
+| Keeping the scenario as a diorama | The mechanic replaced it; the panel is a backdrop now. See §6. |
 
 ---
 
@@ -79,7 +84,8 @@ the player is safe to place them — and doing so makes wrong-note feedback
 ## 3. Actor state
 
 New: `src/scenario/minigames/timeline-actor.ts`. A small pure class, owned by
-`AttemptRuntime` alongside `climb`, fed the same judgment stream.
+`AttemptRuntime` and fed the judgment stream. (It was to run alongside `climb`;
+`ClimbMinigame` has since been deleted — see §6.)
 
 ```
 TimelineActor
@@ -214,6 +220,22 @@ Proposed:
   still the authored record of each route's shape, they still validate, and
   deleting 93 of them on the strength of an untested prototype is not a trade
   worth making. If the actor model survives play, that is when they go.
+
+### What actually happened to the panel
+
+The actor model did survive, and the panel went first. `ClimbMinigame` is
+deleted: with the goat on the bars, the class's entire output — waypoint index,
+pose, position, wobble, dust — was state nobody drew. `ScenarioStripView` is
+`ScenarioBackdropView`, and draws a background, a label and the three-star
+meter. `AttemptRuntime` lost its `climb`, its energy events and `deliverEnergy`
+with it; a judgment now moves its actor directly.
+
+The **data** stayed, exactly as argued above: all 93 waypoints, the climb
+bindings, the climb class parameters. Nothing reads them, the loader still
+validates them, and the one-waypoint-per-note check they carry is a real
+authoring invariant on the musical content. The nine non-background art files
+per Rocky scenario stayed too — they are the canonical slots, and they are what
+the actor layer should draw once it stops being primitives.
 
 Files touched:
 

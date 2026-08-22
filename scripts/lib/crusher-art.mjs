@@ -155,10 +155,16 @@ export function crushImpact(C = CRUSHER_PALETTE, seed = 0xca11) {
   return image;
 }
 
-/** Beach at golden hour. Opaque; the timeline is drawn over it. */
+/**
+ * Beach at golden hour. Opaque; the timeline is drawn over it.
+ *
+ * 384x216, matching the Rocky family, because a background is now stretched
+ * across the whole frame rather than into a third of it — at half that it is
+ * visibly chunkier than the scenario next door.
+ */
 export function beachBackground(C = CRUSHER_PALETTE, seed = 0xbea0) {
-  const width = 192;
-  const height = 108;
+  const width = 384;
+  const height = 216;
   const image = new Pixels(width, height);
   const random = lcg(seed);
 
@@ -174,16 +180,16 @@ export function beachBackground(C = CRUSHER_PALETTE, seed = 0xbea0) {
   }
 
   // Sun, low and fat.
-  image.fillEllipse(width * 0.68, height * 0.42, 13, 13, C.skySun);
+  image.fillEllipse(width * 0.68, height * 0.42, width * 0.068, width * 0.068, C.skySun);
 
   // Sea glitter, then the beach.
-  for (let i = 0; i < 90; i += 1) {
+  for (let i = 0; i < 360; i += 1) {
     const x = Math.round(random() * width);
     const y = Math.round(height * 0.56 + random() * height * 0.2);
     image.fillRect(x, y, 1 + Math.round(random() * 2), 1, C.seaLight);
   }
   image.fillRect(0, Math.round(height * 0.76), width, height, C.sand);
-  for (let i = 0; i < 120; i += 1) {
+  for (let i = 0; i < 480; i += 1) {
     const x = Math.round(random() * width);
     const y = Math.round(height * 0.78 + random() * height * 0.2);
     image.fillRect(x, y, 1, 1, C.sandDark);

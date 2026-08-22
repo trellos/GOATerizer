@@ -1,14 +1,20 @@
 /**
- * Energy streaks: the visible link between a judged note and the scenario.
+ * Streaks: a short flight from one place on screen to another, whose *arrival*
+ * fires a callback.
  *
- * A short streak leaves the judged note on the timeline and flies up into the
- * scenario. On arrival it triggers the scenario's reaction, so the player reads
- * *I played that note correctly, and that made the goat climb* rather than
- * seeing two things happen near each other.
+ * It began as the link between a judged note and the scenario — the streak flew
+ * up from the note and its landing made the goat climb, so the player read
+ * causation rather than two things happening near each other. Both ends of that
+ * flight are now the same place: the actors live on the note bars, so a
+ * judgment moves them where it happens.
+ *
+ * What is left is the one flight that still crosses the screen: the stars
+ * earned by a finished attempt travelling from the scenario to the trophy shelf
+ * in the top bar, each landing adding an ornament to the trophy it builds.
  *
  * Flight time is measured in **beats**, not milliseconds, so it stays
- * proportionate at 60bpm and at 140bpm and never outlives the note that caused
- * it. It is deliberately short: any longer and it stops reading as causation.
+ * proportionate at 60bpm and at 140bpm. It is deliberately short: any longer and
+ * it stops reading as causation.
  */
 
 const FLIGHT_BEATS = 0.28;

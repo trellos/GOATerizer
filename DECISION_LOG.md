@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-022: The scenario panel is a backdrop, and `ClimbMinigame` is deleted
+* **Date:** 2026-08-22
+* **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** With the actors on the note bars, the scenario panel was drawing a second, quieter copy of the same run: a goat climbing an authored route while a goat climbed the note bars a few pixels away. Two presentations of one attempt, competing for the same glance, and only one of them was where the player's eyes already had to be.
+* **Decision:** The panel keeps one job — be the place this minigame happens — which is a background. `ScenarioStripView` becomes `ScenarioBackdropView` and draws a background, the scenario's label, and the three-star meter, and nothing else. `ClimbMinigame` is **deleted**: with nothing drawing its waypoint index, pose, position, wobble or effects, the class was computing state no one read. `AttemptRuntime` loses `climb`, `deliverEnergy` and the whole `energy` event with them — a judgment moves its actor directly. The authored **data** all stays: 93 waypoints, the climb bindings, the climb class parameters, and the nine non-background art files per Rocky scenario. Nothing reads them, the loader still validates them, and the one-waypoint-per-note-opportunity check is a real invariant on the *musical* content whatever ends up drawing it.
+* **Alternatives Considered:** (a) Keeping the climb visual as an A/B against the actors. Rejected: the comparison was already run, and a class whose output is invisible is the kind of dead weight that reads as live code later. It is one revert away and it is on `main`. (b) Keeping GDD §11.2's strip — half the previous scenario, the whole current one, half the next. Rejected on geometry: that composition assumed the panel *was* the playfield, so a scenario worth two thirds of the screen made sense. The timeline is the playfield now and spans the full width, so a scenario in the middle half leaves the lanes running out over black with two seams cut through the notes. Each panel is the full frame instead, and the neighbours live off-screen until the transition slides them through.
+* **Consequences:** Positive — one presentation of the run, and a background that is actually behind the whole playfield. Roughly 500 lines of rendering and runtime state gone, and the frame loop stops updating a minigame nobody can see. Negative — §11.2's early peek at the next scenario is lost; the run's own labelling is all that telegraphs it. Putting it back as a cross-fade beginning in the last measure is a real option and is the first thing to try if the transition feels abrupt. Authored route data is now validated but unread, which is a state worth revisiting rather than leaving indefinitely.
+
+---
+
 #### DECISION-021: The shelf holds trophies, and stars are earned against two different metrics
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
