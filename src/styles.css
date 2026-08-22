@@ -509,10 +509,19 @@ button.chip[data-selected="true"] {
   background: #0b0f14;
   display: grid;
   place-items: center;
-  font-size: 0.5rem;
   color: var(--perfect);
-  letter-spacing: -0.08em;
   overflow: hidden;
+}
+
+/**
+ * The trophy fills its slot. It is drawn in `currentColor`, so the slot states
+ * below recolour it without knowing what shape it is.
+ */
+.slot-trophy {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  line-height: 0;
 }
 
 .history-slot[data-state="current"] {

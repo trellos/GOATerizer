@@ -11,6 +11,7 @@ import {
   SCORE_VALUES,
   STREAK_BONUS_MAX_NOTES,
   STREAK_BONUS_MIN_LENGTH,
+  CONSISTENCY_POINTS_PER_NOTE,
   STREAK_BONUS_PER_NOTE,
   JUDGMENT_POINTS,
   WRONG_NOTE_BREAKS_STREAK,
@@ -70,6 +71,20 @@ export class AttemptScore {
 
   get judgmentPoints(): number {
     return this.#judgmentPoints;
+  }
+
+  /**
+   * The consistency bonus, in judgment-point units, for the star meter's
+   * second-star comparison only (`stars.ts`).
+   *
+   * One point per unbroken note, against ten for a Perfect. So a flawless
+   * attempt earns a bonus worth exactly 10% of its own all-Perfect maximum,
+   * whatever the note count — no scenario-specific tuning, and it cannot be
+   * gamed by a long exercise. PROVISIONAL: 10% is a starting number to play
+   * against, not a derived one.
+   */
+  get consistencyPoints(): number {
+    return this.#bestStreak * CONSISTENCY_POINTS_PER_NOTE;
   }
 
   get score(): number {

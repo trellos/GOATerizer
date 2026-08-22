@@ -94,6 +94,27 @@ function note(message) {
  */
 const VITE_BIN = path.join(REPO, "node_modules", "vite", "bin", "vite.js");
 
+/**
+ * Builds first, then serves the build.
+ *
+ * `vite preview` serves whatever is in `dist/`, so without this the suite
+ * cheerfully validates the last build somebody happened to make — which is how
+ * a green run can be reporting on code that is no longer in the tree.
+ */
+async function build() {
+  if (!existsSync(VITE_BIN)) {
+    throw new Error(`vite is not installed at ${VITE_BIN} — run \`npm install\` first`);
+  }
+  await new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [VITE_BIN, "build"], { cwd: REPO, stdio: "ignore" });
+    child.on("error", reject);
+    child.on("exit", (code) =>
+      code === 0 ? resolve() : reject(new Error(`vite build exited ${code}`))
+    );
+  });
+  note("built dist/ from the current tree");
+}
+
 async function serve() {
   if (!existsSync(VITE_BIN)) {
     throw new Error(`vite is not installed at ${VITE_BIN} — run \`npm install\` first`);
@@ -132,6 +153,19 @@ async function launchBrowser(args) {
     `no usable Chromium. Tried:\n${rejections.join("\n")}\n\n` +
       `Install one with \`npx playwright install chromium\`, or point CHROMIUM_PATH at a build.`
   );
+}
+
+/**
+ * Screenshots with the dev panel out of the way, then puts it back — the panel
+ * covers the right-hand third of the frame, and its buttons are still needed
+ * after the shot.
+ */
+async function shotWithoutDevPanel(page, file) {
+  const panel = page.locator("#dev-panel");
+  await panel.evaluate((element) => element.setAttribute("hidden", ""));
+  await page.waitForTimeout(120);
+  await page.screenshot({ path: path.join(SHOTS, file) });
+  await panel.evaluate((element) => element.removeAttribute("hidden"));
 }
 
 /** Reads a value out of the dev panel by its label. */
@@ -259,6 +293,7 @@ async function canvasHasInk(page, id) {
   }, id);
 }
 
+await build();
 const server = await serve();
 const browser = await launchBrowser([
   "--no-sandbox",
@@ -288,7 +323,13 @@ try {
 
   await page.addInitScript(MASTER_TAP);
 
-  await page.goto(`${BASE}/?dev=1&input=test`, { waitUntil: "networkidle" });
+  // The main walkthrough is a walkthrough of the *climb* path — waypoints, the
+  // goat, one foothold per note — so it pins a climb scenario rather than
+  // taking whatever `scenariosForDifficulty` rolls. The library now holds two
+  // minigame classes at L1-4, and asserting climb behaviour against a scenario
+  // that might be Can Crushing would be asserting nothing. Can Crushing gets
+  // its own pinned section further down.
+  await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(SHOTS, "01-start.png") });
   check("start screen renders", await page.isVisible("#start-play"));
   check(
@@ -397,15 +438,12 @@ try {
     `${JSON.stringify(pregameTimelineBox)} → ${JSON.stringify(gameTimelineBox)}`
   );
 
-  // The registry now holds more than one Rocky-family scenario at L1 (Ascent,
-  // Descent), and `scenariosForDifficulty` picks among them at random — so the
-  // exact scenario shown here is no longer fixed. Assert the family/level
-  // pattern, not one hardcoded name.
-  const ROCKY_SCENARIO = /^Rocky (Ascent|Descent)( High)? L(\d+)$/;
+  // Pinned above, so this is really two assertions: the pin took effect, and
+  // the run put an L1 in the first slot.
   const scenarioL1 = await dev(page, "scenario");
   check(
-    "scenario is a Rocky-family L1 scenario",
-    ROCKY_SCENARIO.test(scenarioL1 ?? ""),
+    "the pinned climb scenario fills the first slot",
+    scenarioL1 === "Rocky Ascent L1",
     scenarioL1 ?? ""
   );
 
@@ -438,7 +476,7 @@ try {
     `score ${await page.textContent("#hud-score")}`
   );
 
-  const ROCKY_L2 = /^Rocky (Ascent|Descent)( High)? L2$/;
+  const ROCKY_L2 = /^Rocky Ascent L2$/;
   await waitForDev(page, "scenario", (value) => ROCKY_L2.test(value ?? ""));
   const afterFirst = {
     waypoint: await dev(page, "waypoint"),
@@ -460,11 +498,20 @@ try {
   const filledSlots = await page.locator('#hud-history .history-slot[data-state="done"]').count();
   check("history records the finished slot", filledSlots >= 1, `${filledSlots} filled`);
 
-  // The stars physically fly into the slot, so they land a moment after the
-  // attempt ends. Wait for the glyphs rather than assuming they are instant.
-  const slotStars = page.locator('#hud-history .history-slot[data-ordinal="0"] .slot-stars');
-  await slotStars.filter({ hasText: "★★★" }).waitFor({ timeout: 5000 }).catch(() => {});
-  check("three stars for a flawless attempt", (await slotStars.textContent()) === "★★★");
+  // The stars physically fly into the slot and *build* the trophy as they land,
+  // so the crowned tier arrives a moment after the attempt ends. Wait for the
+  // tier rather than assuming it is instant.
+  const trophy = page.locator('#hud-history .history-slot[data-ordinal="0"] .slot-trophy svg');
+  await trophy.waitFor({ timeout: 5000 }).catch(() => {});
+  await page
+    .locator('#hud-history .history-slot[data-ordinal="0"] svg[data-tier="3"]')
+    .waitFor({ timeout: 5000 })
+    .catch(() => {});
+  check(
+    "a flawless attempt earns a crowned trophy",
+    (await trophy.getAttribute("data-tier")) === "3",
+    `tier ${await trophy.getAttribute("data-tier")}`
+  );
 
   /* --- a failing attempt --------------------------------------------- */
 
@@ -496,23 +543,82 @@ try {
   await page.close();
 
   /* ==================================================================== */
+  /* Part 1b — the second minigame class actually runs                    */
+  /* ==================================================================== */
+
+  // Everything above exercises `ClimbMinigame`. Can Crushing is the only other
+  // class with a built scenario, and the whole point of it is a rule the climb
+  // does not have: the can lands where the player *played*, not where they were
+  // asked to play. Both halves are asserted here, in a browser, because both
+  // are load-bearing for whether the mechanic reads at all.
+  {
+    const crush = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await crush.goto(`${BASE}/?dev=1&input=test&level=2&scenario=can_crushing`, {
+      waitUntil: "networkidle",
+    });
+    await crush.click("#start-play");
+    await crush.waitForTimeout(1500);
+    await crush.click("#pregame-play");
+
+    check("the repeat scenario fills a slot", (await dev(crush, "scenario")) === "Can Crushing L2");
+    check(
+      "a repeat scenario reports no waypoint, because it has no route",
+      (await dev(crush, "waypoint")) === "0/0",
+      (await dev(crush, "waypoint")) ?? ""
+    );
+
+    await crush.click("#dev-autoplay-perfect");
+    const crushed = await waitForDev(
+      crush,
+      "cans crushed/missed",
+      (value) => Number((value ?? "0/0").split("/")[0]) >= 4
+    );
+    await shotWithoutDevPanel(crush, "07-can-crushing.png");
+    check(
+      "playing the asked-for note crushes the can",
+      Number((crushed ?? "0/0").split("/")[0]) >= 4 &&
+        Number((crushed ?? "0/0").split("/")[1]) === 0,
+      `crushed/missed ${crushed}`
+    );
+
+    // Same material, in time, on the wrong string. The cans have to miss him.
+    await crush.click("#dev-autoplay-fumbled");
+    const fumbled = await waitForDev(
+      crush,
+      "cans crushed/missed",
+      (value) => Number((value ?? "0/0").split("/")[1]) >= 2
+    );
+    await shotWithoutDevPanel(crush, "08-can-crushing-fumbled.png");
+    check(
+      "a wrong note puts the can somewhere he cannot reach",
+      Number((fumbled ?? "0/0").split("/")[1]) >= 2,
+      `crushed/missed ${fumbled}`
+    );
+    check("the timeline is still drawing the performer", (await canvasHasInk(crush, "game-canvas")) > 200);
+    await crush.close();
+  }
+
+  /* ==================================================================== */
   /* Part 2 — L4 looks much more ridiculous than L1                       */
   /* ==================================================================== */
 
-  // `?dev=1&level=N` forces every slot to difficulty N, but with more than one
-  // Rocky-family scenario authoring L1 and L4 now, WHICH one fills that slot is
-  // still `scenariosForDifficulty`'s random pick — Ascent(15)/Descent(16) at
-  // L1, and any of the four at L4 (Ascent 30, Descent 32, either High 24). The
-  // exact count is no longer fixed, so these are range checks against the
-  // authored data, not one hardcoded number.
+  // `?dev=1&level=N` forces every slot to difficulty N, and `?scenario=` pins
+  // which scenario fills it. Both are needed here: the point of this part is a
+  // side-by-side of the *same* route authored easy and authored absurd, so the
+  // two screenshots have to be the same scenario at two difficulties rather
+  // than whatever `scenariosForDifficulty` rolled that run. The other three
+  // Rocky routes are checked in `tests/scenario-data.test.ts`, which asserts
+  // one waypoint per note opportunity for every level of every climb scenario.
   const routeSteps = {};
   const routeScenario = {};
   for (const [level, file] of [
-    [1, "08-route-l1.png"],
-    [4, "09-route-l4.png"],
+    [1, "09-route-l1.png"],
+    [4, "10-route-l4.png"],
   ]) {
     const shot = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await shot.goto(`${BASE}/?dev=1&input=test&level=${level}`, { waitUntil: "networkidle" });
+    await shot.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent&level=${level}`, {
+      waitUntil: "networkidle",
+    });
     await shot.click("#start-play");
     await shot.waitForTimeout(1500);
     await shot.click("#pregame-play");
@@ -533,22 +639,14 @@ try {
 
   note(`L1 route: ${routeScenario[1]} (${routeSteps[1]} footholds)`);
   note(`L4 route: ${routeScenario[4]} (${routeSteps[4]} footholds)`);
-  check(
-    "L1 authors a full Rocky-family route (15-16 footholds)",
-    routeSteps[1] >= 15 && routeSteps[1] <= 16,
-    String(routeSteps[1])
-  );
-  check(
-    "L4 authors a full Rocky-family route (24-32 footholds)",
-    routeSteps[4] >= 24 && routeSteps[4] <= 32,
-    String(routeSteps[4])
-  );
+  check("L1 authors Rocky Ascent's 15 footholds", routeSteps[1] === 15, String(routeSteps[1]));
+  check("L4 authors Rocky Ascent's 30 footholds", routeSteps[4] === 30, String(routeSteps[4]));
   check(
     "L4's climb is denser than L1's",
     routeSteps[4] > routeSteps[1],
     `${routeSteps[1]} → ${routeSteps[4]}`
   );
-  note("compare 08-route-l1.png and 09-route-l4.png for the visual escalation");
+  note("compare 09-route-l1.png and 10-route-l4.png for the visual escalation");
 
   /* ==================================================================== */
   /* Part 3 — the production path really is Tuninator                     */
@@ -588,7 +686,7 @@ try {
     await live.locator("#dev-panel").isHidden()
   );
   check("no page errors on the live path", liveErrors.length === 0, liveErrors.join(" | "));
-  await live.screenshot({ path: path.join(SHOTS, "07-live-input.png") });
+  await live.screenshot({ path: path.join(SHOTS, "11-live-input.png") });
 
   note(
     "Chromium's fake capture device is silence, so no note is detected here. " +

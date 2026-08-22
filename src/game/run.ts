@@ -52,6 +52,13 @@ export type RunOptions = {
    * grinding up to it. Normal play always uses {@link DIFFICULTY_SEQUENCE}.
    */
   difficultySequence?: readonly number[];
+  /**
+   * Fills every slot the named scenario is eligible for with that scenario.
+   * **Developer use only** — it is how one scenario gets looked at without
+   * rerolling the run until selection happens to pick it. Slots it does not
+   * author fall back to normal random selection.
+   */
+  pinnedScenarioId?: string;
 };
 
 export class RunState {
@@ -66,7 +73,8 @@ export class RunState {
     this.bpm = options.bpm;
     this.slots = fillSlots(
       options.difficultySequence ?? DIFFICULTY_SEQUENCE,
-      options.random ?? Math.random
+      options.random ?? Math.random,
+      options.pinnedScenarioId ?? null
     );
   }
 
@@ -150,7 +158,11 @@ export class RunState {
  * any eligible scenario is still unused. There is deliberately no class
  * balancing (GDD §3.1).
  */
-function fillSlots(sequence: readonly number[], random: () => number): RunSlot[] {
+function fillSlots(
+  sequence: readonly number[],
+  random: () => number,
+  pinnedScenarioId: string | null
+): RunSlot[] {
   const used = new Set<string>();
 
   return sequence.map((difficulty, ordinal) => {
@@ -158,6 +170,9 @@ function fillSlots(sequence: readonly number[], random: () => number): RunSlot[]
     if (eligible.length === 0) {
       return { ordinal, difficulty, scenario: null, result: null };
     }
+
+    const pinned = eligible.find((scenario) => scenario.id === pinnedScenarioId);
+    if (pinned) return { ordinal, difficulty, scenario: pinned, result: null };
 
     const unused = eligible.filter((scenario) => !used.has(scenario.id));
     const pool = unused.length > 0 ? unused : eligible;

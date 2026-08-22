@@ -105,6 +105,16 @@ export const SCORE_VALUES = {
  * (`scoring.streakBonusEligible`). The streak itself is always tracked and
  * always shown in the debug panel; only the bonus is gated.
  */
+/**
+ * Consistency bonus per unbroken note, in judgment-point units, used only by
+ * the star meter's second-star comparison (`game/stars.ts`).
+ *
+ * One against ten for a Perfect, so a flawless attempt's bonus is worth exactly
+ * 10% of its own all-Perfect maximum at any note count. PROVISIONAL — a number
+ * to play against, not a derived one.
+ */
+export const CONSISTENCY_POINTS_PER_NOTE = 1;
+
 export const STREAK_BONUS_PER_NOTE = 5;
 export const STREAK_BONUS_MIN_LENGTH = 5;
 export const STREAK_BONUS_MAX_NOTES = 20;

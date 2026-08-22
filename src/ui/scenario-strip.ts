@@ -151,9 +151,16 @@ export class ScenarioStripView {
       y: point.y * this.#height,
     });
 
+    // Everything below reads climb-only slots. A repeat scenario has no route
+    // and no waypoints — it should never reach here, since `#drawPanel` only
+    // calls this when `panel.route` is set — and the discriminant is what makes
+    // that a compile-time fact rather than a convention.
+    const bindings = scenario.assetBindings;
+    if (bindings.kind !== "climb") return;
+
     // Footholds: one reusable sprite, instantiated per waypoint, varied only by
     // transform. Thirty of these is thirty draws of one 18x11 image.
-    const stepId = scenario.assetBindings.waypointVisuals[0];
+    const stepId = bindings.waypointVisuals[0];
     const step = stepId ? this.#assets.get(stepId) : null;
     const climb = panel.climb;
 
@@ -181,7 +188,7 @@ export class ScenarioStripView {
     });
 
     // The destination, visible from the start so the climb has a point.
-    const goal = this.#assets.get(scenario.assetBindings.destinationVisual);
+    const goal = this.#assets.get(bindings.destinationVisual);
     const goalAt = toScreen(route.destination);
     if (goal) {
       const goalScale = (this.#height / 300) * 1.7;

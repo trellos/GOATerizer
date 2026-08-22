@@ -1,15 +1,16 @@
 /**
  * The scenario library.
  *
- * Adding another `ClimbMinigame` scenario means: author a JSON file, drop its
- * art in `public/assets/scenarios/<id>/`, and add one entry here. No gameplay
- * code changes — which is the property the run shell and `ClimbMinigame` exist
- * to preserve.
+ * Adding another scenario of a class that already exists means: author a JSON
+ * file, drop its art in `public/assets/scenarios/<id>/`, and add one entry here.
+ * No gameplay code changes — which is the property the run shell and the
+ * minigame classes exist to preserve.
  *
  * The vertical slice ships one scenario. The run shell below still models all
  * 16 slots and the real difficulty sequence.
  */
 
+import canCrushingJson from "../../docs/scenarios/can-crushing/can_crushing.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
 import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
@@ -83,11 +84,38 @@ export const ROCKY_DESCENT_HIGH: ScenarioDefinition = loadScenario(
   assetUrls("rocky-descent-high", climbAssetIds("rocky_descent_high"))
 );
 
+/**
+ * The `RepeatMinigame` slots, likewise derived rather than retyped. Unlike the
+ * Rocky family these ids are not a function of the scenario id — they follow
+ * the canonical catalogue naming (`hero80_`, `prop_`, `fx_`), so this one is
+ * spelled out rather than templated.
+ */
+const CAN_CRUSHING_ASSET_IDS: readonly string[] = [
+  "bg_can_crushing",
+  "hero80_can_crushing_ready",
+  "hero80_can_crushing_action",
+  "hero80_can_crushing_finish",
+  "prop_can_crushing_intact",
+  "prop_can_crushing_done",
+  "fx_can_crushing_impact",
+];
+
+/**
+ * The one `RepeatMinigame` scenario: a performer who stands still while the
+ * player places cans at him. PROTOTYPE — see
+ * `docs/game-design/PROPOSED_Timeline_Actors.md` §5.
+ */
+export const CAN_CRUSHING: ScenarioDefinition = loadScenario(
+  canCrushingJson,
+  assetUrls("can-crushing", CAN_CRUSHING_ASSET_IDS)
+);
+
 export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
   ROCKY_DESCENT_HIGH,
+  CAN_CRUSHING,
 ];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {

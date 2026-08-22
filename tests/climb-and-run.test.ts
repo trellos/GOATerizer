@@ -16,6 +16,32 @@ import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import { ClimbMinigame } from "../src/scenario/minigames/climb-minigame.js";
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import type { RunKey } from "../src/music/keys.js";
+import type { ClimbAssetBindings, ClimbClassParameters } from "../src/scenario/types.js";
+
+/**
+ * Rocky Ascent is a `ClimbMinigame`, so it has climb bindings, climb parameters
+ * and a route on every level. Narrowing that once here keeps the assertions
+ * below readable — and makes the failure mode "Rocky Ascent stopped being a
+ * climb scenario" rather than a wall of non-null assertions.
+ */
+const ASCENT_BINDINGS: ClimbAssetBindings = (() => {
+  const bindings = ROCKY_ASCENT.assetBindings;
+  if (bindings.kind !== "climb") throw new Error("Rocky Ascent must bind ClimbMinigame slots");
+  return bindings;
+})();
+
+const ASCENT_PARAMETERS: ClimbClassParameters = (() => {
+  const parameters = ROCKY_ASCENT.classParameters;
+  if (parameters.kind !== "climb") throw new Error("Rocky Ascent must carry ClimbMinigame parameters");
+  return parameters;
+})();
+
+function routeOf(difficulty: number) {
+  const route = ROCKY_ASCENT.levels.get(difficulty)?.route;
+  if (!route) throw new Error(`Rocky Ascent L${difficulty} must author a route`);
+  return route;
+}
+
 
 const KEY: RunKey = { tonic: 7, mode: "minor" };
 const BPM = 120;
@@ -86,10 +112,10 @@ function playFlawlessly(difficulty: number): {
 describe("ClimbMinigame progress", () => {
   it("starts at the route's start position, on no waypoint", () => {
     const { attempt } = harness(1);
-    const state = attempt.climb.state;
+    const state = attempt.climb!.state;
     expect(state.waypointIndex).toBe(-1);
     expect(state.successfulNotes).toBe(0);
-    expect(state.position).toEqual(ROCKY_ASCENT.levels.get(1)!.route.startPosition);
+    expect(state.position).toEqual(routeOf(1).startPosition);
   });
 
   it("advances exactly one waypoint on a Perfect note", () => {
@@ -97,8 +123,8 @@ describe("ClimbMinigame progress", () => {
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    expect(h.attempt.climb.state.waypointIndex).toBe(0);
-    expect(h.attempt.climb.state.successfulNotes).toBe(1);
+    expect(h.attempt.climb!.state.waypointIndex).toBe(0);
+    expect(h.attempt.climb!.state.successfulNotes).toBe(1);
   });
 
   it("advances exactly one waypoint on a Good note too", () => {
@@ -107,7 +133,7 @@ describe("ClimbMinigame progress", () => {
     h.playAt(target.midi, target.startBeat, 0.4); // late, but successful
     h.advanceTo(0.45);
     expect(h.events.some((e) => e.type === "judgment" && e.judgment.type === "GoodNote")).toBe(true);
-    expect(h.attempt.climb.state.waypointIndex).toBe(0);
+    expect(h.attempt.climb!.state.waypointIndex).toBe(0);
   });
 
   it("does not advance on a wrong note, and does not lose earned progress", () => {
@@ -115,14 +141,14 @@ describe("ClimbMinigame progress", () => {
     const first = h.attempt.targets[0]!;
     h.playAt(first.midi, first.startBeat);
     h.advanceTo(0.01);
-    const earned = h.attempt.climb.state.waypointIndex;
+    const earned = h.attempt.climb!.state.waypointIndex;
 
     const second = h.attempt.targets[1]!;
     h.playAt(second.midi + 1, second.startBeat); // a semitone off
     h.advanceTo(second.startBeat + 0.01);
 
-    const state = h.attempt.climb.state;
-    const waypoint = ROCKY_ASCENT.levels.get(1)!.route.waypoints[earned]!;
+    const state = h.attempt.climb!.state;
+    const waypoint = routeOf(1).waypoints[earned]!;
     expect(state.waypointIndex).toBe(earned);
     expect(state.successfulNotes).toBe(1);
     // Wobble is a lean, not a fall.
@@ -133,7 +159,7 @@ describe("ClimbMinigame progress", () => {
   it("does not advance on a miss", () => {
     const h = harness(1);
     h.advanceTo(2); // let the first two targets expire unplayed
-    expect(h.attempt.climb.state.waypointIndex).toBe(-1);
+    expect(h.attempt.climb!.state.waypointIndex).toBe(-1);
     expect(h.events.filter((e) => e.type === "judgment" && e.judgment.type === "MissedNote").length)
       .toBeGreaterThan(0);
   });
@@ -143,9 +169,9 @@ describe("ClimbMinigame progress", () => {
     // its own bad energy and would keep re-triggering the wobble.
     const level = ROCKY_ASCENT.levels.get(1)!;
     const climb = new ClimbMinigame({
-      route: level.route,
-      bindings: ROCKY_ASCENT.assetBindings,
-      parameters: ROCKY_ASCENT.classParameters,
+      route: routeOf(1),
+      bindings: ASCENT_BINDINGS,
+      parameters: ASCENT_PARAMETERS,
     });
 
     climb.applyEnergy({ polarity: "good", strength: "perfect" }, 0);
@@ -169,10 +195,10 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.01);
-      poses.push(h.attempt.climb.state.poseAssetId);
+      poses.push(h.attempt.climb!.state.poseAssetId);
     }
     expect(new Set(poses).size).toBeGreaterThan(1);
-    for (const pose of poses) expect(ROCKY_ASCENT.assetBindings.climberPoses).toContain(pose);
+    for (const pose of poses) expect(ASCENT_BINDINGS.climberPoses).toContain(pose);
   });
 
   it("shows a contact effect and an accent, weaker for Good than for Perfect", () => {
@@ -180,14 +206,14 @@ describe("ClimbMinigame progress", () => {
     const first = perfect.attempt.targets[0]!;
     perfect.playAt(first.midi, first.startBeat);
     perfect.advanceTo(0.01);
-    const perfectAccent = perfect.attempt.climb.state.effects.find((e) => e.kind === "accent");
-    expect(perfect.attempt.climb.state.effects.some((e) => e.kind === "contact")).toBe(true);
+    const perfectAccent = perfect.attempt.climb!.state.effects.find((e) => e.kind === "accent");
+    expect(perfect.attempt.climb!.state.effects.some((e) => e.kind === "contact")).toBe(true);
     expect(perfectAccent?.strength).toBe(1);
 
     const good = harness(1);
     good.playAt(first.midi, first.startBeat, 0.4);
     good.advanceTo(0.45);
-    const goodAccent = good.attempt.climb.state.effects.find((e) => e.kind === "accent");
+    const goodAccent = good.attempt.climb!.state.effects.find((e) => e.kind === "accent");
     expect(goodAccent?.strength).toBeLessThan(1);
   });
 
@@ -198,7 +224,7 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.001);
-      seen.push(h.attempt.climb.state.waypointIndex);
+      seen.push(h.attempt.climb!.state.waypointIndex);
     }
     // Strictly increasing, one per note, right through the measure boundaries.
     expect(seen).toEqual([...Array(15).keys()]);
@@ -207,16 +233,16 @@ describe("ClimbMinigame progress", () => {
 
   it("maps every successful note onto its own waypoint at L4's 30 steps", () => {
     const { attempt } = playFlawlessly(4);
-    expect(attempt.climb.state.successfulNotes).toBe(30);
-    expect(attempt.climb.waypointCount).toBe(30);
+    expect(attempt.climb!.state.successfulNotes).toBe(30);
+    expect(attempt.climb!.waypointCount).toBe(30);
   });
 
   it("finishes at the destination when the attempt passes", () => {
     const { attempt, result } = playFlawlessly(1);
     expect(result.passed).toBe(true);
-    expect(attempt.climb.state.finished).toBe(true);
-    expect(attempt.climb.state.position).toEqual(ROCKY_ASCENT.levels.get(1)!.route.destination);
-    expect(attempt.climb.state.poseAssetId).toBe(ROCKY_ASCENT.assetBindings.finishPose);
+    expect(attempt.climb!.state.finished).toBe(true);
+    expect(attempt.climb!.state.position).toEqual(routeOf(1).destination);
+    expect(attempt.climb!.state.poseAssetId).toBe(ASCENT_BINDINGS.finishPose);
   });
 
   it("freezes at the furthest earned waypoint when the attempt fails", () => {
@@ -228,9 +254,9 @@ describe("ClimbMinigame progress", () => {
     const result = h.attempt.result!;
     expect(result.stars).toBe(0);
     expect(result.passed).toBe(false);
-    expect(h.attempt.climb.state.finished).toBe(false);
-    expect(h.attempt.climb.state.frozen).toBe(true);
-    expect(h.attempt.climb.state.waypointIndex).toBe(0);
+    expect(h.attempt.climb!.state.finished).toBe(false);
+    expect(h.attempt.climb!.state.frozen).toBe(true);
+    expect(h.attempt.climb!.state.waypointIndex).toBe(0);
   });
 });
 
@@ -324,6 +350,30 @@ describe("run shell", () => {
         expect(eligibleIds).toContain(slot.scenario!.id);
       }
     }
+  });
+
+  it("pins every eligible slot to one scenario, for developer use", () => {
+    const run = new RunState({
+      key: KEY,
+      bpm: BPM,
+      random: () => 0,
+      pinnedScenarioId: "can_crushing",
+    });
+    for (const slot of run.slots) {
+      const eligible = scenariosForDifficulty(slot.difficulty).map((scenario) => scenario.id);
+      // Where it is not eligible, selection carries on as normal rather than
+      // leaving the slot empty.
+      if (eligible.includes("can_crushing")) expect(slot.scenario?.id).toBe("can_crushing");
+      else if (eligible.length > 0) expect(slot.scenario).not.toBeNull();
+    }
+  });
+
+  it("ignores a pin naming a scenario that does not exist", () => {
+    const run = new RunState({ key: KEY, bpm: BPM, random: () => 0, pinnedScenarioId: "nope" });
+    const normal = new RunState({ key: KEY, bpm: BPM, random: () => 0 });
+    expect(run.slots.map((slot) => slot.scenario?.id ?? null)).toEqual(
+      normal.slots.map((slot) => slot.scenario?.id ?? null)
+    );
   });
 
   it("ends the run at the first slot nothing authors, as a content limit", () => {

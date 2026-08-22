@@ -1,10 +1,23 @@
 # PROPOSED — Actors on the timeline
 
-**Status: designed, not built. Nothing in this document ships today.**
+**Status: drafted on `claude/timeline-actors-draft`. Not on `main`.**
 
 This is the design agreed in the goat-on-the-bars conversation, scoped down to a
-rough draft: the existing scale runs, plus one easy REPEAT scenario. It is
-written to be argued with before any of it is implemented.
+rough draft: the existing scale runs, plus one easy REPEAT scenario.
+
+Everything under "In" in §1 is now built on that branch and playable. What is
+built differs from the design as first written in three places, each noted
+inline below and in `DECISION_LOG.md` (DECISION-019 to 021):
+
+1. **Can Crushing's material is one pitch.** §5 assumed a can could be authored
+   on any lane. It cannot while the performer is stationary — see §5.
+2. **The crusher stands further back than the goat.** 1.2 beats rather than
+   34px, because the can's flight *is* the read — see §5.
+3. **The trophy is a goat-head bust.** Ornament tiers as designed; the art is
+   canvas-free inline SVG rather than a sprite — see §7.
+
+The rest of the document is the design as agreed, and the open questions in §8
+are still open.
 
 The premise, in one line: **the note bar is a container, and an actor at the
 strike line has a verb.** The timeline stops being notation beside a scenario
@@ -89,6 +102,15 @@ Rules:
    rendered between 0.45 and 1.5 lane heights. Notes 1–5 feel enormous, note 25
    still nudges, and a clean L1 (15–16 notes) can max it exactly as a clean L6
    can.
+5. **Past the size cap, the streak buys decoration instead of mass.** Every
+   further 4 unbroken notes adds a small star sparking off the actor, up to
+   four. Size stops eating the read-ahead zone at 12, but a 28-note streak still
+   visibly registers — and the decorations vanish with the actor on a break, so
+   the whole streak is still one readable object.
+
+   These are **not** the trophy's ornaments. The trophy's horns and crown come
+   from the star count and are earned per attempt; these are live, transient,
+   and come from the streak. They should not share art.
 5. `peakStreak` is `bestStreak`, which `AttemptScore` already tracks. The actor
    does not need its own copy; this is listed for clarity.
 
@@ -145,6 +167,30 @@ the hook exists.
 **This needs a second minigame class**, which is the largest single piece of
 work in the draft. See §6.
 
+### Two things the build changed
+
+**Every authored note is the root.** The three bullets above are only coherent
+if the note the player is *asked* for is on the crusher's lane. Otherwise
+playing correctly puts the can somewhere he cannot reach and the player is shown
+the failure animation for a note they got right. While he is stationary, the
+material has to sit entirely on his lane — so Can Crushing L1–4 escalate by
+rhythm alone, which is what a REPEAT exercise is anyway. A test pins it
+(`tests/can-crushing.test.ts`). The between-measures walk relaxes this to "one
+lane per measure"; it is the first thing worth building next here.
+
+**He stands 1.2 beats back from the strike line, not 34px.** The goat's offset
+is small on purpose — it lands where you played. But the crusher's read is the
+can's *flight*: born in its bar at the strike line, scrolling left at exactly
+the bars' speed, and either arriving in his hands or passing over his head. At
+34px that flight is under a third of a beat and the crush is over before the eye
+finds it. At 1.2 beats it is roughly 800ms at 90bpm, there are two cans in the
+air at once during eighths, and an overshoot is legible as it happens.
+
+A can also rides in every bar that has not reached the strike line yet, which is
+the "the note bar is a container" premise made literal: what is coming at you is
+visibly a can, and at the strike line it either goes to him or goes where you
+actually played.
+
 ---
 
 ## 6. What this costs in the existing code
@@ -160,10 +206,14 @@ Proposed:
   route validation exactly as they are.
 - Add `parseRepeatBindings` for the smaller REPEAT slot set, and make the route
   optional for classes that have no route.
-- **Keep the climb routes.** They are still the authored record of each
-  scenario's shape, they still validate, and deleting 93 coordinates on the
-  strength of an untested prototype is not a trade worth making. If the actor
-  model survives play, that is when they go.
+- **Keep the climb routes.** A waypoint is not a note — it is a *position in the
+  scenario art panel*: normalised `x`/`y` plus a `scale` and `rotationDeg` for
+  the reused foothold sprite, one per note opportunity, which is what makes "one
+  good note = one step" true today. Under this design the actor's position comes
+  from the note's lane instead, so the coordinates stop being read. They are
+  still the authored record of each route's shape, they still validate, and
+  deleting 93 of them on the strength of an untested prototype is not a trade
+  worth making. If the actor model survives play, that is when they go.
 
 Files touched:
 
@@ -208,6 +258,14 @@ where the star history is now.
 - Size: full at 1 star. Size does not vary — the shelf records results, and the
   live goat already carried consistency during play.
 - Ornament: nothing at 1 star, horns at 2, crown at 3.
+
+Built as a goat-head bust on a plinth (`src/ui/trophy.ts`), inline SVG in
+`currentColor` so the shelf's existing pass/fail colours keep applying. The
+stars that fly from the scenario to the shelf at the end of an attempt now
+*build* the trophy as they land: the first raises the bust, the second adds the
+horns, the third the crown. That is "goats lead to stars, stars lead to the
+trophy" shown rather than explained, and it cost nothing — the flight animation
+already fired one callback per star.
 
 ---
 

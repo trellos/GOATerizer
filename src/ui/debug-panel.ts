@@ -10,10 +10,18 @@
 
 export type DebugSnapshot = Record<string, string>;
 
+/**
+ * How the autoplay driver plays: dead on, late enough for Good, late and
+ * dropping notes, or in time on the wrong pitch. `fumbled` exists because
+ * wrong-pitch feedback is a mechanic of its own in `RepeatMinigame` — the can
+ * lands where you played — and nothing else here can produce a wrong note.
+ */
+export type AutoplayMode = "perfect" | "good" | "scruffy" | "fumbled" | "off";
+
 export type DebugHandlers = {
   onSourceChange: (source: "tuninator" | "synth" | "test") => void;
   onLatencyChange: (milliseconds: number) => void;
-  onAutoplay: (mode: "perfect" | "good" | "scruffy" | "off") => void;
+  onAutoplay: (mode: AutoplayMode) => void;
 };
 
 export class DebugPanel {
@@ -47,6 +55,7 @@ export class DebugPanel {
       ["dev-autoplay-perfect", "perfect"],
       ["dev-autoplay-good", "good"],
       ["dev-autoplay-scruffy", "scruffy"],
+      ["dev-autoplay-fumbled", "fumbled"],
       ["dev-autoplay-off", "off"],
     ] as const) {
       root.querySelector(`#${id}`)?.addEventListener("click", () => handlers.onAutoplay(mode));

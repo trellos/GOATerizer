@@ -4,6 +4,39 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-021: The shelf holds trophies, and stars are earned against two different metrics
+* **Date:** 2026-08-22
+* **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Two related problems. The run's record was sixteen slots showing `★`, `★★`, `★★★` at half a rem — a count you had to read rather than see. And the actor on the timeline makes consistency visible during play with nothing to show for it afterwards, which is a mechanic that ends at the attempt boundary.
+* **Decision:** (a) `StarMeter.update()` takes two numbers — accuracy points, and accuracy plus a consistency bonus — and uses the right one per comparison: **accuracy only for 0→1** so consistency can never buy a pass, **accuracy + bonus for 1→2** so a long clean streak is what earns the second star, **accuracy only for 2→3** so three stars stays a perfection badge. The bonus is `bestStreak × 1` point against 10 for a Perfect, so a flawless attempt's bonus is exactly 10% of its own maximum at any note count. (b) The shelf shows one trophy per *passed* minigame: a goat-head bust, full size at one star and never varying, ornamented by star tier — nothing, horns, crown. The stars that already fly from the scenario to the shelf now build the trophy as they land.
+* **Alternatives Considered:** (a) A single blended metric. Rejected: with pass at 45% and a 15% bonus, a 30% attempt clears the pass line on consistency alone — "never losable on one metric" has to be structural, not a matter of picking the bonus small enough. (b) Trophy size scaling with stars. Rejected: sixteen trophies in three sizes is the star count again, harder to read, and the live actor already carried size during play. Size answers "how many did I clear" by count; silhouette answers "how well".
+* **Consequences:** Positive — the star a player earns for grinding out a clean run is now a different star from the one they earn for accuracy, and the shelf is readable at a glance. Negative — the bonus magnitude is a guess (10%) that needs play to tune, and until then the second star is easier to reach than it was. `stars.ts` now tracks two peaks rather than one.
+
+---
+
+#### DECISION-020: Authored pitch places terrain; played pitch places projectiles
+* **Date:** 2026-08-22
+* **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Once the note bar is a container an actor stands on, the question is what a *wrong* note puts in it. Letting the played pitch place everything is the more responsive answer, and for a climber it is fatal: a flub could put the goat on a ledge the next authored note is unreachable from, so one mistake ends a run.
+* **Decision:** Split by what the object is. **Terrain** — anything the actor stands on or has to reach — comes from the authored pitch and is therefore deterministic and readable seconds ahead. **Projectiles** — anything that resolves at the strike line and leaves no state — come from the played pitch. `ClimbMinigame`'s goat lands on `judgment.target.lane`, never on what was played. `RepeatMinigame`'s can appears at `laneOfMidi(judgment.playedMidi)`, and is crushed only if that is the performer's own lane. Off-scale or unpitched input spawns a can wobbling rather than snapping it to a lane it does not belong on.
+* **Alternatives Considered:** (a) Played pitch everywhere. Rejected above. (b) Authored pitch everywhere. Rejected: wrong-note feedback then says only "wrong", where a can arriving two lanes high says "you overshot by a third" before the player can think about it — the projectile channel is the only place in the game that reports *how* you were wrong, in the moment.
+* **Consequences:** Positive — one sentence decides where every future class's objects come from, and no class needs a special case. Negative — it constrains authoring for stationary performers: while the crusher does not move, every note in his material must be on his lane, or correct play triggers the failure animation. Can Crushing L1–4 are authored entirely on the root because of it, and a test enforces it.
+
+---
+
+#### DECISION-019: The timeline is where the scenario happens
+* **Date:** 2026-08-22
+* **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The player has to watch the timeline to know what note is coming, so in a two-pane layout their eyes never reach the scenario and the payoff is invisible. Overlaying the timeline on the art (the previous branch) fixed the geometry but not the attention: the goat was still a separate object behind separate notation.
+* **Decision:** Put the actor **on the bars**. `TimelineActor` is a small pure class owned by `AttemptRuntime` beside the minigame class, fed the same judgment stream: it stands on the lane of the note being judged, dies on a miss or a wrong note, and is reborn at minimum size on the next good one. Size is `min(1, sqrt(streak / 12))` — notes 1–5 feel enormous, note 25 still nudges — and past the cap the streak buys small stars sparking off it instead of mass. Fallen actors mill on a floor strip below the band, capped at eight, so a bad patch fills the screen rather than emptying it. Nothing about the actor can end a run, gate a star, or make the next note harder: it is a *display of* the streak, not a second rule system.
+* **Alternatives Considered:** (a) Contour-tracing locomotion — the actor walking the melodic line continuously. Deferred: at 140bpm eighths there are 214ms between notes, which reads, but sixteenths would be 107ms and no shipped scenario authors them yet, so the case cannot be tested. Discrete jumps until it can. (b) Keeping the waypoint routes as the actor's path. Rejected: a waypoint is a position in the *art panel*, not a note, and the actor's position has to come from the lane. The 93 authored waypoints stay, unread, behind the class switch — deleting them on the strength of an untested prototype is not a trade worth making.
+* **Consequences:** Positive — one gaze covers the notation and the payoff, and the streak is one readable object that grows, decorates and dies. Negative — two presentations of the same run now exist in one build (the strip's climber and the timeline's actor), which is deliberate for comparison but is duplicated state until one wins. The live actor's decorations and the trophy's ornaments are separate systems that must not share art, and nothing but this note enforces that.
+
+---
+
 #### DECISION-018: The key is spelled conventionally, not forced to sharps
 * **Date:** 2026-08-21
 * **Status:** Accepted

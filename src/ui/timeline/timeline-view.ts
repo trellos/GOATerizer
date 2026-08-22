@@ -31,7 +31,16 @@ import { formatFretPosition, OPEN_STRING_MIDI, STRING_NAMES } from "../../music/
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
 import { midiToName } from "../../music/pitch.js";
-import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js";
+import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
+import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
+import { drawTimelineActor } from "./actor-layer.js";
+import { drawRepeatPerformer } from "./repeat-layer.js";
+import type {
+  PlayedNote,
+  TargetNote,
+  TimelineModel,
+  TimelineSnapshot,
+} from "./timeline-model.js";
 
 export type TimelineViewMode = "key" | "tab";
 
@@ -84,6 +93,11 @@ export class TimelineView {
   #mode: TimelineViewMode = "key";
   /** Drawn over the scenario rather than in a pane of its own. */
   #overlay = false;
+  /** PROTOTYPE: the actor standing on the note bars, or null when off. */
+  #actor: TimelineActorState | null = null;
+  #actorBeat = 0;
+  /** PROTOTYPE: the repeat performer, when the scenario is a `RepeatMinigame`. */
+  #repeat: RepeatVisualState | null = null;
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
@@ -115,6 +129,24 @@ export class TimelineView {
    */
   setOverlay(overlay: boolean): void {
     this.#overlay = overlay;
+  }
+
+  /**
+   * PROTOTYPE: the actor to draw on the bars, and the attempt-relative beat to
+   * draw it at. Null clears it — pregame has no attempt, so it has no actor.
+   */
+  setActor(actor: TimelineActorState | null, attemptBeat: number): void {
+    this.#actor = actor;
+    this.#actorBeat = attemptBeat;
+  }
+
+  /**
+   * PROTOTYPE: the repeat performer to draw, sharing `setActor`'s beat. Setting
+   * one replaces the climbing actor rather than joining it — a scenario has one
+   * character on the bars, and which one is a fact about its minigame class.
+   */
+  setRepeat(repeat: RepeatVisualState | null): void {
+    this.#repeat = repeat;
   }
 
   setKey(key: RunKey): void {
@@ -273,8 +305,54 @@ export class TimelineView {
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
     for (const note of snapshot.targets) this.#drawTarget(note, nowBeat);
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
+    this.#drawActor(snapshot, nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
+  }
+
+  /**
+   * PROTOTYPE: whichever character this scenario puts on the bars. Key View
+   * only — tablature's string rows carry no pitch contour, so a character
+   * hopping them would be hopping nothing meaningful.
+   */
+  #drawActor(snapshot: TimelineSnapshot, nowBeat: number): void {
+    if (this.#mode !== "key") return;
+    const repeat = this.#repeat;
+    const actor = this.#actor;
+    if (!repeat && !actor) return;
+
+    const ctx = this.#ctx;
+    ctx.save();
+    this.#clipPlayfield();
+    const geometry = {
+      // Continuous, so the hop between lanes interpolates smoothly rather
+      // than snapping between integer rows.
+      laneY: (lane: number) => this.#rowY(lane) - this.#noteHeight / 2,
+      strikeX: this.#strikeX,
+      rowHeight: this.#rowHeight,
+      floorY: this.#bandTop + this.#bandHeight + this.#rowHeight * 0.7,
+    };
+    if (repeat) {
+      // A can rides in every bar that has not reached the strike line yet.
+      // Once the note is judged the performer's own state owns that can, so
+      // the two never draw the same one twice.
+      const pending = snapshot.targets
+        .filter((note) => note.outcome === null && note.startBeat >= nowBeat)
+        .map((note) => ({
+          x: this.#x(note.startBeat, nowBeat),
+          y: geometry.laneY(note.lane),
+        }));
+      drawRepeatPerformer(
+        ctx,
+        repeat,
+        { ...geometry, pixelsPerBeat: this.#pixelsPerBeat },
+        this.#actorBeat,
+        pending
+      );
+    } else if (actor) {
+      drawTimelineActor(ctx, actor, geometry, this.#actorBeat);
+    }
+    ctx.restore();
   }
 
   /**

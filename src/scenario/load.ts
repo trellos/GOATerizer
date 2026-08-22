@@ -15,7 +15,11 @@ import type {
   MinigameClassId,
   NoteDuration,
   PromptEvent,
+  RepeatAssetBindings,
+  RepeatClassParameters,
   RouteData,
+  ScenarioAssetBindings,
+  ScenarioClassParameters,
   ScenarioDefinition,
   ScenarioLevelData,
   StarThresholds,
@@ -193,7 +197,7 @@ function parseRoute(raw: unknown, where: string, expectedWaypoints: number): Rou
   };
 }
 
-function parseLevel(raw: unknown, where: string): ScenarioLevelData {
+function parseLevel(raw: unknown, where: string, needsRoute: boolean): ScenarioLevelData {
   const level = obj(raw, where);
   const measurePlan = parseMeasurePlan(level["measurePlan"], `${where}.measurePlan`);
   const prompt = parsePrompt(level["prompt"], `${where}.prompt`, measurePlan);
@@ -218,12 +222,16 @@ function parseLevel(raw: unknown, where: string): ScenarioLevelData {
     measurePlan,
     stars: parseStars(level["stars"], `${where}.stars`),
     scoring: { streakBonusEligible: bool(scoring["streakBonusEligible"], `${where}.scoring.streakBonusEligible`) },
-    route: parseRoute(visual["route"], `${where}.visual.route`, noteCount),
+    // A route is required of route-having classes and refused from the rest —
+    // a `RepeatMinigame` performer stands still, so authoring a path for one
+    // would be authoring data that means nothing.
+    route: needsRoute ? parseRoute(visual["route"], `${where}.visual.route`, noteCount) : null,
     visual,
   };
 }
 
-function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
+/** Slot readers shared by every class's bindings parser. */
+function bindingReaders(raw: unknown, where: string) {
   const bindings = obj(raw, where);
   const one = (slot: string): string => {
     const values = strings(bindings[slot], `${where}.${slot}`);
@@ -240,7 +248,11 @@ function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
     }
     return values;
   };
+  return { one, many };
+}
 
+function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
+  const { one, many } = bindingReaders(raw, where);
   return {
     background: one("background"),
     climberPoses: many("climberPoses", 1),
@@ -249,6 +261,42 @@ function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
     destinationVisual: one("destinationVisual"),
     stepEffects: many("stepEffects", 2),
   };
+}
+
+function parseRepeatBindings(raw: unknown, where: string): RepeatAssetBindings {
+  const { one, many } = bindingReaders(raw, where);
+  return {
+    background: one("background"),
+    performerNeutral: one("performerNeutral"),
+    performerAction: one("performerAction"),
+    performerFinish: one("performerFinish"),
+    repeatTarget: one("repeatTarget"),
+    targetCompletedState: one("targetCompletedState"),
+    impactEffects: many("impactEffects", 1),
+  };
+}
+
+/** Every asset id a set of bindings refers to, whatever the class. */
+function boundAssetIds(bindings: ScenarioAssetBindings): string[] {
+  if (bindings.kind === "climb") {
+    return [
+      bindings.background,
+      ...bindings.climberPoses,
+      bindings.finishPose,
+      ...bindings.waypointVisuals,
+      bindings.destinationVisual,
+      ...bindings.stepEffects,
+    ];
+  }
+  return [
+    bindings.background,
+    bindings.performerNeutral,
+    bindings.performerAction,
+    bindings.performerFinish,
+    bindings.repeatTarget,
+    bindings.targetCompletedState,
+    ...bindings.impactEffects,
+  ];
 }
 
 function parseClimbParameters(raw: unknown, where: string, plan: MeasurePlan): ClimbClassParameters {
@@ -264,6 +312,27 @@ function parseClimbParameters(raw: unknown, where: string, plan: MeasurePlan): C
     showDestinationFromStart: bool(
       params["showDestinationFromStart"],
       `${where}.showDestinationFromStart`
+    ),
+  };
+}
+
+function parseRepeatParameters(
+  raw: unknown,
+  where: string,
+  plan: MeasurePlan
+): RepeatClassParameters {
+  const params = obj(raw, where);
+  const mode = str(params["repeatMode"], `${where}.repeatMode`);
+  if (mode !== "sequence" && mode !== "accumulate") {
+    throw new ScenarioDataError(`${where}.repeatMode`, 'expected "sequence" or "accumulate"');
+  }
+  return {
+    visualSpanMeasures: num(params["visualSpanMeasures"], `${where}.visualSpanMeasures`),
+    resetBetweenMeasures: plan.resetBetweenMeasures,
+    repeatMode: mode,
+    performerMovesBetweenMeasures: bool(
+      params["performerMovesBetweenMeasures"],
+      `${where}.performerMovesBetweenMeasures`
     ),
   };
 }
@@ -305,7 +374,7 @@ export function loadScenario(
     if (entry === undefined) {
       throw new ScenarioDataError("scenario.levels", `level ${level} is supported but absent`);
     }
-    const parsed = parseLevel(entry, `scenario.levels.${level}`);
+    const parsed = parseLevel(entry, `scenario.levels.${level}`, minigameClass === "ClimbMinigame");
     if (parsed.difficulty !== level) {
       throw new ScenarioDataError(
         `scenario.levels.${level}.difficulty`,
@@ -318,15 +387,32 @@ export function loadScenario(
   const firstLevel = levels.values().next().value;
   if (!firstLevel) throw new ScenarioDataError("scenario.levels", "no supported levels");
 
-  const bindings = parseClimbBindings(root["assetBindings"], "scenario.assetBindings");
-  for (const assetId of [
-    bindings.background,
-    ...bindings.climberPoses,
-    bindings.finishPose,
-    ...bindings.waypointVisuals,
-    bindings.destinationVisual,
-    ...bindings.stepEffects,
-  ]) {
+  // One decision — the declared class — picks both the binding shape and the
+  // parameter shape, so a scenario can never end up with one class's slots and
+  // another's parameters.
+  const isRepeat = minigameClass === "RepeatMinigame";
+  const bindings: ScenarioAssetBindings = isRepeat
+    ? { kind: "repeat", ...parseRepeatBindings(root["assetBindings"], "scenario.assetBindings") }
+    : { kind: "climb", ...parseClimbBindings(root["assetBindings"], "scenario.assetBindings") };
+  const parameters: ScenarioClassParameters = isRepeat
+    ? {
+        kind: "repeat",
+        ...parseRepeatParameters(
+          root["classParameters"],
+          "scenario.classParameters",
+          firstLevel.measurePlan
+        ),
+      }
+    : {
+        kind: "climb",
+        ...parseClimbParameters(
+          root["classParameters"],
+          "scenario.classParameters",
+          firstLevel.measurePlan
+        ),
+      };
+
+  for (const assetId of boundAssetIds(bindings)) {
     if (assetUrls[assetId] === undefined) {
       throw new ScenarioDataError("scenario.assetBindings", `no URL supplied for ${assetId}`);
     }
@@ -341,11 +427,7 @@ export function loadScenario(
     visualVerb: str(root["visualVerb"], "scenario.visualVerb"),
     supportedLevels,
     premise: str(root["scenarioPremise"], "scenario.scenarioPremise"),
-    classParameters: parseClimbParameters(
-      root["classParameters"],
-      "scenario.classParameters",
-      firstLevel.measurePlan
-    ),
+    classParameters: parameters,
     assetBindings: bindings,
     assetUrls,
     levels,

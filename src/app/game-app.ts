@@ -43,12 +43,13 @@ import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingeri
 import { keyDisplayName, keyShortName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
-import { SCENARIOS } from "../scenario/registry.js";
+import { SCENARIOS, scenarioById } from "../scenario/registry.js";
 import { AssetStore } from "../ui/assets.js";
-import { DebugPanel } from "../ui/debug-panel.js";
+import { DebugPanel, type AutoplayMode } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
+import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import {
   OVERLAY_BAND_FRACTION,
@@ -73,6 +74,20 @@ type ActiveAttempt = {
   slotOrdinal: number;
   runtime: AttemptRuntime;
 };
+
+/**
+ * Puts one slot's trophy on the shelf. `null` clears it — an unplayed slot.
+ *
+ * `innerHTML` with a string this module built from a number: no user or asset
+ * content reaches it, and the alternative is hand-building eight SVG nodes.
+ */
+function setTrophy(slot: HTMLElement, stars: number | null): void {
+  const label = slot.querySelector(".slot-trophy");
+  if (!(label instanceof HTMLElement)) return;
+  label.innerHTML = stars === null ? "" : trophySvg(stars);
+  if (stars === null) slot.removeAttribute("aria-label");
+  else slot.setAttribute("aria-label", trophyLabel(stars));
+}
 
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
@@ -151,7 +166,8 @@ export class GameApp {
    * that is no longer always Rocky Ascent.
    */
   #devLevel: number | null = null;
-  #autoplay: "perfect" | "good" | "scruffy" | "off" = "off";
+  #devScenarioId: string | null = null;
+  #autoplay: AutoplayMode = "off";
   #autoplayScheduledFor: string | null = null;
 
   /* ------------------------------------------------------------------ */
@@ -376,6 +392,18 @@ export class GameApp {
     const level = Number(params.get("level"));
     if (this.#devMode && Number.isInteger(level) && level >= 1 && level <= 7) {
       this.#devLevel = level;
+    }
+
+    // `?scenario=<id>` pins every slot that scenario authors to it. Dev-only,
+    // and it must name a real scenario: silently ignoring a typo would look
+    // like the pin working and selection disagreeing with it.
+    const scenarioId = params.get("scenario");
+    if (this.#devMode && scenarioId) {
+      if (!scenarioById(scenarioId)) {
+        console.warn(`[goaterizer] ?scenario=${scenarioId} is not a registered scenario id`);
+      } else {
+        this.#devScenarioId = scenarioId;
+      }
     }
 
     const requestedInput = params.get("input");
@@ -619,10 +647,12 @@ export class GameApp {
     this.#run = new RunState({
       key: this.#setup.key,
       bpm: tempoById(this.#setup.tempoId).bpm,
-      // Dev-only. Normal play always uses the design's fixed difficulty curve.
+      // Dev-only. Normal play always uses the design's fixed difficulty curve
+      // and random scenario selection.
       ...(this.#devLevel !== null
         ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
         : {}),
+      ...(this.#devScenarioId !== null ? { pinnedScenarioId: this.#devScenarioId } : {}),
     });
     this.#current = null;
     this.#next = null;
@@ -637,8 +667,7 @@ export class GameApp {
     for (const container of ["hud-history", "results-history"]) {
       for (const slot of document.querySelectorAll<HTMLElement>(`#${container} .history-slot`)) {
         slot.dataset["state"] = "pending";
-        const stars = slot.querySelector(".slot-stars");
-        if (stars) stars.textContent = "";
+        setTrophy(slot, null);
       }
     }
 
@@ -818,17 +847,22 @@ export class GameApp {
     );
     const layer = this.#energy;
     const strip = this.#strip;
-    const setStars = (count: number) => {
-      const label = slot?.querySelector(".slot-stars");
-      if (label) label.textContent = "★".repeat(count);
+    /**
+     * Each star that lands upgrades the trophy it lands on: bare at one, horns
+     * at two, a crown at three. The ornament arriving with the star is the
+     * whole "goats lead to stars, stars lead to the trophy" chain shown rather
+     * than explained.
+     */
+    const setTrophyTier = (count: number) => {
+      if (slot) setTrophy(slot, count);
     };
 
     // The slot's *state* flips now, so a finished minigame never looks unplayed
-    // while its stars are still in the air. Only the glyphs arrive with them.
+    // while its trophy is still in the air. Only the trophy arrives with them.
     if (slot) slot.dataset["state"] = stars > 0 ? "done" : "failed";
 
     if (!slot || !layer || !strip || stars === 0) {
-      setStars(stars);
+      setTrophyTier(stars);
       return;
     }
 
@@ -836,7 +870,7 @@ export class GameApp {
     const rect = slot.getBoundingClientRect();
     const overlay = document.getElementById("energy-canvas");
     if (!from || !(overlay instanceof HTMLCanvasElement)) {
-      setStars(stars);
+      setTrophyTier(stars);
       return;
     }
     const overlayRect = overlay.getBoundingClientRect();
@@ -853,7 +887,7 @@ export class GameApp {
         polarity: "good",
         strong: true,
         bornBeat: nowBeat + i * 0.08,
-        onArrive: () => setStars(i + 1),
+        onArrive: () => setTrophyTier(i + 1),
       });
     }
   }
@@ -892,8 +926,7 @@ export class GameApp {
       const entry = run.slots[ordinal];
       const stars = entry?.result?.stars ?? 0;
       slot.dataset["state"] = entry?.result ? (stars > 0 ? "done" : "failed") : "pending";
-      const label = slot.querySelector(".slot-stars");
-      if (label) label.textContent = entry?.result ? "★".repeat(stars) : "";
+      setTrophy(slot, entry?.result ? stars : null);
     }
 
     this.#buildStartScreen();
@@ -937,6 +970,15 @@ export class GameApp {
       this.#pregameView?.render(this.#timeline, beat);
       this.#updatePregameReadouts();
     } else if (this.#screen === "game") {
+      // PROTOTYPE: the actor belongs to the attempt being played, and its beat
+      // is that attempt's, so its hop arc is in the phrase's own time.
+      const attempt = this.#current?.runtime;
+      this.#gameView?.setActor(
+        attempt ? attempt.actor.state : null,
+        attempt ? attempt.toAttemptBeat(beat) : 0
+      );
+      // A repeat scenario puts its own performer on the bars instead.
+      this.#gameView?.setRepeat(attempt?.repeat ? attempt.repeat.state : null);
       this.#gameView?.render(this.#timeline, beat);
       this.#renderStrip(beat);
       this.#energy?.render(beat);
@@ -963,7 +1005,7 @@ export class GameApp {
       return {
         scenario: slot.scenario,
         route: slot.scenario?.levels.get(slot.difficulty)?.route ?? null,
-        climb: runtime ? runtime.climb.state : null,
+        climb: runtime?.climb ? runtime.climb.state : null,
         stars: runtime ? runtime.starMeter.stars : slot.result?.stars ?? 0,
         starProgress: runtime ? runtime.starMeter.progressToNextStar : 0,
         difficulty: slot.difficulty,
@@ -1059,7 +1101,15 @@ export class GameApp {
       "judgment points": score ? String(score.judgmentPoints) : "—",
       stars: attempt ? String(attempt.starMeter.stars) : "—",
       waypoint: attempt
-        ? `${attempt.climb.state.waypointIndex + 1}/${attempt.climb.waypointCount}`
+        ? `${(attempt.climb?.state.waypointIndex ?? -1) + 1}/${attempt.climb?.waypointCount ?? 0}`
+        : "—",
+      // One readout per class, so the panel says "—" for the one this scenario
+      // is not rather than quietly reporting a zero that means nothing.
+      "cans crushed/missed": attempt?.repeat
+        ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.beaned}`
+        : "—",
+      "actor lane/streak": attempt
+        ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`
         : "—",
       "energy in flight": String(this.#energy?.activeCount ?? 0),
       autoplay: this.#autoplay,
@@ -1116,11 +1166,15 @@ export class GameApp {
     attempt.runtime.targets.forEach((target, index) => {
       if (mode === "scruffy" && index % 5 === 0) return;
       const offsetBeats = mode === "perfect" ? 0 : mode === "good" ? 0.3 : 0.34;
+      // `fumbled` is in time but on the wrong string: every third note lands a
+      // fifth high. It is the only way to see wrong-pitch feedback -- which is
+      // a whole mechanic in `RepeatMinigame` -- without a guitar in the room.
+      const midi = mode === "fumbled" && index % 3 === 1 ? target.midi + 7 : target.midi;
       const at = this.#transport.contextTimeAt(attempt.runtime.startBeat + target.startBeat);
       const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
       const attackTime = at + offsetBeats * secondsPerBeat + latency;
       if (testProvider) {
-        testProvider.schedule([{ at: attackTime, kind: "attack", midi: target.midi }]);
+        testProvider.schedule([{ at: attackTime, kind: "attack", midi }]);
       } else if (synth) {
         // A hair short of the full duration, so consecutive notes at the same
         // pitch still get a real onset each rather than reading as one long

@@ -95,7 +95,12 @@ export type ScenarioLevelData = {
   measurePlan: MeasurePlan;
   stars: StarThresholds;
   scoring: { streakBonusEligible: boolean };
-  route: RouteData;
+  /**
+   * The climber's authored path. `ClimbMinigame` only — a class with no route
+   * (`RepeatMinigame`, whose performer stands still) authors none, and the
+   * loader does not invent one for it.
+   */
+  route: RouteData | null;
   /** Free-form per-level visual character, passed to the class as parameters. */
   visual: Readonly<Record<string, unknown>>;
 };
@@ -120,6 +125,60 @@ export type ClimbClassParameters = {
   showDestinationFromStart: boolean;
 };
 
+/**
+ * `RepeatMinigame`'s parameters. Shares nothing with the climb's but the two
+ * measure-cycle fields: there is no route to show from the start and no wobble
+ * policy, because a wrong note here places a can rather than shaking a climber.
+ */
+export type RepeatClassParameters = {
+  visualSpanMeasures: number;
+  resetBetweenMeasures: boolean;
+  /** `sequence`: targets arrive one at a time. `accumulate`: they pile up. */
+  repeatMode: "sequence" | "accumulate";
+  /**
+   * Whether the performer may change lanes at a measure boundary, telegraphed
+   * by walking through the preceding one. Designed, not built — every scenario
+   * authors `false` today.
+   */
+  performerMovesBetweenMeasures: boolean;
+};
+
+/**
+ * `RepeatMinigame`'s slots, from the canonical schema in
+ * `GOATerizer_Scenario_Asset_Slot_Bindings.md` §2.
+ *
+ * A performer who stands still and does one thing over and over to a reusable
+ * target. Can Crushing decides the target is a beer can.
+ */
+export type RepeatAssetBindings = {
+  background: string;
+  performerNeutral: string;
+  performerAction: string;
+  performerFinish: string;
+  /** The reusable untouched unit — the can. */
+  repeatTarget: string;
+  /** What it becomes once dealt with. */
+  targetCompletedState: string;
+  impactEffects: readonly string[];
+};
+
+/**
+ * Bindings are named by the *class*, and which class a scenario belongs to is
+ * what decides the shape. Discriminated so nothing can read `waypointVisuals`
+ * off a scenario that has no waypoints.
+ */
+export type ScenarioAssetBindings =
+  | ({ kind: "climb" } & ClimbAssetBindings)
+  | ({ kind: "repeat" } & RepeatAssetBindings);
+
+/**
+ * Class parameters, discriminated the same way and by the same class decision,
+ * so a scenario can only ever carry the parameters its own class reads.
+ */
+export type ScenarioClassParameters =
+  | ({ kind: "climb" } & ClimbClassParameters)
+  | ({ kind: "repeat" } & RepeatClassParameters);
+
 export type ScenarioDefinition = {
   id: string;
   displayName: string;
@@ -129,8 +188,8 @@ export type ScenarioDefinition = {
   visualVerb: string;
   supportedLevels: readonly number[];
   premise: string;
-  classParameters: ClimbClassParameters;
-  assetBindings: ClimbAssetBindings;
+  classParameters: ScenarioClassParameters;
+  assetBindings: ScenarioAssetBindings;
   /** Asset id -> URL, resolved against the app's base path at load time. */
   assetUrls: Readonly<Record<string, string>>;
   levels: ReadonlyMap<number, ScenarioLevelData>;

@@ -19,6 +19,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
 import {
+  CAN_CRUSHING,
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
@@ -29,14 +30,22 @@ import {
 } from "../src/scenario/registry.js";
 
 describe("scenario registry", () => {
-  it("holds all four Rocky-family scenarios, each a ClimbMinigame in the Scale family", () => {
-    expect(SCENARIOS).toHaveLength(4);
+  it("holds the four Rocky-family climbs and the one repeat scenario", () => {
+    expect(SCENARIOS).toHaveLength(5);
     for (const scenario of SCENARIOS) {
+      if (scenario === CAN_CRUSHING) continue;
       expect(scenario.minigameClass).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
+    expect(CAN_CRUSHING.minigameClass).toBe("RepeatMinigame");
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
-      new Set(["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"])
+      new Set([
+        "rocky_ascent",
+        "rocky_ascent_high",
+        "rocky_descent",
+        "rocky_descent_high",
+        "can_crushing",
+      ])
     );
   });
 
@@ -45,6 +54,7 @@ describe("scenario registry", () => {
     expect(scenarioById("rocky_ascent_high")).toBe(ROCKY_ASCENT_HIGH);
     expect(scenarioById("rocky_descent")).toBe(ROCKY_DESCENT);
     expect(scenarioById("rocky_descent_high")).toBe(ROCKY_DESCENT_HIGH);
+    expect(scenarioById("can_crushing")).toBe(CAN_CRUSHING);
     expect(scenarioById("does_not_exist")).toBeUndefined();
   });
 
@@ -53,13 +63,20 @@ describe("scenario registry", () => {
     expect([...ROCKY_DESCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...ROCKY_ASCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6]);
     expect([...ROCKY_DESCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6]);
+    expect([...CAN_CRUSHING.supportedLevels]).toEqual([1, 2, 3, 4]);
   });
 
   it.each([
-    [1, ["rocky_ascent", "rocky_descent"]],
-    [2, ["rocky_ascent", "rocky_descent"]],
-    [3, ["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
-    [4, ["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
+    [1, ["can_crushing", "rocky_ascent", "rocky_descent"]],
+    [2, ["can_crushing", "rocky_ascent", "rocky_descent"]],
+    [
+      3,
+      ["can_crushing", "rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"],
+    ],
+    [
+      4,
+      ["can_crushing", "rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"],
+    ],
     [5, ["rocky_ascent_high", "rocky_descent_high"]],
     [6, ["rocky_ascent_high", "rocky_descent_high"]],
     [7, []],
