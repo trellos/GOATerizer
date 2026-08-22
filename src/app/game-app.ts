@@ -39,7 +39,6 @@ import { TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
-import { LANE_COUNT } from "../music/degrees.js";
 import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingering.js";
 import { keyDisplayName, keyShortName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
@@ -51,7 +50,11 @@ import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import { TimelineView, type TimelineViewMode } from "../ui/timeline/timeline-view.js";
+import {
+  OVERLAY_BAND_FRACTION,
+  TimelineView,
+  type TimelineViewMode,
+} from "../ui/timeline/timeline-view.js";
 
 const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
@@ -176,13 +179,22 @@ export class GameApp {
       console.warn("[goaterizer] assets failed to load:", this.#assets.failed);
     }
 
-    // The overlay is a run-screen treatment: pregame has no scenario to sit
-    // over, so its timeline stays in a pane of its own.
-    const gameScreen = document.getElementById("screen-game");
-    if (gameScreen instanceof HTMLElement) {
-      gameScreen.dataset["overlay"] = String(this.#overlayTimeline);
+    // Both play screens take the overlay geometry, so the lane band is in the
+    // identical rectangle while warming up and while playing. Pregame has no
+    // scenario behind it — its controls take the space above and below the
+    // band instead.
+    for (const id of ["screen-game", "screen-pregame"]) {
+      const screen = document.getElementById(id);
+      if (screen instanceof HTMLElement) screen.dataset["overlay"] = String(this.#overlayTimeline);
     }
+    // One source of truth for the band's height: the canvas lays the lanes out
+    // from the constant, the stylesheet keeps the controls clear of it.
+    document.documentElement.style.setProperty(
+      "--timeline-band",
+      `${OVERLAY_BAND_FRACTION * 100}%`
+    );
     this.#gameView?.setOverlay(this.#overlayTimeline);
+    this.#pregameView?.setOverlay(this.#overlayTimeline);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -744,51 +756,20 @@ export class GameApp {
   }
 
   /**
-   * Launches the visual streak, and makes its *arrival* trigger the scenario.
+   * Delivers the energy to the scenario immediately.
    *
-   * The step happening when the streak lands is what makes the causal chain
-   * legible: the player sees their note become the goat's next foothold.
+   * This used to launch a streak from the note to the scenario panel and let
+   * its *arrival* trigger the step, so the causal chain was legible. Overlaying
+   * the timeline on the scenario put source and destination in the same place,
+   * leaving the streak nothing to travel — so it is gone, and the goat now
+   * steps on the beat the note is judged. Immediate is the better feel anyway:
+   * the response is the player's own timing, not an animation's flight time.
    */
   #launchEnergy(attempt: ActiveAttempt, energy: EnergyEvent): void {
-    const view = this.#gameView;
-    const strip = this.#strip;
-    const layer = this.#energy;
-    const deliver = () =>
-      attempt.runtime.deliverEnergy(
-        energy,
-        attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
-      );
-
-    if (!view || !strip || !layer || this.#screen !== "game") {
-      deliver();
-      return;
-    }
-
-    const nowBeat = this.#transport.beat;
-    const from = this.#toOverlay(
-      "game-canvas",
-      // A streak with no lane (a played note off the octave entirely) launches
-      // from the middle of the pitch axis rather than from an edge.
-      view.pointFor(
-        energy.lane ?? (LANE_COUNT - 1) / 2,
-        attempt.runtime.startBeat + energy.beat,
-        nowBeat
-      )
+    attempt.runtime.deliverEnergy(
+      energy,
+      attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
     );
-    const to = this.#toOverlay("scenario-canvas", strip.currentPanelTarget);
-    if (!from || !to) {
-      deliver();
-      return;
-    }
-
-    layer.spawn({
-      from,
-      to,
-      polarity: energy.polarity,
-      strong: energy.cause === "perfect",
-      bornBeat: nowBeat,
-      onArrive: deliver,
-    });
   }
 
   /** Canvas-local point -> the energy overlay's coordinate space. */

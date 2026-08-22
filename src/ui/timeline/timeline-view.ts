@@ -45,7 +45,7 @@ const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
  * simply spread to fill it: they need to be a band the eye can take in at once,
  * with the goat visible above and below it.
  */
-const OVERLAY_BAND_FRACTION = 0.5;
+export const OVERLAY_BAND_FRACTION = 0.5;
 
 const THEME = {
   ground: "#0d1014",

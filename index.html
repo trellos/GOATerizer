@@ -60,8 +60,17 @@
           </div>
         </header>
 
-        <div class="stage setup-stage">
-          <div class="setup-row">
+        <div class="timeline-pane">
+          <canvas id="pregame-canvas"></canvas>
+        </div>
+
+        <!--
+          The setup controls sit above and below the lane band, never over it:
+          the timeline you warm up on has to be the same rectangle you play on,
+          so the middle row of this grid is left empty for it.
+        -->
+        <div class="setup-overlay">
+          <div class="setup-row setup-row-top">
             <div class="control-block">
               <h3>Key</h3>
               <button class="secondary" id="pregame-reroll" type="button">
@@ -91,21 +100,15 @@
             </div>
           </div>
 
-          <div class="control-block fingering-block">
-            <h3>Fingering — where on the neck</h3>
-            <div class="fingering-row" id="pregame-fingerings"></div>
-            <p class="note">
-              One octave, root to root, in one hand position. A physical
-              reference only — Tuninator judges the pitch, not where you fretted
-              it.
-            </p>
+          <div class="setup-band-spacer" aria-hidden="true"></div>
+
+          <div class="setup-row setup-row-bottom">
+            <div class="control-block fingering-block">
+              <h3>Fingering — where on the neck</h3>
+              <div class="fingering-row" id="pregame-fingerings"></div>
+            </div>
+            <button class="primary" id="pregame-play" type="button">Play</button>
           </div>
-
-          <button class="primary" id="pregame-play" type="button">Play</button>
-        </div>
-
-        <div class="timeline-pane">
-          <canvas id="pregame-canvas"></canvas>
         </div>
       </section>
 

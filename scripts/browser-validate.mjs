@@ -389,29 +389,13 @@ try {
   check("game screen is shown", await page.isVisible("#scenario-canvas"));
 
   const gameTimelineBox = await canvasBox(page, "game-canvas");
-  const overlaid = await page.evaluate(
-    () => document.getElementById("screen-game")?.dataset.overlay === "true"
+  check(
+    "the timeline is the same rectangle in pregame and in the run",
+    ["x", "y", "width", "height"].every(
+      (side) => Math.abs(pregameTimelineBox[side] - gameTimelineBox[side]) < 0.5
+    ),
+    `${JSON.stringify(pregameTimelineBox)} → ${JSON.stringify(gameTimelineBox)}`
   );
-  if (overlaid) {
-    // EXPERIMENT: the overlaid timeline deliberately breaks the parity
-    // DECISION-015 established, because the run's timeline now fills the whole
-    // play area while pregame's still sits in a pane. This is a known open
-    // problem, not a passing state — pregame needs its own answer (most likely
-    // the same overlay geometry over a preview of the first scenario) before
-    // this branch could merge.
-    note(
-      "OVERLAY EXPERIMENT: pregame/run timeline parity is BROKEN and unresolved — " +
-        `${JSON.stringify(pregameTimelineBox)} → ${JSON.stringify(gameTimelineBox)}`
-    );
-  } else {
-    check(
-      "the timeline is the same rectangle in pregame and in the run",
-      ["x", "y", "width", "height"].every(
-        (side) => Math.abs(pregameTimelineBox[side] - gameTimelineBox[side]) < 0.5
-      ),
-      `${JSON.stringify(pregameTimelineBox)} → ${JSON.stringify(gameTimelineBox)}`
-    );
-  }
 
   // The registry now holds more than one Rocky-family scenario at L1 (Ascent,
   // Descent), and `scenariosForDifficulty` picks among them at random — so the

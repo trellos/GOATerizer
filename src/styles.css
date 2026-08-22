@@ -306,27 +306,77 @@ button.chip[data-selected="true"] {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pregame setup — lives in the stage, where the scenario goes                 */
+/* Pregame setup — arranged around the lane band, never over it                */
 /* -------------------------------------------------------------------------- */
 
-.setup-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.7rem;
-  overflow-y: auto;
-  background: var(--bg);
+/*
+ * Pregame has no scenario, so it shows the timeline alone in exactly the
+ * rectangle the run will use, and puts the setup controls in the space above
+ * and below the lane band. The middle grid row is `--timeline-band`, set from
+ * `OVERLAY_BAND_FRACTION` in TypeScript so the canvas and the stylesheet cannot
+ * disagree about where the lanes are.
+ */
+#screen-pregame[data-overlay="true"] {
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+}
+
+#screen-pregame[data-overlay="true"] .timeline-pane,
+#screen-pregame[data-overlay="true"] .setup-overlay {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+/*
+ * Positioned, and above the timeline pane. `.timeline-pane` is itself
+ * positioned, and a positioned element paints over a static one whatever the
+ * DOM order — without this the canvas sits on top of the controls and swallows
+ * every click.
+ */
+.setup-overlay {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 1fr var(--timeline-band, 50%) 1fr;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 0;
+}
+
+/* The timeline is never interactive; it must not intercept a control's click. */
+#screen-pregame[data-overlay="true"] .timeline-pane {
+  pointer-events: none;
+}
+
+.setup-band-spacer {
+  pointer-events: none;
 }
 
 .setup-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  min-height: 0;
 }
 
-.setup-stage .primary {
+.setup-row-top {
+  align-content: start;
+}
+
+.setup-row-bottom {
+  align-content: end;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.setup-row-bottom .primary {
+  min-width: 10rem;
   align-self: center;
-  min-width: 12rem;
+}
+
+.setup-overlay .control-block {
+  background: rgba(15, 20, 26, 0.92);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .control-block {
