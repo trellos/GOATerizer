@@ -68,9 +68,15 @@ const THEME = {
    * whether the key is major or minor — so it is the accent, and the fifth,
    * which is the same note either way, is the secondary.
    *
-   * Each accented row is a faint band as well as a coloured line, because "the
-   * row" is the band the note bar sits in, and a hairline is easy to lose under
-   * a lit-up note.
+   * The accent is **the row**, not its edge: the whole strip a note bar occupies
+   * is washed in the colour, so the third and fifth are findable in peripheral
+   * vision while both hands are busy. A hairline is not — it disappears under
+   * the first lit-up note that lands on it.
+   *
+   * The root keeps the strongest wash and the only bold label, the third is the
+   * accent under it, and the fifth is the secondary. Raising the third and fifth
+   * without raising the root would have inverted that: the primary landmark
+   * would have become the faintest of the three.
    *
    * Hue choice is constrained: cyan, gold, green and red are already the
    * judgment colours (target/perfect/good/wrong), so violet is the one strong
@@ -81,9 +87,9 @@ const THEME = {
   laneLineRoot: "#5a4426",
   laneLineThird: "#54386b",
   laneLineFifth: "#2f3f52",
-  laneBandRoot: "rgba(240,198,116,0.09)",
-  laneBandThird: "rgba(196,150,232,0.12)",
-  laneBandFifth: "rgba(159,199,232,0.07)",
+  laneBandRoot: "rgba(240,198,116,0.20)",
+  laneBandThird: "rgba(196,150,232,0.20)",
+  laneBandFifth: "rgba(159,199,232,0.15)",
   laneText: "#8fa0b0",
   laneTextRoot: "#f0c674",
   laneTextThird: "#c496e8",
