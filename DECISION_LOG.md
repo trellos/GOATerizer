@@ -4,6 +4,28 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-023: One clock, and it is the one the player hears
+* **Date:** 2026-08-23
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** "Seems like a lot of latency with the beat." It was not a feeling. `Transport.beat` is the beat being *scheduled*, and audio written at context time `t` reaches the ears at `t + outputLatency + baseLatency`, so the raw transport clock runs that far ahead of the room. The timeline was drawn on it, so the note bar crossed the strike line before the drum hit arrived — imperceptible on a wired output, a third of a beat at 90bpm on Bluetooth. Worse, played notes were already timestamped in *compensated* time (`#toBeat` subtracts the same latency) while the judge was **ticked** in raw time, so its windows closed a full latency early and a note played dead on the beat could be marked missed before its own attack was delivered. The visual cue and the audible cue also disagreed, so a player following the screen was judged early and a player following the beat was judged late.
+* **Decision:** Split the two clocks explicitly and name them. Scheduling audio stays in raw transport time — that is what `contextTimeAt` is for, and the bass and drums are unchanged. Everything downstream of the speakers — the timeline, the actors, the judge's tick, attempt completion, the transition slide, the attempt's own start beat — runs on `#heardBeat`, which is `beatAt(now − outputLatency − baseLatency − trim)`. Both cues then say the same thing and the existing input compensation is finally correct.
+* **Alternatives Considered:** (a) Compensating the visuals only, leaving the judge on the raw clock. Rejected: that fixes the feel and leaves the early-expiry bug, which is the half that costs the player notes. (b) Shifting the audio later instead, scheduling everything a latency into the future so it lands with the visuals. Rejected: it makes every tempo change and every attempt boundary depend on a number the browser can revise mid-session, and it adds real delay to a game whose whole loop is "play a note, see it judged".
+* **Consequences:** Positive — one clock for everything the player experiences, and a class of timing bug that could only show up on rigs nobody develops on is gone. The lead-in before the first note is now measured in heard time too, so it is the length the constant claims on every rig. Negative — `#heardBeat` reads `AudioContext.currentTime` once per access rather than caching per frame; it is a property read and the frame loop takes it once, but it is a footgun for future call sites. Anything scheduling audio must keep using the transport directly, and only the comment on `#heardBeat` enforces that.
+
+---
+
+#### DECISION-022b: The player measures their own rig, and the game remembers
+* **Date:** 2026-08-23
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** DECISION-023 fixes the part of the latency the browser knows about. The rest — a USB interface's own buffering, an amp in the chain, Bluetooth headphones the browser under-reports — is invisible to `AudioContext` and was a dev-only number in a hidden panel that reset on every reload. There was no way for a player to find out how late they were, and no way for the game to keep the answer.
+* **Decision:** Calibrate in pregame, against the beat grid. Pregame already runs the transport, the drums and the microphone, so every note the player plays there is measured against the nearest beat (`offBeatMs`) and fed to the existing `TimingDeltaLog`. A Timing block shows both halves of the compensation — what the browser reported and what the player added — and, once there are at least eight notes clustered tightly enough that the median describes a rig rather than a warm-up, offers to apply the measured bias. The result is remembered in `localStorage`, clamped to ±500ms.
+* **Alternatives Considered:** (a) A mic loopback: play a click, detect it in the input, subtract. It is the gold standard and it measures the true round trip with no reliance on browser reporting — but browsers apply echo cancellation to `getUserMedia` by default and it exists specifically to remove speaker sound from the mic, so the measurement is fighting the platform. Worth revisiting with `echoCancellation: false`, and noted as the next step if playing along proves too coarse. (b) Auto-applying the bias without asking. Rejected: it would change judgment mid-run, silently, on the strength of a player who might just be rushing.
+* **Consequences:** Positive — the question "how much latency do I have?" is answerable by anyone, in the room, with their own guitar, and the answer survives a reload. The dev panel's trim now goes through the same setter, so the two controls cannot disagree. Negative — the measurement is only valid up to half a beat (±333ms at 90bpm), because past that `Math.round` picks the next beat and the error folds over; a worse rig has to calibrate at a slower tempo, and nothing but the readout tells the player so. It also assumes the player is aiming at beats, which in pregame — where the instruction is "noodle" — they may not be.
+
+---
+
 #### DECISION-022: The scenario panel is a backdrop, and `ClimbMinigame` is deleted
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)

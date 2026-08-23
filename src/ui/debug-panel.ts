@@ -73,6 +73,16 @@ export class DebugPanel {
     this.#root.hidden = !enabled;
   }
 
+  /**
+   * Reflects a trim set somewhere else — the pregame calibration, or a value
+   * remembered from a previous session — back into the panel's own input, so
+   * the two controls cannot disagree about what the compensation currently is.
+   */
+  setLatencyTrim(milliseconds: number): void {
+    const input = this.#root.querySelector("#dev-latency");
+    if (input instanceof HTMLInputElement) input.value = String(Math.round(milliseconds));
+  }
+
   /** Called every frame while enabled. Rows are created once and then reused. */
   update(snapshot: DebugSnapshot): void {
     if (!this.#enabled) return;

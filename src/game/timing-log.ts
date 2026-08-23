@@ -24,6 +24,24 @@
 /** How many recent notes the bias is computed over. */
 const DEFAULT_CAPACITY = 64;
 
+/**
+ * How far a note landed from the nearest beat, in milliseconds, positive late.
+ *
+ * This is the pregame calibration's measurement: there are no targets there, so
+ * the reference is the beat grid the player is hearing from the drums.
+ *
+ * **It can only see an offset up to half a beat.** Past that, the nearest beat
+ * is the *next* one and the error folds over — a note 0.6 beats late measures as
+ * 0.4 beats early. At 90bpm that ceiling is ±333ms, which covers everything
+ * short of a badly-paired Bluetooth speaker; the slowest tempo gives ±500ms. A
+ * rig worse than that has to be calibrated at a slower tempo, and the fold-over
+ * is why the caller should treat a sign flip between samples as noise rather
+ * than as a player who cannot keep time.
+ */
+export function offBeatMs(beat: number, secondsPerBeat: number): number {
+  return (beat - Math.round(beat)) * secondsPerBeat * 1000;
+}
+
 export class TimingDeltaLog {
   readonly #capacity: number;
   #samples: number[] = [];

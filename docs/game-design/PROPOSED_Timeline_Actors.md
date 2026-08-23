@@ -138,6 +138,12 @@ and before the strike line.
   60bpm that is ~700ms of otherwise dead air, and the lean doubles as a pointer.
 - Fallen actors mill on a floor strip **below the lane band**, small and
   low-contrast, capped at eight, cleared at attempt end.
+- The goat is the scenario's own `climberPoses[]` art, cycled one pose per
+  landing — the same art and the same cycle the scenario panel used to show. A
+  first pass drew it from canvas primitives on the argument that the prototype
+  was testing the mechanic rather than the art; that was wrong, because the art
+  already existed at the right pixel density and a crude ellipse-and-horns goat
+  beside a pixel-art backdrop reads as a bug rather than as a placeholder.
 - Jump budget, for reference — ms between consecutive notes:
 
   | tempo | quarter | eighth |

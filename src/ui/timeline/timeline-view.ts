@@ -33,7 +33,7 @@ import { LANE_COUNT } from "../../music/degrees.js";
 import { midiToName } from "../../music/pitch.js";
 import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
-import { drawTimelineActor } from "./actor-layer.js";
+import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
 import { drawRepeatPerformer } from "./repeat-layer.js";
 import type {
   PlayedNote,
@@ -60,17 +60,34 @@ const THEME = {
   ground: "#0d1014",
   gutter: "#12161c",
   laneLine: "#1e242c",
-  // Root and fifth get distinct hues, not just brighter versions of the plain
-  // row — the player should be able to find "where the root is" at a glance,
-  // the way a keyboard player finds middle C by feel. Root is the primary
-  // landmark (warm), fifth is secondary (cool), both kept duller than the
-  // judgment colours (perfect/good/target) so a lit-up note on top of the row
-  // never gets mistaken for the row accent itself.
+  /*
+   * The triad gets distinct hues, not brighter versions of the plain row: the
+   * player should be able to find the root, third and fifth at a glance, the
+   * way a keyboard player finds middle C by feel. They are the three notes
+   * every other degree is heard *against*, and the third is the one that says
+   * whether the key is major or minor — so it is the accent, and the fifth,
+   * which is the same note either way, is the secondary.
+   *
+   * Each accented row is a faint band as well as a coloured line, because "the
+   * row" is the band the note bar sits in, and a hairline is easy to lose under
+   * a lit-up note.
+   *
+   * Hue choice is constrained: cyan, gold, green and red are already the
+   * judgment colours (target/perfect/good/wrong), so violet is the one strong
+   * hue left that cannot be mistaken for an outcome. Every accent stays well
+   * below them in saturation for the same reason — a row must never read as a
+   * note.
+   */
   laneLineRoot: "#5a4426",
+  laneLineThird: "#54386b",
   laneLineFifth: "#2f3f52",
+  laneBandRoot: "rgba(240,198,116,0.09)",
+  laneBandThird: "rgba(196,150,232,0.12)",
+  laneBandFifth: "rgba(159,199,232,0.07)",
   laneText: "#8fa0b0",
   laneTextRoot: "#f0c674",
-  laneTextFifth: "#9fc7e8",
+  laneTextThird: "#c496e8",
+  laneTextFifth: "#8ec3ee",
   beatLine: "#171c23",
   measureLine: "#28313c",
   strike: "#f4f7fb",
@@ -87,6 +104,27 @@ const THEME = {
   outOfRange: "#b06a2c",
 } as const;
 
+/** Row accent -> its line, band and label colour. Keyed so no branch is missed. */
+type RowAccent = "root" | "third" | "fifth";
+
+const ROW_LINE: Readonly<Record<RowAccent, string>> = {
+  root: THEME.laneLineRoot,
+  third: THEME.laneLineThird,
+  fifth: THEME.laneLineFifth,
+};
+
+const ROW_BAND: Readonly<Record<RowAccent, string>> = {
+  root: THEME.laneBandRoot,
+  third: THEME.laneBandThird,
+  fifth: THEME.laneBandFifth,
+};
+
+const ROW_TEXT: Readonly<Record<RowAccent, string>> = {
+  root: THEME.laneTextRoot,
+  third: THEME.laneTextThird,
+  fifth: THEME.laneTextFifth,
+};
+
 export class TimelineView {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
@@ -96,6 +134,8 @@ export class TimelineView {
   /** PROTOTYPE: the actor standing on the note bars, or null when off. */
   #actor: TimelineActorState | null = null;
   #actorBeat = 0;
+  /** The scenario's climber art. Empty until a scenario is being played. */
+  #actorSprites: ActorSprites = { poses: [] };
   /** PROTOTYPE: the repeat performer, when the scenario is a `RepeatMinigame`. */
   #repeat: RepeatVisualState | null = null;
   #key: RunKey;
@@ -138,6 +178,14 @@ export class TimelineView {
   setActor(actor: TimelineActorState | null, attemptBeat: number): void {
     this.#actor = actor;
     this.#actorBeat = attemptBeat;
+  }
+
+  /**
+   * The pose cycle the actor is drawn from — the current scenario's
+   * `climberPoses[]`, already resolved to images by the caller.
+   */
+  setActorSprites(sprites: ActorSprites): void {
+    this.#actorSprites = sprites;
   }
 
   /**
@@ -350,7 +398,7 @@ export class TimelineView {
         pending
       );
     } else if (actor) {
-      drawTimelineActor(ctx, actor, geometry, this.#actorBeat);
+      drawTimelineActor(ctx, actor, geometry, this.#actorBeat, this.#actorSprites);
     }
     ctx.restore();
   }
@@ -419,19 +467,27 @@ export class TimelineView {
   }
 
   /**
-   * Root/fifth for a Key View row.
+   * Which triad tone a Key View row is, if any.
    *
    * Lane index is `octaveBand * 7 + (degree - 1)` (`music/degrees.ts`), so
-   * degree 1 (root) always falls on `row % 7 === 0` and degree 5 (fifth) on
-   * `row % 7 === 4`, in every octave band and every key — this needs no key
-   * lookup, unlike the label text next to it.
+   * degree 1 (root) always falls on `row % 7 === 0`, degree 3 on `row % 7 === 2`
+   * and degree 5 on `row % 7 === 4`, in every octave band and every key — this
+   * needs no key lookup, unlike the label text next to it. In a minor key the
+   * third is `b3` and the fifth is still `5`; both are the same lanes, which is
+   * exactly why lane index rather than pitch is the right thing to test.
    */
-  #rowAccent(row: number): "root" | "fifth" | null {
+  #rowAccent(row: number): "root" | "third" | "fifth" | null {
     if (this.#mode !== "key") return null;
-    const degreeIndex = row % 7;
-    if (degreeIndex === 0) return "root";
-    if (degreeIndex === 4) return "fifth";
-    return null;
+    switch (row % 7) {
+      case 0:
+        return "root";
+      case 2:
+        return "third";
+      case 4:
+        return "fifth";
+      default:
+        return null;
+    }
   }
 
   #drawRows(): void {
@@ -439,12 +495,21 @@ export class TimelineView {
     for (let row = 0; row < this.#rowCount; row += 1) {
       const y = this.#rowY(row);
       const accent = this.#rowAccent(row);
-      ctx.strokeStyle =
-        accent === "root"
-          ? THEME.laneLineRoot
-          : accent === "fifth"
-            ? THEME.laneLineFifth
-            : THEME.laneLine;
+
+      // The band first: the row is the strip a note bar occupies, centred on
+      // the line, so the accent has to be the strip and not just its edge.
+      const band = accent && ROW_BAND[accent];
+      if (band) {
+        ctx.fillStyle = band;
+        ctx.fillRect(
+          this.#playLeft,
+          y - this.#noteHeight / 2,
+          this.#width - this.#playLeft,
+          this.#noteHeight
+        );
+      }
+
+      ctx.strokeStyle = accent ? ROW_LINE[accent] : THEME.laneLine;
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(this.#playLeft, Math.round(y) + 0.5);
@@ -477,10 +542,11 @@ export class TimelineView {
         const accent = this.#rowAccent(row);
         const label = laneLabel(row, this.#key);
         const fingering = this.#fingering?.positions[row];
-        ctx.fillStyle =
-          accent === "root" ? THEME.laneTextRoot : accent === "fifth" ? THEME.laneTextFifth : THEME.laneText;
+        ctx.fillStyle = accent ? ROW_TEXT[accent] : THEME.laneText;
         // Bold marks the root only — it stays the one landmark you can find
-        // without reading colour, the fifth is colour-only so it stays secondary.
+        // without reading colour at all. The third and fifth are colour-only,
+        // which is what keeps them reading as accents under it rather than as
+        // three equal landmarks.
         ctx.font = `${accent === "root" ? "700 " : "500 "}${font}px ${MONO}`;
         ctx.textAlign = "left";
         // Scale degree first, note name retained: the player should be able to

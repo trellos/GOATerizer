@@ -145,7 +145,7 @@ export const JUDGMENT_POINTS = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Extra input-latency compensation, in milliseconds, on top of what the
+ * The *default* extra input-latency compensation, in milliseconds, on top of what the
  * AudioContext reports.
  *
  * The measured part is `outputLatency + baseLatency`: the player hears the bass
@@ -156,8 +156,15 @@ export const JUDGMENT_POINTS = {
  * of that — a detected attack already carries the sample time of the attack.
  *
  * This knob exists for rigs the browser under-reports (USB interfaces, wireless
- * headphones). It is surfaced live in the debug panel; a positive value judges
- * the player as having played *earlier* than the raw timestamp says.
+ * headphones). A positive value judges the player as having played *earlier*
+ * than the raw timestamp says.
+ *
+ * It is a default, not a setting: the player measures their own rig in pregame
+ * by playing along to the beat, and the result is remembered in
+ * `src/persistence/latency.ts`. This constant is what a rig that has never been
+ * measured starts from, and zero is right for that — the browser's own
+ * `outputLatency + baseLatency` is already applied, and guessing a correction
+ * on top of a number the browser got right would be worse than no correction.
  */
 export const EXTRA_INPUT_LATENCY_MS = 0;
 

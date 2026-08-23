@@ -44,12 +44,14 @@ Every asset id below follows `<kind>_<scenario id>[_suffix]` — swap
 Directories: `rocky-ascent/`, `rocky-ascent-high/`, `rocky-descent/`,
 `rocky-descent-high/` — ten files each, same ten slots, forty files total.
 
-**Only the background is drawn today.** The timeline-actor work moved the goat
-onto the note bars and reduced the scenario panel to a backdrop, so the pose
-cycle, foothold, cairn, dust and tick are bound and loaded but never drawn. They
-stay because they are the canonical slots and because they are what the actor
-layer should draw once it stops being canvas primitives; nothing about the swap
-plan below changes.
+**The background and the pose cycle are drawn; the rest is not.** The
+timeline-actor work moved the goat onto the note bars and reduced the scenario
+panel to a backdrop. The backdrop is `bg_*`, and the goat standing on the bars
+is the same `climberPoses[]` art the panel used to show, cycled one pose per
+successful note exactly as before — so the swap plan below still applies to both
+and replacing them changes what is on screen. The foothold, cairn, dust and tick
+have no route or panel to appear in and are bound but never drawn; they stay
+because they are the canonical slots.
 
 - **Author:** original work for this repository.
 - **Licence:** CC0 / public domain. No third-party rights are involved.
@@ -142,10 +144,11 @@ with art nothing loads is clutter.
 
 **Note on the prototype.** The timeline-actor draft draws the crusher, his cans
 and his pile with canvas primitives in `src/ui/timeline/repeat-layer.ts` rather
-than from these PNGs — the same choice, and the same reasoning, as the goat in
-`actor-layer.ts`. As with the Rocky family, only `bg_can_crushing` is actually
-drawn today; the rest are bound and loaded against the day the actor layer stops
-being primitives.
+than from these PNGs, so only `bg_can_crushing` is drawn today. The Rocky family
+no longer works that way — its goat is the real `climberPoses[]` art — and this
+scenario should follow: `hero80_can_crushing_ready` / `_action` / `_finish` map
+one-to-one onto the three poses the layer already switches between, and
+`prop_can_crushing_intact` / `_done` onto the two can states.
 
 The background is 384x216, matching the Rocky family, because a backdrop now
 covers the whole frame rather than the middle third of it.

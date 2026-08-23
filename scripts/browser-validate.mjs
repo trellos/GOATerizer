@@ -390,6 +390,24 @@ try {
     `${output?.onsetsPerSecond.toFixed(2)}/s at 120bpm`
   );
 
+  // The player's latency readout. The exact number is a property of whatever
+  // audio device this machine has, so what is asserted is that it is reported
+  // at all and adds up — a blank or NaN here means the player has no way to
+  // find out why the beat feels late.
+  const latencyText = (await page.textContent("#pregame-latency")) ?? "";
+  check(
+    "the pregame reports the rig's latency, split into reported and calibrated",
+    /^\d+ ms total — \d+ reported by the browser, -?\d+ yours$/.test(latencyText),
+    latencyText
+  );
+  check(
+    "calibration cannot be applied before there are notes to measure",
+    await page.evaluate(() => {
+      const apply = document.getElementById("pregame-calibrate-apply");
+      return apply instanceof HTMLButtonElement && apply.disabled;
+    })
+  );
+
   check(
     "the fingering picker offers more than one place on the neck, with diagrams",
     await page.evaluate(() => {

@@ -39,7 +39,7 @@ import {
 import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
 import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
-import { TimingDeltaLog } from "../game/timing-log.js";
+import { offBeatMs, TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
@@ -47,13 +47,20 @@ import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingeri
 import { keyDisplayName, keyShortName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
+import {
+  MAX_LATENCY_TRIM_MS,
+  readLatencyTrimMs,
+  writeLatencyTrimMs,
+} from "../persistence/latency.js";
 import { SCENARIOS, scenarioById } from "../scenario/registry.js";
+import type { ScenarioDefinition } from "../scenario/types.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel, type AutoplayMode } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
+import type { ActorSprites } from "../ui/timeline/actor-layer.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import {
   OVERLAY_BAND_FRACTION,
@@ -93,6 +100,9 @@ function setTrophy(slot: HTMLElement, stars: number | null): void {
   else slot.setAttribute("aria-label", trophyLabel(stars));
 }
 
+/** A scenario with no climber art — pregame, and every non-climb class. */
+const EMPTY_SPRITES: ActorSprites = { poses: [] };
+
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
   if (!(element instanceof ctor)) {
@@ -127,7 +137,12 @@ export class GameApp {
   #initialInputKind: "tuninator" | "test" | "synth" = "tuninator";
   #unsubscribeInput: (() => void)[] = [];
   #inputStatus: GuitarInputStatus | null = null;
-  #latencyTrimMs = EXTRA_INPUT_LATENCY_MS;
+  /**
+   * The player's own latency compensation, on top of what the browser reports.
+   * Seeded from a previous session's calibration; `EXTRA_INPUT_LATENCY_MS` is
+   * the default for a rig that has never been measured.
+   */
+  #latencyTrimMs = readLatencyTrimMs() ?? EXTRA_INPUT_LATENCY_MS;
   readonly #timing = new TimingDeltaLog();
 
   /* Game state ------------------------------------------------------- */
@@ -169,6 +184,7 @@ export class GameApp {
    * picks — with more than one Rocky-family scenario authoring the same level,
    * that is no longer always Rocky Ascent.
    */
+  #actorSpriteCache: { id: string; sprites: ActorSprites } | null = null;
   #devLevel: number | null = null;
   #devScenarioId: string | null = null;
   #autoplay: AutoplayMode = "off";
@@ -344,6 +360,12 @@ export class GameApp {
       void this.#enterPregame();
     });
     must("pregame-reroll", HTMLButtonElement).addEventListener("click", () => this.#reroll());
+    must("pregame-calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
+      this.#applyCalibration()
+    );
+    must("pregame-calibrate-reset", HTMLButtonElement).addEventListener("click", () =>
+      this.#resetCalibration()
+    );
     must("pregame-play", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-replay", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-new", HTMLButtonElement).addEventListener("click", () => {
@@ -371,12 +393,7 @@ export class GameApp {
       onSourceChange: (source) => {
         void this.#switchProvider(source);
       },
-      onLatencyChange: (ms) => {
-        this.#latencyTrimMs = ms;
-        // Samples taken under the old trim describe a different rig. Keeping
-        // them would average the change away and make the trim look ineffective.
-        this.#timing.clear();
-      },
+      onLatencyChange: (ms) => this.#setLatencyTrim(ms),
       onAutoplay: (mode) => {
         this.#autoplay = mode;
         this.#autoplayScheduledFor = null;
@@ -386,6 +403,9 @@ export class GameApp {
       },
     });
     this.#debug.setEnabled(this.#devMode);
+    // A trim remembered from a previous session has to show in the panel, or
+    // the input reads 0 while a real compensation is being applied.
+    this.#debug.setLatencyTrim(this.#latencyTrimMs);
 
     // `?input=test` and `?input=synth` are dev-only on purpose. `test` is the
     // only way to make the deterministic provider drive scoring, and it is
@@ -615,17 +635,50 @@ export class GameApp {
     element.textContent = message;
   }
 
+  /**
+   * Total latency compensation, in seconds: what the browser reports plus the
+   * player's own calibration trim.
+   */
+  get #latencySeconds(): number {
+    return this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
+  }
+
   /** Audio-clock seconds -> absolute transport beats, latency-compensated. */
   #toBeat = (contextTime: number): number => {
-    const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
-    return this.#transport.beatAt(contextTime - latency);
+    return this.#transport.beatAt(contextTime - this.#latencySeconds);
   };
+
+  /**
+   * **The beat the player is hearing right now**, and the clock everything
+   * downstream of the speakers runs on.
+   *
+   * `Transport.beat` is the beat being *scheduled*: audio written at context
+   * time `t` reaches the player's ears at `t + outputLatency`, so the raw
+   * transport clock runs that far ahead of the room. Drawing the timeline on it
+   * put the note bar across the strike line before the drum hit arrived, by the
+   * whole output latency — a few milliseconds on a wired output, but a third of
+   * a beat at 90bpm on Bluetooth headphones, which is exactly the "the beat
+   * feels laggy" complaint.
+   *
+   * It also quietly broke judgment. Played notes are timestamped in this
+   * compensated space (`#toBeat`) while the judge was *ticked* in raw transport
+   * time, so its windows closed a full latency early and a note played on the
+   * beat could be marked missed before its own attack was delivered.
+   *
+   * One clock, then: scheduling audio stays in raw transport time — that is
+   * what `contextTimeAt` is for — and everything the player sees or is judged
+   * on runs here.
+   */
+  get #heardBeat(): number {
+    return this.#toBeat(this.#audio.now());
+  }
 
   #onGuitarEvent(event: GuitarInputEvent): void {
     const beat = this.#toBeat(event.contextTime);
     switch (event.type) {
       case "attack":
         this.#timeline.addPlayed(event.id, event.midi, beat);
+        if (this.#screen === "pregame") this.#recordCalibrationSample(beat);
         break;
       case "retune":
         this.#timeline.revisePlayed(event.id, event.midi);
@@ -639,6 +692,51 @@ export class GameApp {
 
     // Judgment only ever sees the attempt that is actually being played.
     this.#current?.runtime.handleGuitarEvent(event);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Latency calibration                                                 */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * One note of the pregame calibration: how far off the nearest beat it was.
+   *
+   * Pregame has no targets, so the reference is the beat grid itself — the
+   * drums the player is hearing. The measurement therefore only works while
+   * they are playing *on* beats, and it can only see an offset up to half a
+   * beat: past that, `Math.round` picks the next beat instead and the error
+   * folds over. At 90bpm that is ±333ms, which covers every rig short of a
+   * badly-paired Bluetooth speaker; at the slowest tempo it is ±500ms.
+   *
+   * The sign convention is the log's: positive is late. `beat` is already
+   * latency-compensated, so what is measured is the residual the current
+   * compensation does *not* explain — exactly the thing the trim exists for.
+   */
+  #recordCalibrationSample(beat: number): void {
+    if (!this.#transport.running) return;
+    this.#timing.record(offBeatMs(beat, this.#transport.secondsPerBeat));
+  }
+
+  /** Adopts the measured bias, remembers it, and starts measuring again. */
+  #applyCalibration(): void {
+    const suggested = this.#timing.suggestedTrimMs(this.#latencyTrimMs);
+    if (suggested === null) return;
+    this.#setLatencyTrim(Math.max(-MAX_LATENCY_TRIM_MS, Math.min(MAX_LATENCY_TRIM_MS, suggested)));
+  }
+
+  /** Forgets the calibration; the browser's own reported latency stands alone. */
+  #resetCalibration(): void {
+    this.#setLatencyTrim(EXTRA_INPUT_LATENCY_MS);
+    writeLatencyTrimMs(null);
+  }
+
+  #setLatencyTrim(milliseconds: number): void {
+    this.#latencyTrimMs = Math.round(milliseconds);
+    // Samples taken under the old trim describe a rig that no longer exists;
+    // averaging them with the new ones hides the very change being tested.
+    this.#timing.clear();
+    writeLatencyTrimMs(this.#latencyTrimMs);
+    this.#debug?.setLatencyTrim(this.#latencyTrimMs);
   }
 
   /* ------------------------------------------------------------------ */
@@ -676,8 +774,10 @@ export class GameApp {
     }
 
     // Start on the next measure boundary plus a lead-in, so the first target
-    // arrives in time rather than instantly. The beat never stops.
-    const startBeat = this.#transport.nextMeasureBoundary() + RUN_LEAD_IN_BEATS;
+    // arrives in time rather than instantly. The beat never stops. Measured
+    // from the beat the player is *hearing*, so the lead-in they actually get
+    // is the one the constant names however much latency their rig has.
+    const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
     this.#queueNextAttempt();
     this.#updateHud();
@@ -813,7 +913,7 @@ export class GameApp {
 
     // Promote immediately so judgment never has a gap; the strip takes exactly
     // one beat to slide, and the beat does not stop.
-    this.#slideStartBeat = this.#transport.beat;
+    this.#slideStartBeat = this.#heardBeat;
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
@@ -863,7 +963,7 @@ export class GameApp {
       y: rect.top - overlayRect.top + rect.height / 2,
     };
 
-    const nowBeat = this.#transport.beat;
+    const nowBeat = this.#heardBeat;
     for (let i = 0; i < stars; i += 1) {
       layer.spawn({
         from,
@@ -932,7 +1032,9 @@ export class GameApp {
 
   #tick(): void {
     if (!this.#transport.running) return;
-    const beat = this.#transport.beat;
+    // Everything below runs on the beat the player is hearing, never the beat
+    // being scheduled. See `#heardBeat`.
+    const beat = this.#heardBeat;
 
     if (this.#provider instanceof TestGuitarInputProvider) {
       this.#provider.pump(this.#audio.now());
@@ -961,6 +1063,7 @@ export class GameApp {
         attempt ? attempt.actor.state : null,
         attempt ? attempt.toAttemptBeat(beat) : 0
       );
+      this.#gameView?.setActorSprites(this.#actorSpritesFor(attempt?.scenario ?? null));
       // A repeat scenario puts its own performer on the bars instead.
       this.#gameView?.setRepeat(attempt?.repeat ? attempt.repeat.state : null);
       this.#gameView?.render(this.#timeline, beat);
@@ -969,6 +1072,28 @@ export class GameApp {
     }
 
     this.#updateDebug(beat);
+  }
+
+  /**
+   * The climber art for a scenario, resolved through the asset store.
+   *
+   * Cached on the scenario id: this runs every frame, and rebuilding an array
+   * of four image lookups sixty times a second to hand the same four images to
+   * the same view is work for nothing.
+   */
+  #actorSpritesFor(scenario: ScenarioDefinition | null): ActorSprites {
+    if (!scenario) return EMPTY_SPRITES;
+    if (this.#actorSpriteCache?.id === scenario.id) return this.#actorSpriteCache.sprites;
+    const bindings = scenario.assetBindings;
+    const poses =
+      bindings.kind === "climb"
+        ? bindings.climberPoses
+            .map((id) => this.#assets.get(id))
+            .filter((image): image is HTMLImageElement => image !== null)
+        : [];
+    const sprites: ActorSprites = { poses };
+    this.#actorSpriteCache = { id: scenario.id, sprites };
+    return sprites;
   }
 
   #renderStrip(beat: number): void {
@@ -1038,6 +1163,50 @@ export class GameApp {
             )} · conf ${frame.confidence.toFixed(2)}`
           : "—";
     }
+    this.#updateCalibrationReadouts();
+  }
+
+  /**
+   * The two halves of the compensation, and what the player's own playing says
+   * about whether it is right.
+   *
+   * Both are shown because they answer different questions. The reported figure
+   * is what the browser knows about its own audio path, and a large one is a
+   * fact about the rig rather than a problem to fix. The measured figure is the
+   * part nothing reported — and it is the only one that can say "you are still
+   * playing 40ms late after all of that".
+   */
+  #updateCalibrationReadouts(): void {
+    const reportedMs = Math.round(this.#audio.outputLatencySeconds * 1000);
+    const latency = document.getElementById("pregame-latency");
+    if (latency instanceof HTMLElement) {
+      latency.textContent =
+        `${reportedMs + this.#latencyTrimMs} ms total — ` +
+        `${reportedMs} reported by the browser, ${this.#latencyTrimMs} yours`;
+    }
+
+    const state = document.getElementById("pregame-calibration");
+    const apply = document.getElementById("pregame-calibrate-apply");
+    const median = this.#timing.median;
+    const spread = this.#timing.spread;
+    // Enough notes to have a median worth trusting, and a cluster tight enough
+    // that it describes a rig rather than a player still warming up. A spread
+    // wider than the offset means the honest answer is "keep playing".
+    const usable =
+      this.#timing.count >= 8 && median !== null && spread !== null && spread < Math.abs(median);
+
+    if (state instanceof HTMLElement) {
+      if (median === null) {
+        state.textContent = "Play single notes on the beat to measure your rig.";
+      } else {
+        const direction = median >= 0 ? "late" : "early";
+        state.textContent =
+          `${Math.abs(Math.round(median))} ms ${direction} ` +
+          `(±${Math.round(spread ?? 0)}, ${this.#timing.count} notes)` +
+          (usable ? "" : " — keep playing");
+      }
+    }
+    if (apply instanceof HTMLButtonElement) apply.disabled = !usable;
   }
 
   #updateDebug(beat: number): void {
@@ -1060,6 +1229,10 @@ export class GameApp {
       "detected conf": this.#inputStatus?.frame?.confidence.toFixed(2) ?? "—",
       "channel rms": this.#inputStatus?.frame?.channelRms?.map((v) => v.toFixed(3)).join(" ") ?? "—",
       "selected channel": String(this.#inputStatus?.frame?.selectedChannel ?? "—"),
+      // Split, because "the browser says 180ms" and "you are 40ms late on top
+      // of that" are different findings with different fixes.
+      "latency reported ms": (this.#audio.outputLatencySeconds * 1000).toFixed(1),
+      "latency trim ms": String(this.#latencyTrimMs),
       "latency comp ms": (
         this.#audio.outputLatencySeconds * 1000 +
         this.#latencyTrimMs

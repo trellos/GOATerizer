@@ -17,18 +17,19 @@
  *      patch there is no live actor at all, and an empty screen exactly when
  *      the player is struggling is the wrong feedback.
  *
- * Drawn with primitives rather than sprites: this is a prototype whose point is
- * whether the *mechanic* reads, and a placeholder goat that can be reshaped in
- * one function is worth more here than an asset pipeline.
+ * The goat itself is the scenario's own `climberPoses[]` art, cycled one pose
+ * per landing exactly as the old scenario panel cycled it. An earlier pass drew
+ * it from canvas primitives on the argument that the prototype was testing the
+ * mechanic rather than the art — but the art already existed, is the right pixel
+ * density, and a crude ellipse-and-horns goat beside a pixel-art backdrop reads
+ * as a bug rather than as a placeholder. The primitives survive only as the
+ * fallback for an asset that failed to load.
  */
 
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
 
 const ACTOR = {
-  body: "#efe6d4",
-  bodyDim: "rgba(239,230,212,0.35)",
-  horn: "#c0a678",
-  eye: "#2a2118",
+  fallback: "#efe6d4",
   spark: "#ffd34d",
 } as const;
 
@@ -37,6 +38,17 @@ const LEFT_OF_STRIKE_PX = 34;
 
 /** How long the landing hop takes, in beats. */
 const HOP_BEATS = 0.28;
+
+/**
+ * The scenario's climber art: a pose cycle, one pose per successful note.
+ *
+ * Passed in already resolved rather than looked up here — this module has no
+ * business knowing about asset ids or the store, and the caller already holds
+ * both.
+ */
+export type ActorSprites = {
+  poses: readonly HTMLImageElement[];
+};
 
 export type ActorGeometry = {
   /** Canvas y for a lane, continuous — same mapping the notes use. */
@@ -57,9 +69,10 @@ export function drawTimelineActor(
   ctx: CanvasRenderingContext2D,
   state: TimelineActorState,
   geometry: ActorGeometry,
-  beat: number
+  beat: number,
+  sprites: ActorSprites
 ): void {
-  drawFallen(ctx, state, geometry, beat);
+  drawFallen(ctx, state, geometry, beat, sprites);
   if (!state.alive || state.lane === null) return;
 
   const x = geometry.strikeX - LEFT_OF_STRIKE_PX;
@@ -83,15 +96,23 @@ export function drawTimelineActor(
       ? Math.max(-1, Math.min(1, (geometry.laneY(state.nextLane) - toY) / (geometry.rowHeight * 3)))
       : 0;
 
-  drawGoat(ctx, x, y, scale, -lean, state.decorations);
+  // One pose per landing, so consecutive steps do not look identical. Keyed off
+  // the streak rather than a counter of its own: the streak is already the
+  // number of steps this actor has taken.
+  drawGoat(ctx, x, y, scale, -lean, poseFor(sprites, state.streak), state.decorations);
+}
+
+function poseFor(sprites: ActorSprites, step: number): HTMLImageElement | null {
+  const poses = sprites.poses;
+  if (poses.length === 0) return null;
+  return poses[Math.abs(step) % poses.length] ?? null;
 }
 
 /**
- * A placeholder goat, from primitives.
+ * The goat, standing on the bar.
  *
- * Deliberately crude and deliberately one function: the question this prototype
- * answers is whether a character standing on the note bars reads at all, and
- * that is not a question better art changes the answer to.
+ * Drawn bottom-anchored: the bar's top edge is the ground, which is what makes
+ * a scale run read as a staircase rather than as a sprite tracking a line.
  */
 function drawGoat(
   ctx: CanvasRenderingContext2D,
@@ -99,60 +120,35 @@ function drawGoat(
   baseY: number,
   scale: number,
   lean: number,
+  pose: HTMLImageElement | null,
   decorations: number
 ): void {
-  const w = scale * 0.9;
-  const h = scale * 0.62;
-
   ctx.save();
   ctx.translate(x, baseY);
   ctx.rotate(lean * 0.18);
 
-  // Body, sitting ON the bar: the bar's top edge is the ground.
-  ctx.fillStyle = ACTOR.body;
-  ctx.beginPath();
-  ctx.ellipse(0, -h * 0.75, w * 0.5, h * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Legs.
-  ctx.fillRect(-w * 0.3, -h * 0.42, Math.max(1, w * 0.1), h * 0.42);
-  ctx.fillRect(w * 0.16, -h * 0.42, Math.max(1, w * 0.1), h * 0.42);
-
-  // Head, forward — it is looking where it is going.
-  const headX = w * 0.42;
-  const headY = -h * 1.12;
-  ctx.beginPath();
-  ctx.ellipse(headX, headY, w * 0.24, h * 0.26, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Horns, which is most of what makes the silhouette read as a goat at 20px.
-  ctx.strokeStyle = ACTOR.horn;
-  ctx.lineWidth = Math.max(1, scale * 0.07);
-  ctx.beginPath();
-  ctx.moveTo(headX - w * 0.04, headY - h * 0.2);
-  ctx.quadraticCurveTo(headX + w * 0.2, headY - h * 0.6, headX + w * 0.32, headY - h * 0.2);
-  ctx.stroke();
-
-  ctx.fillStyle = ACTOR.eye;
-  ctx.beginPath();
-  ctx.arc(headX + w * 0.1, headY, Math.max(0.8, scale * 0.035), 0, Math.PI * 2);
-  ctx.fill();
-
-  // Beard, because a goat without one is a sheep.
-  ctx.fillStyle = ACTOR.body;
-  ctx.beginPath();
-  ctx.moveTo(headX + w * 0.06, headY + h * 0.2);
-  ctx.lineTo(headX + w * 0.2, headY + h * 0.2);
-  ctx.lineTo(headX + w * 0.12, headY + h * 0.5);
-  ctx.closePath();
-  ctx.fill();
+  if (pose && pose.width > 0) {
+    const height = scale * 0.72;
+    const width = height * (pose.width / pose.height);
+    ctx.drawImage(pose, -width / 2, -height, width, height);
+  } else {
+    // The asset failed to load. A block is honest about that; inventing a goat
+    // here would hide a missing file behind something that looks deliberate.
+    ctx.fillStyle = ACTOR.fallback;
+    ctx.fillRect(-scale * 0.3, -scale * 0.55, scale * 0.6, scale * 0.55);
+  }
 
   // Decorations: earned past the size cap, so a long streak still registers
   // once growing has stopped.
   ctx.fillStyle = ACTOR.spark;
   for (let i = 0; i < decorations; i += 1) {
     const angle = -Math.PI * 0.75 + i * 0.42;
-    drawStar(ctx, Math.cos(angle) * w * 0.85, -h * 0.8 + Math.sin(angle) * h * 0.9, scale * 0.13);
+    drawStar(
+      ctx,
+      Math.cos(angle) * scale * 0.7,
+      -scale * 0.5 + Math.sin(angle) * scale * 0.55,
+      scale * 0.13
+    );
   }
 
   ctx.restore();
@@ -183,19 +179,19 @@ function drawFallen(
   ctx: CanvasRenderingContext2D,
   state: TimelineActorState,
   geometry: ActorGeometry,
-  beat: number
+  beat: number,
+  sprites: ActorSprites
 ): void {
   if (state.fallen.length === 0) return;
   ctx.save();
-  ctx.globalAlpha = 0.55;
-  ctx.fillStyle = ACTOR.bodyDim;
+  ctx.globalAlpha = 0.5;
 
   state.fallen.forEach((actor, index) => {
     const spread = geometry.rowHeight * 1.6;
     const wander = Math.sin(beat * 0.6 + actor.id * 1.7) * geometry.rowHeight * 0.35;
     const x = geometry.strikeX - LEFT_OF_STRIKE_PX - spread + index * spread * 0.42 + wander;
     const scale = geometry.rowHeight * (0.34 + actor.size * 0.3);
-    drawGoat(ctx, x, geometry.floorY, scale, 0, 0);
+    drawGoat(ctx, x, geometry.floorY, scale, 0, poseFor(sprites, actor.id), 0);
   });
 
   ctx.restore();
