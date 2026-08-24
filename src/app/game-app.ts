@@ -67,6 +67,7 @@ import type { ScenarioDefinition } from "../scenario/types.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel, type AutoplayMode } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
+import { FrameMeter } from "../ui/frame-meter.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
@@ -143,6 +144,20 @@ function calibrationVerdict(state: CalibrationState): string {
   );
 }
 
+/**
+ * Writes text only when it changed.
+ *
+ * The check's readouts are repainted every frame while its screen is up, and
+ * almost every frame they are identical. Assigning `textContent` regardless
+ * dirties the node and buys a style recalculation for nothing.
+ */
+function setText(id: string, value: string): void {
+  const element = document.getElementById(id);
+  if (element instanceof HTMLElement && element.textContent !== value) {
+    element.textContent = value;
+  }
+}
+
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
   if (!(element instanceof ctor)) {
@@ -216,6 +231,7 @@ export class GameApp {
   #strip: ScenarioBackdropView | null = null;
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
+  readonly #frameMeter = new FrameMeter();
   #devMode = false;
   /** EXPERIMENT: draw the run's timeline over the scenario. */
   #overlayTimeline = true;
@@ -876,8 +892,7 @@ export class GameApp {
   }
 
   #setCalibrationPhase(text: string): void {
-    const phase = document.getElementById("calibrate-phase");
-    if (phase instanceof HTMLElement) phase.textContent = text;
+    setText("calibrate-phase", text);
   }
 
   /**
@@ -893,24 +908,21 @@ export class GameApp {
     const state = this.#calibration?.state ?? null;
     const offset = document.getElementById("calibrate-offset");
     const spread = document.getElementById("calibrate-spread");
-    const verdict = document.getElementById("calibrate-verdict");
-    const progress = document.getElementById("calibrate-progress");
     const apply = document.getElementById("calibrate-apply");
     const start = document.getElementById("calibrate-start");
-    const current = document.getElementById("calibrate-current");
 
-    if (current instanceof HTMLElement) {
-      const reported = Math.round(this.#audio.outputLatencySeconds * 1000);
-      current.textContent =
-        `Currently compensating ${reported + this.#latencyTrimMs} ms ` +
-        `(${reported} reported by the browser, ${this.#latencyTrimMs} yours).`;
-    }
+    const reported = Math.round(this.#audio.outputLatencySeconds * 1000);
+    setText(
+      "calibrate-current",
+      `Currently compensating ${reported + this.#latencyTrimMs} ms ` +
+        `(${reported} reported by the browser, ${this.#latencyTrimMs} yours).`
+    );
 
     if (!state) {
       this.#setCalibrationPhase("Ready when you are.");
-      if (progress instanceof HTMLElement) progress.innerHTML = "&nbsp;";
-      if (offset instanceof HTMLElement) offset.textContent = "—";
-      if (spread instanceof HTMLElement) spread.textContent = "—";
+      setText("calibrate-progress", "\u00a0");
+      setText("calibrate-offset", "—");
+      setText("calibrate-spread", "—");
       if (apply instanceof HTMLButtonElement) apply.disabled = true;
       if (start instanceof HTMLButtonElement) start.textContent = "Start";
       return;
@@ -918,10 +930,10 @@ export class GameApp {
 
     // Bars as dots: one glyph per bar, filled as it passes. It updates once
     // every 2.7 seconds, which is far too coarse to play to.
-    if (progress instanceof HTMLElement) {
-      progress.textContent =
-        "●".repeat(state.bar) + "○".repeat(Math.max(0, TOTAL_BARS - state.bar));
-    }
+    setText(
+      "calibrate-progress",
+      "●".repeat(state.bar) + "○".repeat(Math.max(0, TOTAL_BARS - state.bar))
+    );
 
     switch (state.phase) {
       case "countIn":
@@ -938,19 +950,22 @@ export class GameApp {
         break;
     }
 
-    if (offset instanceof HTMLElement) {
-      offset.textContent =
-        state.offsetMs === null
-          ? "—"
-          : `${state.offsetMs >= 0 ? "+" : "−"}${Math.abs(Math.round(state.offsetMs))} ms`;
-      offset.dataset["state"] = state.usable ? "good" : "";
-    }
+    setText(
+      "calibrate-offset",
+      state.offsetMs === null
+        ? "—"
+        : `${state.offsetMs >= 0 ? "+" : "−"}${Math.abs(Math.round(state.offsetMs))} ms`
+    );
+    setText(
+      "calibrate-spread",
+      state.spreadMs === null ? "—" : `±${Math.round(state.spreadMs)} ms`
+    );
+    if (offset instanceof HTMLElement) offset.dataset["state"] = state.usable ? "good" : "";
     if (spread instanceof HTMLElement) {
-      spread.textContent = state.spreadMs === null ? "—" : `±${Math.round(state.spreadMs)} ms`;
       spread.dataset["state"] = state.spreadMs === null ? "" : state.usable ? "good" : "warn";
     }
 
-    if (verdict instanceof HTMLElement) verdict.textContent = calibrationVerdict(state);
+    setText("calibrate-verdict", calibrationVerdict(state));
     if (apply instanceof HTMLButtonElement) {
       apply.disabled = !(state.phase === "done" && state.worthApplying);
     }
@@ -1286,12 +1301,28 @@ export class GameApp {
   /* Frame                                                               */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * One frame, on `requestAnimationFrame` and nothing else.
+   *
+   * Uncapped on purpose: rAF fires at the display's refresh rate, so a 120Hz or
+   * 144Hz panel gets 120 or 144 frames a second rather than a self-imposed 60.
+   * Nothing here throttles, and nothing may — a rhythm game's read-ahead is a
+   * moving object, and the smoothness of that motion is what the player judges
+   * their own timing against.
+   *
+   * The frame is also free to be *skipped*: every position is derived from the
+   * transport (`#heardBeat`), never accumulated, so a dropped frame moves
+   * nothing and a slow machine plays the same game more coarsely rather than a
+   * different one.
+   */
   #frame(): void {
+    this.#frameMeter.begin(performance.now());
     try {
       this.#tick();
     } catch (error) {
       console.error("[goaterizer] frame failed", error);
     }
+    this.#frameMeter.end(performance.now());
     requestAnimationFrame(() => this.#frame());
   }
 
@@ -1537,6 +1568,12 @@ export class GameApp {
       "actor lane/streak": attempt
         ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`
         : "—",
+      // Frame rate and *our share of it*, separately: a low rate beside a tiny
+      // work figure is the paint, not the JavaScript, and they are fixed in
+      // different places. See `ui/frame-meter.ts`.
+      fps: this.#frameMeter.fps?.toFixed(0) ?? "—",
+      "frame work ms": this.#frameMeter.workMs?.toFixed(2) ?? "—",
+      "worst frame ms": this.#frameMeter.worstIntervalMs?.toFixed(1) ?? "—",
       "energy in flight": String(this.#energy?.activeCount ?? 0),
       autoplay: this.#autoplay,
       "assets failed": this.#assets.failed.join(",") || "none",

@@ -12,5 +12,5 @@ validation-screenshots/
 # Ad-hoc review screenshots and the throwaway scripts that make them.
 # `npm run validate:browser -- --keep` is the reproducible source of truth.
 ui-screenshots/
-.shots.mjs
-.probe.mjs
+# Throwaway probe scripts kept at the root while investigating something.
+.*.mjs

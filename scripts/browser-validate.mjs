@@ -706,6 +706,86 @@ try {
   note("compare 09-timeline-l1.png and 10-timeline-l4.png for the visual escalation");
 
   /* ==================================================================== */
+  /* Part 2b — the frame loop is uncapped and cheap                       */
+  /* ==================================================================== */
+
+  // The requirement is that a fast machine gets more than 60fps, not exactly
+  // 60. Two separate things have to hold for that, and they fail differently:
+  //
+  //   1. Nothing throttles the loop. `requestAnimationFrame` is normally
+  //      clamped to the display's refresh, so a browser told to ignore vsync
+  //      should run far past 60 — if it does not, something in the app is
+  //      pacing itself.
+  //   2. Our own per-frame work leaves room for the paint. This is the only
+  //      half a codebase can guarantee across machines: the achieved rate in a
+  //      container with no GPU (this one rasterises on the CPU through
+  //      SwiftShader) says nothing about a real one.
+  //
+  // A second browser, because these flags would change the timing of every
+  // other measurement in this suite.
+  {
+    const fast = await launchBrowser([
+      "--no-sandbox",
+      "--autoplay-policy=no-user-gesture-required",
+      "--disable-frame-rate-limit",
+      "--disable-gpu-vsync",
+    ]);
+    // The same viewport the rest of the suite uses: the dev panel is fixed to
+    // the top right, and on a narrower one it covers the button this needs.
+    const page = await fast.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.addInitScript(() => {
+      const raf = window.requestAnimationFrame.bind(window);
+      window.__frames = [];
+      window.requestAnimationFrame = (cb) =>
+        raf((t) => {
+          const started = performance.now();
+          cb(t);
+          window.__frames.push([started, performance.now() - started]);
+        });
+    });
+    await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent&level=4`, {
+      waitUntil: "networkidle",
+    });
+    await page.click("#start-play");
+    await page.waitForTimeout(1500);
+    await page.click("#pregame-play");
+    await page.waitForTimeout(300);
+    await page.click("#dev-autoplay-perfect");
+    await page.waitForTimeout(2500);
+    await page.evaluate(() => void (window.__frames.length = 0));
+    await page.waitForTimeout(4000);
+
+    const perf = await page.evaluate(() => {
+      const frames = window.__frames;
+      const work = frames.map((f) => f[1]).sort((a, b) => a - b);
+      const span = (frames.at(-1)?.[0] ?? 0) - (frames[0]?.[0] ?? 0);
+      return {
+        fps: span > 0 ? ((frames.length - 1) / span) * 1000 : 0,
+        workP95: work[Math.floor(work.length * 0.95)] ?? 0,
+        workMax: work.at(-1) ?? 0,
+      };
+    });
+    note(
+      `${perf.fps.toFixed(0)} fps unthrottled, frame work p95 ${perf.workP95.toFixed(2)}ms ` +
+        `max ${perf.workMax.toFixed(2)}ms (CPU rasterisation — a real GPU is faster)`
+    );
+    check(
+      "the frame loop is not capped at 60fps",
+      perf.fps > 90,
+      `${perf.fps.toFixed(0)} fps with vsync disabled`
+    );
+    // 4ms is a quarter of a 60Hz budget and an eighth of a 120Hz one, against a
+    // measured 0.4ms — a wide regression guard, not a tight target.
+    check(
+      "per-frame JavaScript leaves the budget to the paint",
+      perf.workP95 < 4,
+      `p95 ${perf.workP95.toFixed(2)}ms`
+    );
+    await page.close();
+    await fast.close();
+  }
+
+  /* ==================================================================== */
   /* Part 3 — the production path really is Tuninator                     */
   /* ==================================================================== */
 

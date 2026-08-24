@@ -43,6 +43,8 @@ export class EnergyLayer {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   #streaks: Streak[] = [];
+  /** True while the canvas has something on it that will need clearing. */
+  #painted = false;
   #width = 0;
   #height = 0;
 
@@ -63,6 +65,8 @@ export class EnergyLayer {
 
   clear(): void {
     this.#streaks = [];
+    // Not `#painted = false`: whatever was mid-flight is still on the canvas
+    // and needs one more pass to wipe it.
   }
 
   /**
@@ -86,9 +90,16 @@ export class EnergyLayer {
   }
 
   render(nowBeat: number): void {
+    // This layer is empty almost always — streaks exist for a fraction of a
+    // second at the end of an attempt — and it is a full-viewport canvas over
+    // the whole game. Clearing it every frame regardless was a third of the
+    // per-frame fill for nothing at all.
+    if (this.#streaks.length === 0 && !this.#painted) return;
+
     this.#resize();
     const ctx = this.#ctx;
     ctx.clearRect(0, 0, this.#width, this.#height);
+    this.#painted = this.#streaks.length > 0;
 
     for (const streak of this.#streaks) {
       const t = Math.min(1, (nowBeat - streak.bornBeat) / FLIGHT_BEATS);

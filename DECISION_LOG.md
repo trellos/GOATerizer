@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-025: The frame loop is uncapped, and only the JavaScript half is ours to promise
+* **Date:** 2026-08-23
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** "Does the game run at 60fps or higher if the machine is fast enough? It needs to." Nothing in the codebase paced itself — the loop is plain `requestAnimationFrame`, which follows the display's refresh — but nothing measured it either, so the answer was an assumption. Measuring it found the loop uncapped and the JavaScript nowhere near the budget (0.32ms mean per frame), and the real cost entirely in the *paint*: three full-viewport canvases repainting every frame, two of which had nothing new to draw.
+* **Decision:** Keep the loop uncapped — rAF fires at the panel's rate, so 120Hz and 144Hz displays get 120 and 144 frames, and no throttle may be added. Stop repainting what did not change: `EnergyLayer` skips its full-viewport clear entirely when no streak is in flight, which is almost always; `ScenarioBackdropView` repaints only when a signature of everything it draws from changes, which during play is only when the star meter fills or the transition slides. In a container rasterising on the CPU that took 1440x900 from 145 to 203fps and 4K from 20 to 30. Report both halves in the dev panel — frame rate *and* our own per-frame work — because a low rate beside a tiny work figure is the paint and a JS profile would show nothing.
+* **Alternatives Considered:** (a) Asserting an achieved frame rate in the browser suite. Rejected as the primary guard: this container has no GPU (SwiftShader), so its number says nothing about a real machine and would make the suite a hardware detector. The suite asserts the two things that *are* portable — the loop exceeds 60fps with vsync disabled, so nothing is pacing it, and per-frame JavaScript stays under 4ms, a quarter of a 60Hz budget against a measured 0.5ms p95. (b) Caching the backdrop to an offscreen canvas and blitting it. Unnecessary once it stopped repainting at all; it would only help the transition frames, which are already the cheap case.
+* **Consequences:** Positive — two of the three canvases now cost nothing on a typical frame, and the game degrades correctly rather than differently on a slow machine: every position is derived from the transport, never accumulated, so a dropped frame moves nothing and a backgrounded tab (where the browser stops rAF entirely, as it should) resumes exactly where the music got to. Negative — the backdrop's dirty check is a string signature rebuilt every frame; it is cheap against a full-viewport repaint but it is a correctness hazard, because anything added to that view's drawing that is *not* in the signature will silently stop updating.
+
+---
+
 #### DECISION-024: A timing check with its own screen, at 90bpm, on quarter notes
 * **Date:** 2026-08-23
 * **Status:** Accepted
