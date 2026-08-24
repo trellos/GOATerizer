@@ -32,6 +32,7 @@ import { pickWeightedKey } from "../config/key-weighting.js";
 import { DEFAULT_TEMPO_ID, TEMPOS, tempoById, type TempoId } from "../config/tempos.js";
 import {
   ATTEMPT_BEATS,
+  BEATS_PER_MEASURE,
   EXTRA_INPUT_LATENCY_MS,
   RUN_LEAD_IN_BEATS,
   TRANSITION_BEATS,
@@ -39,6 +40,15 @@ import {
 import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
 import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
+import {
+  CALIBRATION_BPM,
+  CalibrationSession,
+  COUNT_IN_BARS,
+  MAX_USABLE_SPREAD_MS,
+  MIN_SAMPLES,
+  TOTAL_BARS,
+  type CalibrationState,
+} from "../game/calibration.js";
 import { offBeatMs, TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
@@ -70,7 +80,7 @@ import {
 
 const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
-type Screen = "start" | "pregame" | "game" | "results";
+type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
 
 type Setup = {
   key: RunKey;
@@ -102,6 +112,36 @@ function setTrophy(slot: HTMLElement, stars: number | null): void {
 
 /** A scenario with no climber art — pregame, and every non-climb class. */
 const EMPTY_SPRITES: ActorSprites = { poses: [] };
+
+/**
+ * What the timing check says about what it found.
+ *
+ * The two numbers answer different questions and the copy has to keep them
+ * apart, because the player's real question — "is that me or is that the
+ * game?" — is exactly the confusion this screen exists to resolve. The offset
+ * is their rig and their feel together; the spread is only them, and it is what
+ * decides whether the offset can be trusted at all.
+ */
+function calibrationVerdict(state: CalibrationState): string {
+  if (state.phase !== "done") {
+    return "The offset is your rig and your feel together. The consistency is just you — it says whether the offset can be trusted.";
+  }
+  if (state.samples < MIN_SAMPLES) {
+    return `Only ${state.samples} notes came through. Play one on every click — and check the guitar is actually being heard.`;
+  }
+  if (!state.usable) {
+    return `Your notes were spread ±${Math.round(state.spreadMs ?? 0)} ms, which is too loose for the middle of them to mean anything. Try again and worry about being even rather than being right.`;
+  }
+  if (!state.worthApplying) {
+    return "You are already inside 10 ms of the beat. Nothing to change — if the game still feels off, it is not this.";
+  }
+  const late = (state.offsetMs ?? 0) >= 0;
+  return (
+    `You play ${Math.abs(Math.round(state.offsetMs ?? 0))} ms ${late ? "after" : "before"} the click, ` +
+    `steadily to within ±${Math.round(state.spreadMs ?? 0)} ms. Applying it moves judgment ` +
+    `${late ? "later" : "earlier"} by that much, so the notes you feel are on time are scored that way.`
+  );
+}
 
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
@@ -144,6 +184,8 @@ export class GameApp {
    */
   #latencyTrimMs = readLatencyTrimMs() ?? EXTRA_INPUT_LATENCY_MS;
   readonly #timing = new TimingDeltaLog();
+  /** The timing check in progress, or null when that screen is idle. */
+  #calibration: CalibrationSession | null = null;
 
   /* Game state ------------------------------------------------------- */
   #screen: Screen = "start";
@@ -249,7 +291,7 @@ export class GameApp {
 
   #showScreen(screen: Screen): void {
     this.#screen = screen;
-    for (const id of ["start", "pregame", "game", "results"] as const) {
+    for (const id of ["start", "calibrate", "pregame", "game", "results"] as const) {
       const element = document.getElementById(`screen-${id}`);
       if (element) element.dataset["active"] = String(id === screen);
     }
@@ -267,6 +309,18 @@ export class GameApp {
       value.textContent = String(scores[tempo.id] ?? 0);
       item.append(name, value);
       list.append(item);
+    }
+
+    // A nudge, not a gate. A player whose rig is fine should not be made to sit
+    // through a check to reach the game, but a player whose rig is 200ms out
+    // will otherwise spend a run blaming their hands.
+    const state = document.getElementById("start-calibration-state");
+    if (state instanceof HTMLElement) {
+      const stored = readLatencyTrimMs();
+      state.textContent =
+        stored === null
+          ? "Timing not measured yet — the check takes about 20 seconds."
+          : `Timing measured: ${stored >= 0 ? "+" : "−"}${Math.abs(stored)} ms of your own.`;
     }
   }
 
@@ -359,6 +413,18 @@ export class GameApp {
     must("start-play", HTMLButtonElement).addEventListener("click", () => {
       void this.#enterPregame();
     });
+    must("start-calibrate", HTMLButtonElement).addEventListener("click", () => {
+      void this.#enterCalibration();
+    });
+    must("calibrate-start", HTMLButtonElement).addEventListener("click", () =>
+      this.#startCalibrationRun()
+    );
+    must("calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
+      this.#applyCalibrationResult()
+    );
+    must("calibrate-back", HTMLButtonElement).addEventListener("click", () =>
+      this.#leaveCalibration()
+    );
     must("pregame-reroll", HTMLButtonElement).addEventListener("click", () => this.#reroll());
     must("pregame-calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
       this.#applyCalibration()
@@ -502,12 +568,21 @@ export class GameApp {
     for (const button of document.querySelectorAll<HTMLElement>("#pregame-tempos button")) {
       button.dataset["selected"] = String(button.dataset["tempo"] === tempoId);
     }
-    if (this.#transport.running) {
-      // Phase-preserving: the loop keeps its place, only the rate changes.
-      this.#transport.setBpm(tempoById(tempoId).bpm);
-      this.#bass?.retime();
-      this.#drums?.retime();
-    }
+    if (this.#transport.running) this.#setBpm(tempoById(tempoId).bpm);
+  }
+
+  /**
+   * Changes tempo without stopping the beat.
+   *
+   * Phase-preserving: the loop keeps its place, only the rate changes — and
+   * both players have to re-time the tail they have already queued, or the
+   * notes scheduled under the old rate arrive at the wrong moment. One place,
+   * because forgetting either `retime` is a bug you hear rather than see.
+   */
+  #setBpm(bpm: number): void {
+    this.#transport.setBpm(bpm);
+    this.#bass?.retime();
+    this.#drums?.retime();
   }
 
   /**
@@ -679,6 +754,7 @@ export class GameApp {
       case "attack":
         this.#timeline.addPlayed(event.id, event.midi, beat);
         if (this.#screen === "pregame") this.#recordCalibrationSample(beat);
+        else if (this.#screen === "calibrate") this.#calibration?.note(beat);
         break;
       case "retune":
         this.#timeline.revisePlayed(event.id, event.midi);
@@ -692,6 +768,195 @@ export class GameApp {
 
     // Judgment only ever sees the attempt that is actually being played.
     this.#current?.runtime.handleGuitarEvent(event);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* The timing check                                                    */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Opens the timing check: audio, a click, a microphone, and nothing else.
+   *
+   * Deliberately *not* the pregame calibration's environment. Pregame has a
+   * bass loop over the click and tells the player to noodle, so a note played
+   * there is as likely to be aimed at the music as at the beat. Here the
+   * backing is the bare quarter pulse — the same accented pulse a run plays
+   * over, so what is calibrated is what will be played against — and the only
+   * instruction is one note per click.
+   */
+  async #enterCalibration(): Promise<void> {
+    this.#showScreen("calibrate");
+    const unlocked = await this.#audio.unlock();
+    if (!unlocked) {
+      this.#setCalibrationPhase(this.#audio.failure ?? "Audio could not start.");
+      return;
+    }
+
+    // The check pins its own tempo, whatever the player picked for their run:
+    // a fixed reference keeps the number comparable between sessions, and the
+    // fold-over headroom becomes a known quantity rather than a setting.
+    if (!this.#transport.running) this.#transport.start(CALIBRATION_BPM);
+    else this.#setBpm(CALIBRATION_BPM);
+
+    const context = this.#audio.context;
+    const master = this.#audio.master;
+    if (context && master && !this.#drums) {
+      this.#drums = new DrumPlayer(context, this.#transport, master);
+    }
+    // No bass. It is a musical loop, and a player will phrase against it.
+    this.#bass?.stop();
+    this.#refreshDrumGrid();
+    this.#drums?.start();
+
+    this.#calibration = null;
+    this.#renderCalibration();
+    await this.#switchProvider(this.#initialInputKind);
+  }
+
+  /** Leaves the check and restores the tempo the player actually chose. */
+  #leaveCalibration(): void {
+    this.#calibration = null;
+    if (this.#transport.running) this.#setBpm(tempoById(this.#setup.tempoId).bpm);
+    this.#showScreen("start");
+    this.#buildStartScreen();
+  }
+
+  /** Begins a run of the check on the next bar line, so the count-in counts. */
+  #startCalibrationRun(): void {
+    if (!this.#transport.running) return;
+    const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat);
+    this.#calibration = new CalibrationSession(startBeat, this.#transport.secondsPerBeat);
+    this.#scheduleCalibrationAutoplay(startBeat);
+    this.#renderCalibration();
+  }
+
+  /**
+   * Dev-only: plays the check for you, one note per beat.
+   *
+   * There is no guitar in CI, and the check is the one screen whose whole
+   * behaviour is "what happens when a human plays along". Autoplay schedules
+   * its attacks at the beat *plus the current compensation* — it simulates a
+   * player who is exactly on time on this rig — so a run of it should measure
+   * an offset of about zero. That makes the round trip assertable: if the check
+   * reported a large offset for a player who was by construction on time, the
+   * measurement is wrong.
+   */
+  #scheduleCalibrationAutoplay(startBeat: number): void {
+    const mode = this.#autoplay;
+    if (mode === "off") return;
+    const testProvider =
+      this.#provider instanceof TestGuitarInputProvider ? this.#provider : null;
+    const synth = this.#micMocked ? this.#synth : null;
+    if (!testProvider && !synth) return;
+
+    const secondsPerBeat = this.#transport.secondsPerBeat;
+    const offsetBeats = mode === "perfect" ? 0 : mode === "good" ? 0.06 : 0.12;
+    const latency = this.#latencySeconds;
+    const midi = 40; // Open low E: one string, no left hand, like the instructions.
+
+    for (let beat = COUNT_IN_BARS * BEATS_PER_MEASURE; beat < TOTAL_BARS * BEATS_PER_MEASURE; beat += 1) {
+      const at =
+        this.#transport.contextTimeAt(startBeat + beat) + offsetBeats * secondsPerBeat + latency;
+      if (testProvider) testProvider.schedule([{ at, kind: "attack", midi }]);
+      else synth?.pluck(midi, at, Math.max(0.12, secondsPerBeat * 0.6));
+    }
+  }
+
+  /** Adopts the measured offset. The check itself never applies silently. */
+  #applyCalibrationResult(): void {
+    const state = this.#calibration?.state;
+    if (!state?.usable || state.offsetMs === null) return;
+    const next = this.#latencyTrimMs + state.offsetMs;
+    this.#setLatencyTrim(Math.max(-MAX_LATENCY_TRIM_MS, Math.min(MAX_LATENCY_TRIM_MS, next)));
+    // The session described the rig as it was before this change, so it is now
+    // stale by exactly the amount just applied. Clearing it makes "Start" mean
+    // "measure again against the new setting", which is the verification pass.
+    this.#calibration = null;
+    this.#renderCalibration();
+  }
+
+  #setCalibrationPhase(text: string): void {
+    const phase = document.getElementById("calibrate-phase");
+    if (phase instanceof HTMLElement) phase.textContent = text;
+  }
+
+  /**
+   * Paints the check.
+   *
+   * Everything here changes at most once per bar. Nothing on this screen may
+   * move on the beat: a visual pulse is a second cue, and a player given two
+   * cues splits the difference between them — which would make the measurement
+   * a blend of their audio offset and their visual one rather than the audio
+   * offset the judge actually compensates.
+   */
+  #renderCalibration(): void {
+    const state = this.#calibration?.state ?? null;
+    const offset = document.getElementById("calibrate-offset");
+    const spread = document.getElementById("calibrate-spread");
+    const verdict = document.getElementById("calibrate-verdict");
+    const progress = document.getElementById("calibrate-progress");
+    const apply = document.getElementById("calibrate-apply");
+    const start = document.getElementById("calibrate-start");
+    const current = document.getElementById("calibrate-current");
+
+    if (current instanceof HTMLElement) {
+      const reported = Math.round(this.#audio.outputLatencySeconds * 1000);
+      current.textContent =
+        `Currently compensating ${reported + this.#latencyTrimMs} ms ` +
+        `(${reported} reported by the browser, ${this.#latencyTrimMs} yours).`;
+    }
+
+    if (!state) {
+      this.#setCalibrationPhase("Ready when you are.");
+      if (progress instanceof HTMLElement) progress.innerHTML = "&nbsp;";
+      if (offset instanceof HTMLElement) offset.textContent = "—";
+      if (spread instanceof HTMLElement) spread.textContent = "—";
+      if (apply instanceof HTMLButtonElement) apply.disabled = true;
+      if (start instanceof HTMLButtonElement) start.textContent = "Start";
+      return;
+    }
+
+    // Bars as dots: one glyph per bar, filled as it passes. It updates once
+    // every 2.7 seconds, which is far too coarse to play to.
+    if (progress instanceof HTMLElement) {
+      progress.textContent =
+        "●".repeat(state.bar) + "○".repeat(Math.max(0, TOTAL_BARS - state.bar));
+    }
+
+    switch (state.phase) {
+      case "countIn":
+        this.#setCalibrationPhase("Listen…");
+        break;
+      case "warmUp":
+        this.#setCalibrationPhase("Play along — this bar is a warm-up");
+        break;
+      case "measuring":
+        this.#setCalibrationPhase(`Keep going — ${state.samples} notes`);
+        break;
+      case "done":
+        this.#setCalibrationPhase(state.usable ? "Done" : "Not enough to go on");
+        break;
+    }
+
+    if (offset instanceof HTMLElement) {
+      offset.textContent =
+        state.offsetMs === null
+          ? "—"
+          : `${state.offsetMs >= 0 ? "+" : "−"}${Math.abs(Math.round(state.offsetMs))} ms`;
+      offset.dataset["state"] = state.usable ? "good" : "";
+    }
+    if (spread instanceof HTMLElement) {
+      spread.textContent = state.spreadMs === null ? "—" : `±${Math.round(state.spreadMs)} ms`;
+      spread.dataset["state"] = state.spreadMs === null ? "" : state.usable ? "good" : "warn";
+    }
+
+    if (verdict instanceof HTMLElement) verdict.textContent = calibrationVerdict(state);
+    if (apply instanceof HTMLButtonElement) {
+      apply.disabled = !(state.phase === "done" && state.worthApplying);
+    }
+    if (start instanceof HTMLButtonElement) {
+      start.textContent = state.phase === "done" ? "Again" : "Restart";
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -1052,7 +1317,10 @@ export class GameApp {
     this.#timeline.prune(beat);
     this.#energy?.update(beat);
 
-    if (this.#screen === "pregame") {
+    if (this.#screen === "calibrate") {
+      this.#calibration?.update(beat);
+      this.#renderCalibration();
+    } else if (this.#screen === "pregame") {
       this.#pregameView?.render(this.#timeline, beat);
       this.#updatePregameReadouts();
     } else if (this.#screen === "game") {
@@ -1190,10 +1458,17 @@ export class GameApp {
     const median = this.#timing.median;
     const spread = this.#timing.spread;
     // Enough notes to have a median worth trusting, and a cluster tight enough
-    // that it describes a rig rather than a player still warming up. A spread
-    // wider than the offset means the honest answer is "keep playing".
+    // that it describes a rig rather than a player still warming up.
+    //
+    // The threshold is absolute, not a ratio against the offset: "spread
+    // smaller than the offset" sounds reasonable and is wrong at the one place
+    // it matters, because a perfectly compensated rig has an offset near zero
+    // and would be told to keep playing forever.
     const usable =
-      this.#timing.count >= 8 && median !== null && spread !== null && spread < Math.abs(median);
+      this.#timing.count >= MIN_SAMPLES &&
+      median !== null &&
+      spread !== null &&
+      spread <= MAX_USABLE_SPREAD_MS;
 
     if (state instanceof HTMLElement) {
       if (median === null) {

@@ -607,6 +607,53 @@ try {
   }
 
   /* ==================================================================== */
+  /* Part 1c — the timing check measures what it claims to                */
+  /* ==================================================================== */
+
+  // The check exists to tell a player whether the beat feeling late is their
+  // rig or their hands, so the number it reports has to be right — a screen
+  // that confidently reports noise is worse than no screen, because the player
+  // will apply it. Autoplay schedules its attacks at the beat plus the current
+  // compensation, so it is a player who is on time *by construction*: with the
+  // perfect mode the check must find nothing to change, and with `good` — a
+  // fixed 0.06 of a beat late, 40ms at the check's 90bpm — it must find exactly
+  // that and offer to apply it.
+  for (const [mode, expected, wantsApply] of [
+    ["perfect", 0, false],
+    ["good", 40, true],
+  ]) {
+    const cal = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+    await cal.goto(`${BASE}/?dev=1&input=test`, { waitUntil: "networkidle" });
+    await cal.click("#start-calibrate");
+    await cal.waitForTimeout(1500);
+    await cal.click(`#dev-autoplay-${mode}`);
+    await cal.click("#calibrate-start");
+
+    // Seven bars at 90bpm is under 19s, plus up to a bar waiting for the line
+    // the count-in starts on.
+    const phase = cal.locator("#calibrate-phase");
+    await phase.filter({ hasText: "Done" }).waitFor({ timeout: 40000 }).catch(() => {});
+
+    const offset = Number((await cal.textContent("#calibrate-offset"))?.replace(/[^\d-]/g, "") ?? NaN);
+    const disabled = await cal.evaluate(
+      () => document.getElementById("calibrate-apply").disabled
+    );
+    check(
+      `the check finds ${expected}ms for a player who is ${expected}ms late`,
+      Math.abs(offset - expected) <= 8,
+      `reported ${await cal.textContent("#calibrate-offset")}`
+    );
+    check(
+      wantsApply
+        ? "an offset worth applying enables Apply"
+        : "an already-accurate rig is told there is nothing to change",
+      disabled === !wantsApply
+    );
+    if (mode === "good") await shotWithoutDevPanel(cal, "11-timing-check.png");
+    await cal.close();
+  }
+
+  /* ==================================================================== */
   /* Part 2 — L4 is visibly denser than L1                                */
   /* ==================================================================== */
 
@@ -696,7 +743,7 @@ try {
     await live.locator("#dev-panel").isHidden()
   );
   check("no page errors on the live path", liveErrors.length === 0, liveErrors.join(" | "));
-  await live.screenshot({ path: path.join(SHOTS, "11-live-input.png") });
+  await live.screenshot({ path: path.join(SHOTS, "12-live-input.png") });
 
   note(
     "Chromium's fake capture device is silence, so no note is detected here. " +

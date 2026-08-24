@@ -124,6 +124,87 @@ button.chip[data-selected="true"] {
   padding: 2rem;
 }
 
+#screen-start .start-card > button {
+  margin: 0 0.3rem;
+}
+
+/*
+ * The timing check.
+ *
+ * Nothing here moves on the beat. The phase and progress lines change once per
+ * bar at most, which is deliberate: anything pulsing at the tempo would give
+ * the player a second cue to synchronise with, and what is being measured is
+ * their offset from the *click*. A visual metronome would quietly turn this
+ * into a measurement of how they split the difference between two cues.
+ */
+#screen-calibrate {
+  align-items: center;
+  justify-content: center;
+}
+
+.calibrate-card {
+  max-width: 32rem;
+}
+
+.calibrate-lede {
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0.6rem 0 1.6rem;
+}
+
+.calibrate-phase {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+  min-height: 1.6em;
+}
+
+.calibrate-progress {
+  font-family: var(--mono);
+  color: var(--text-dim);
+  letter-spacing: 0.3em;
+  margin: 0.3rem 0 1.4rem;
+  min-height: 1.4em;
+}
+
+.calibrate-figures {
+  display: flex;
+  justify-content: center;
+  gap: 2.4rem;
+  margin: 0 0 0.6rem;
+}
+
+.calibrate-figures div {
+  text-align: center;
+}
+
+.calibrate-figures dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+
+.calibrate-figures dd {
+  margin: 0.2rem 0 0;
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.calibrate-figures dd[data-state="good"] {
+  color: var(--good);
+}
+
+.calibrate-figures dd[data-state="warn"] {
+  color: var(--perfect);
+}
+
+.calibrate-actions {
+  justify-content: center;
+  margin-top: 1.4rem;
+}
+
 .title {
   font-size: clamp(2.6rem, 8vw, 4.6rem);
   margin: 0;

@@ -28,13 +28,58 @@
           <h1 class="title">GOATerizer</h1>
           <p class="tagline">You really suck and this is your best shot.</p>
           <button class="primary" id="start-play" type="button">Play</button>
+          <button class="secondary" id="start-calibrate" type="button">Timing check</button>
           <p class="hint">
             Plug in or mic a guitar. The browser will ask for the microphone.
           </p>
+          <p class="hint" id="start-calibration-state"></p>
           <div class="high-scores">
             <h2>High scores</h2>
             <ul id="start-high-scores"></ul>
           </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <!--
+        The timing check. Deliberately the plainest screen in the game: there is
+        no timeline, no scenario and nothing that moves on the beat, because a
+        visual pulse is something the player would sync to and the whole point
+        is measuring them against the *sound*. The only thing that animates is a
+        bar counter, once per bar, which is far too coarse to play to.
+      -->
+      <section class="screen" id="screen-calibrate">
+        <div class="start-card calibrate-card">
+          <h2 class="bar-title">Timing check</h2>
+          <p class="calibrate-lede" id="calibrate-lede">
+            Play one note on every click. Any note — an open string is fine.
+            Listen to the click; don't watch the screen.
+          </p>
+
+          <p class="calibrate-phase" id="calibrate-phase">Ready when you are.</p>
+          <p class="calibrate-progress" id="calibrate-progress">&nbsp;</p>
+
+          <dl class="calibrate-figures">
+            <div>
+              <dt>Your offset</dt>
+              <dd id="calibrate-offset">—</dd>
+            </div>
+            <div>
+              <dt>Your consistency</dt>
+              <dd id="calibrate-spread">—</dd>
+            </div>
+          </dl>
+          <p class="note" id="calibrate-verdict">
+            The offset is your rig and your feel together. The consistency is
+            just you — it says whether the offset can be trusted.
+          </p>
+
+          <div class="button-row calibrate-actions">
+            <button class="primary" id="calibrate-start" type="button">Start</button>
+            <button class="secondary" id="calibrate-apply" type="button" disabled>Apply</button>
+            <button class="secondary" id="calibrate-back" type="button">Back</button>
+          </div>
+          <p class="hint" id="calibrate-current">—</p>
         </div>
       </section>
 
