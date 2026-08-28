@@ -76,6 +76,7 @@ export class TimelineModel {
   #key: RunKey;
   #targets: TargetNote[] = [];
   #played: PlayedNote[] = [];
+  #unreleasedPruned = 0;
   #bass: BassNoteView[] = [];
   #bassLine: BassLine | null = null;
 
@@ -184,13 +185,33 @@ export class TimelineModel {
     note.wrong = wrong;
   }
 
+  /**
+   * How many played notes have been dropped while still unreleased.
+   *
+   * A played note grows until its `release` arrives, which is correct — a
+   * sustained note should draw as a long bar, and capping the length would
+   * quietly truncate real sustain. But `HISTORY_BEATS` is longer than any
+   * authored note, so a note that reaches pruning without ending is, by
+   * construction, a producer that stopped emitting note-offs: an injected
+   * script with no `release`, or real Tuninator dropping a `noteEnded`. Counted
+   * rather than hidden, and surfaced in the dev panel.
+   */
+  get unreleasedPruned(): number {
+    return this.#unreleasedPruned;
+  }
+
   /** Drops played notes that have scrolled well past the left edge. */
   prune(nowBeat: number): void {
-    this.#played = this.#played.filter((note) => nowBeat - note.startBeat < HISTORY_BEATS);
+    this.#played = this.#played.filter((note) => {
+      if (nowBeat - note.startBeat < HISTORY_BEATS) return true;
+      if (note.endBeat === null) this.#unreleasedPruned += 1;
+      return false;
+    });
   }
 
   clearPlayed(): void {
     this.#played = [];
+    this.#unreleasedPruned = 0;
   }
 
   /** Everything inside the visible window, targets and history included. */

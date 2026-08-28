@@ -240,3 +240,38 @@ describe("timeline model", () => {
     expect(timeline.snapshot(101, 2, 2).played[0]?.endBeat).toBe(101);
   });
 });
+
+describe("unreleased played notes", () => {
+  const KEY_G_MINOR: RunKey = { tonic: 7, mode: "minor" };
+
+  it("freezes a note's end on release, and grows it until then", () => {
+    const timeline = new TimelineModel(KEY_G_MINOR);
+    timeline.addPlayed("n1", 60, 4);
+    expect(timeline.snapshot(5, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS).played[0]?.endBeat)
+      .toBeNull();
+
+    timeline.endPlayed("n1", 5);
+    expect(timeline.snapshot(5, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS).played[0]?.endBeat)
+      .toBe(5);
+  });
+
+  it("counts a note pruned without ever being released", () => {
+    // The instrument that stands in for a length cap: a sustained note is
+    // allowed to grow, but reaching pruning unreleased means a producer stopped
+    // emitting note-offs, and the dev panel says so rather than the timeline
+    // quietly truncating it.
+    const timeline = new TimelineModel(KEY_G_MINOR);
+    timeline.addPlayed("stuck", 60, 0);
+    timeline.addPlayed("clean", 62, 0);
+    timeline.endPlayed("clean", 1);
+
+    timeline.prune(1);
+    expect(timeline.unreleasedPruned).toBe(0);
+
+    timeline.prune(TIMELINE_HISTORY_BEATS + 100);
+    expect(timeline.unreleasedPruned).toBe(1);
+
+    timeline.clearPlayed();
+    expect(timeline.unreleasedPruned).toBe(0);
+  });
+});

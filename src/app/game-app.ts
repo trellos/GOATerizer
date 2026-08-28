@@ -23,11 +23,23 @@ import { BassPlayer } from "../audio/bass-player.js";
 import { drumPatternFor } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { Transport } from "../audio/transport.js";
+import {
+  planAutoPerformance,
+  parseAutoplayMode,
+  type AutoGesture,
+  type AutoPerformance,
+  type AutoplayMode,
+} from "../dev/auto-performance.js";
 import { SyntheticGuitarSource } from "../dev/synthetic-guitar.js";
 import { pickWeightedKey } from "../config/key-weighting.js";
 import { DEFAULT_TEMPO_ID, TEMPOS, tempoById, type TempoId } from "../config/tempos.js";
 import {
   ATTEMPT_BEATS,
+  AUTOPLAY_DEFAULT_SEED,
+  AUTOPLAY_PLUCK_GAP_SECONDS,
+  AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS,
+  AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS,
+  AUTOPLAY_SCHEDULE_LEAD_SECONDS,
   EXTRA_INPUT_LATENCY_MS,
   RUN_LEAD_IN_BEATS,
   TRANSITION_BEATS,
@@ -68,6 +80,8 @@ type ActiveAttempt = {
   /** Timeline key, so two attempts can share the timeline across a transition. */
   timelineKey: string;
   slotOrdinal: number;
+  /** Monotonic across a run. Seeds this attempt's autoplay performance. */
+  attemptIndex: number;
   runtime: AttemptRuntime;
 };
 
@@ -101,8 +115,22 @@ export class GameApp {
    * source the provider itself has no way to distinguish from a real mic.
    */
   #micMocked = false;
+  /**
+   * Which source was actually asked for, as opposed to which provider class is
+   * running. `#providerKind` cannot tell `synth` from `tuninator` by design.
+   */
+  #sourceKind: "tuninator" | "test" | "synth" = "tuninator";
   /** What `#enterPregame`'s first `#switchProvider` call should use. */
   #initialInputKind: "tuninator" | "test" | "synth" = "tuninator";
+  /**
+   * Serialises provider switches.
+   *
+   * `#switchProvider` disposes the recognizer and awaits a fresh `start()`, and
+   * it is now reachable from two sync click handlers (the source select and the
+   * autoplay chips). Overlapping calls could otherwise leave `#provider`
+   * pointing at a disposed recognizer, with `#micMocked` set by whichever lost.
+   */
+  #providerSwitch: Promise<void> = Promise.resolve();
   #unsubscribeInput: (() => void)[] = [];
   #inputStatus: GuitarInputStatus | null = null;
   #latencyTrimMs = EXTRA_INPUT_LATENCY_MS;
@@ -146,8 +174,18 @@ export class GameApp {
    * that is no longer always Rocky Ascent.
    */
   #devLevel: number | null = null;
-  #autoplay: "perfect" | "good" | "scruffy" | "off" = "off";
-  #autoplayScheduledFor: string | null = null;
+  #autoplay: AutoplayMode = "off";
+  /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
+  #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
+  /**
+   * Performances already handed to a sink, keyed by `timelineKey`.
+   *
+   * A map rather than the single key this used to be: `#current` and `#next`
+   * are both scheduled, so an attempt gets a full attempt of lead time instead
+   * of the one `TRANSITION_BEATS` beat it had when only the promoted attempt
+   * was scheduled.
+   */
+  readonly #autoplayScheduled = new Map<string, AutoPerformance>();
 
   /* ------------------------------------------------------------------ */
   /* Boot                                                                */
@@ -323,20 +361,19 @@ export class GameApp {
     if (!(root instanceof HTMLElement)) return;
     this.#debug = new DebugPanel(root, {
       onSourceChange: (source) => {
-        void this.#switchProvider(source);
+        void this.#queueProviderSwitch(source);
       },
       onLatencyChange: (ms) => {
         this.#latencyTrimMs = ms;
         // Samples taken under the old trim describe a different rig. Keeping
         // them would average the change away and make the trim look ineffective.
         this.#timing.clear();
+        // The compensation is baked in at schedule time, so anything already
+        // queued describes the old trim too.
+        this.#cancelAutoplay();
       },
       onAutoplay: (mode) => {
-        this.#autoplay = mode;
-        this.#autoplayScheduledFor = null;
-        if (mode === "off" && this.#provider instanceof TestGuitarInputProvider) {
-          this.#provider.clearSchedule();
-        }
+        void this.#setAutoplayMode(mode);
       },
     });
     this.#debug.setEnabled(this.#devMode);
@@ -356,8 +393,30 @@ export class GameApp {
     if (this.#devMode && (requestedInput === "test" || requestedInput === "synth")) {
       this.#initialInputKind = requestedInput;
       if (requestedInput === "test") this.#providerKind = "test";
-      const select = root.querySelector("#dev-source");
-      if (select instanceof HTMLSelectElement) select.value = requestedInput;
+      this.#debug.setSourceValue(requestedInput);
+    }
+
+    // Guarded on presence, not just on `Number`: `Number(null)` is 0, which
+    // would quietly make a bare `?dev=1` a different performance from the
+    // documented default rather than the same one.
+    const rawSeed = params.get("seed");
+    const seed = Number(rawSeed);
+    if (this.#devMode && rawSeed !== null && rawSeed !== "" && Number.isFinite(seed)) {
+      this.#autoplaySeed = Math.trunc(seed) >>> 0;
+    }
+
+    // `?dev=1&autoplay=<mode>` is the shareable-demo path, and it is
+    // deliberately the *clean* one: setting the source here means
+    // `#enterPregame` opens the synthetic mic on its single provider start,
+    // rather than a click tearing a running recognizer down mid-run.
+    const autoplay = parseAutoplayMode(params.get("autoplay"));
+    if (this.#devMode && autoplay && autoplay !== "off") {
+      this.#autoplay = autoplay;
+      this.#debug.setAutoplayMode(autoplay);
+      if (!requestedInput) {
+        this.#initialInputKind = "synth";
+        this.#debug.setSourceValue("synth");
+      }
     }
   }
 
@@ -399,7 +458,7 @@ export class GameApp {
     this.#gameView?.setMode(this.#setup.viewMode);
     this.#updateKeyReadouts();
 
-    await this.#switchProvider(this.#initialInputKind);
+    await this.#queueProviderSwitch(this.#initialInputKind);
   }
 
   /** New key and new bass line. Deliberately does NOT touch the transport. */
@@ -429,6 +488,9 @@ export class GameApp {
       this.#transport.setBpm(tempoById(tempoId).bpm);
       this.#bass?.retime();
       this.#drums?.retime();
+      // `setBpm` re-anchors the transport, so every already-computed audio-clock
+      // time for a queued gesture now points at the wrong beat.
+      this.#cancelAutoplay();
     }
   }
 
@@ -450,6 +512,18 @@ export class GameApp {
   /* Input                                                               */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * Switches input source, one at a time.
+   *
+   * Every caller goes through here rather than calling `#switchProvider`
+   * directly: two overlapping switches can interleave a `dispose()` with a
+   * `start()` and leave the app holding a disposed recognizer.
+   */
+  #queueProviderSwitch(kind: "tuninator" | "test" | "synth"): Promise<void> {
+    this.#providerSwitch = this.#providerSwitch.then(() => this.#switchProvider(kind));
+    return this.#providerSwitch;
+  }
+
   async #switchProvider(kind: "tuninator" | "test" | "synth"): Promise<void> {
     if (kind !== "tuninator" && !this.#devMode) {
       // Belt and braces: neither dev source must be reachable in normal play,
@@ -457,6 +531,15 @@ export class GameApp {
       console.warn(`[goaterizer] refusing to use ${kind} input outside dev mode`);
       return;
     }
+
+    // Already on it and working: do not tear down a healthy recognizer just to
+    // build the same one again. A provider that errored is retried.
+    if (kind === this.#sourceKind && this.#provider && this.#provider.getStatus().state !== "error") {
+      return;
+    }
+
+    // Anything queued was timed against the provider that is about to go away.
+    this.#cancelAutoplay();
 
     for (const off of this.#unsubscribeInput) off();
     this.#unsubscribeInput = [];
@@ -477,6 +560,8 @@ export class GameApp {
       this.#synth?.uninstall();
     }
     this.#micMocked = kind === "synth";
+    this.#sourceKind = kind;
+    this.#debug?.setSourceValue(kind);
 
     // The synthetic mic is still consumed through the real recognizer: as far
     // as TuninatorGuitarInputProvider or Tuninator can tell, "synth" and
@@ -500,7 +585,15 @@ export class GameApp {
     } catch {
       // The provider has already published a status with player-facing copy.
     }
-    this.#onInputStatus(this.#provider.getStatus());
+    const status = this.#provider.getStatus();
+    this.#onInputStatus(status);
+
+    // A mode running against a source that never opened would show
+    // `autoplay: 50` in the panel with nothing happening (`AGENTS.md` §13).
+    if (status.state === "error" && this.#autoplay !== "off") {
+      this.#autoplay = "off";
+      this.#debug?.setAutoplayMode("off");
+    }
   }
 
   #onInputStatus(status: GuitarInputStatus): void {
@@ -593,6 +686,8 @@ export class GameApp {
     this.#timeline.clearTargets();
     this.#timeline.clearPlayed();
     this.#energy?.clear();
+    // Without this, a replay inherits the previous run's queued plucks.
+    this.#cancelAutoplay();
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
 
@@ -615,7 +710,8 @@ export class GameApp {
 
   #createAttempt(slot: RunSlot | null, startBeat: number): ActiveAttempt | null {
     if (!slot?.scenario) return null;
-    const timelineKey = `a${this.#attemptCounter++}`;
+    const attemptIndex = this.#attemptCounter++;
+    const timelineKey = `a${attemptIndex}`;
     const runtime = new AttemptRuntime({
       scenario: slot.scenario,
       difficulty: slot.difficulty,
@@ -623,7 +719,12 @@ export class GameApp {
       startBeat,
       toBeat: this.#toBeat,
     });
-    const attempt: ActiveAttempt = { timelineKey, slotOrdinal: slot.ordinal, runtime };
+    const attempt: ActiveAttempt = {
+      timelineKey,
+      slotOrdinal: slot.ordinal,
+      attemptIndex,
+      runtime,
+    };
     runtime.onEvent((event) => this.#onAttemptEvent(attempt, event));
     this.#timeline.addTargets(timelineKey, runtime.targets, startBeat);
     return attempt;
@@ -858,6 +959,9 @@ export class GameApp {
     this.#current = null;
     this.#next = null;
     this.#timeline.clearTargets();
+    // The run is over; anything still queued belongs to an attempt that will
+    // never be judged, and would play over the results screen.
+    this.#cancelAutoplay();
     // Back to the bare pulse: there is no upcoming phrase to warn about.
     this.#refreshDrumGrid();
 
@@ -910,14 +1014,12 @@ export class GameApp {
     if (!this.#transport.running) return;
     const beat = this.#transport.beat;
 
+    // The test provider fires its queue against the audio clock; the synthetic
+    // mic has no queue to pump, because its plucks are real scheduled audio.
     if (this.#provider instanceof TestGuitarInputProvider) {
       this.#provider.pump(this.#audio.now());
-      this.#maybeScheduleAutoplay();
-    } else if (this.#micMocked) {
-      // The synthetic mic has no queue to pump -- plucks are real scheduled
-      // audio -- but it still needs the same per-attempt scheduling call.
-      this.#maybeScheduleAutoplay();
     }
+    this.#syncAutoplay();
 
     this.#current?.runtime.update(beat);
     this.#next?.runtime.update(beat);
@@ -1016,6 +1118,9 @@ export class GameApp {
     const attempt = this.#current?.runtime;
     const target = attempt?.judge.currentTarget(attempt.toAttemptBeat(beat)) ?? null;
     const score = attempt?.score.snapshot;
+    const plan = this.#current
+      ? (this.#autoplayScheduled.get(this.#current.timelineKey) ?? null)
+      : null;
 
     debug.update({
       screen: this.#screen,
@@ -1024,6 +1129,10 @@ export class GameApp {
       beat: beat.toFixed(2),
       measure: String(this.#transport.measure),
       "input source": this.#provider?.kind ?? "none",
+      // A separate row rather than changing what "input source" means: the
+      // synthetic path reports `kind: "tuninator"` by design, and quietly
+      // redefining an existing readout is the drift this panel exists to catch.
+      "input mocked": this.#micMocked ? "yes (synthetic sine)" : "no",
       "input state": this.#inputStatus?.state ?? "—",
       "input error": this.#inputStatus?.errorCode ?? "—",
       "detected Hz": this.#inputStatus?.frame?.frequencyHz?.toFixed(1) ?? "—",
@@ -1055,7 +1164,22 @@ export class GameApp {
         ? `${attempt.climb.state.waypointIndex + 1}/${attempt.climb.waypointCount}`
         : "—",
       "energy in flight": String(this.#energy?.activeCount ?? 0),
-      autoplay: this.#autoplay,
+      autoplay: this.#autoplay === "off" ? "off" : `${this.#autoplay} seed ${this.#autoplaySeed}`,
+      // What the fake guitarist *intended*. On the synthetic path the
+      // recognizer is free to disagree, which is exactly why both this and
+      // "perfect/good/miss" are on screen at once.
+      "autoplay plan": plan
+        ? `${plan.counts.hits} hit / ${plan.counts.wrong} wrong / ` +
+          `${plan.counts.dropped} drop / ${plan.counts.noodles} noodle`
+        : "—",
+      /*
+       * A played note with no release grows until it is pruned. Nothing caps it
+       * on purpose — a genuinely sustained note *should* grow — so this is the
+       * instrument instead of a cap: a number climbing here means a producer
+       * stopped emitting note-offs, including real Tuninator dropping a
+       * `noteEnded`. It should sit at 0.
+       */
+      "unreleased played": String(this.#timeline.unreleasedPruned),
       "assets failed": this.#assets.failed.join(",") || "none",
     });
   }
@@ -1077,51 +1201,150 @@ export class GameApp {
   /* ------------------------------------------------------------------ */
 
   /**
-   * Schedules a whole attempt's worth of injected notes.
+   * Selects a tier, and makes sure something can actually perform it.
    *
-   * Dev and test only. `scruffy` deliberately drops every fifth note and plays
-   * the rest late, which is the shape of a one-star pass — it exists so the
-   * failure and partial-credit paths can be exercised in a browser without a
-   * guitarist who can play badly on request.
+   * Clicking a tier used to be a silent no-op whenever the live microphone was
+   * the source — there was no sink, so nothing happened and nothing said so.
+   * The rule now is that a mode switches the source **only when the current
+   * source cannot be a sink**: a real microphone cannot, and the deterministic
+   * test provider very much can.
    *
-   * Two playback paths, same target loop and timing math: `TestGuitarInputProvider`
-   * takes already-judged discrete events; the synthetic mic (`#micMocked`)
-   * takes real sine plucks that the real recognizer has to detect, which is
-   * the whole reason it exists (`src/dev/synthetic-guitar.ts`).
+   * Leaving `?dev=1&input=test` alone is not an oversight. `browser-validate.mjs`
+   * drives its whole first run on the test provider and asserts exact outcomes
+   * ("three stars for a flawless attempt"); moving it onto real detection would
+   * trade a deterministic suite for a flaky one.
    */
-  #maybeScheduleAutoplay(): void {
-    const provider = this.#provider;
-    const attempt = this.#current;
-    const synth = this.#micMocked ? this.#synth : null;
-    const testProvider = provider instanceof TestGuitarInputProvider ? provider : null;
-    if (
-      this.#autoplay === "off" ||
-      !attempt ||
-      (!testProvider && !synth) ||
-      this.#autoplayScheduledFor === attempt.timelineKey
-    ) {
+  async #setAutoplayMode(mode: AutoplayMode): Promise<void> {
+    this.#autoplay = mode;
+    this.#debug?.setAutoplayMode(mode);
+    this.#cancelAutoplay();
+    if (mode === "off" || this.#sourceKind !== "tuninator") return;
+
+    // Before pregame there is no AudioContext, so a switch would only publish
+    // an error status. Record the intent and let `#enterPregame` open the
+    // synthetic mic on its single provider start instead — which is also the
+    // path that avoids tearing down a running recognizer mid-run.
+    if (!this.#audio.context) {
+      this.#initialInputKind = "synth";
+      this.#debug?.setSourceValue("synth");
       return;
     }
-    this.#autoplayScheduledFor = attempt.timelineKey;
+    await this.#queueProviderSwitch("synth");
+  }
 
-    const mode = this.#autoplay;
+  /**
+   * Plans and schedules autoplay for whichever attempts are live.
+   *
+   * Both `#current` and `#next` are scheduled, and `#next` the moment
+   * `#queueNextAttempt` creates it. That is worth the extra bookkeeping: an
+   * attempt used to be scheduled only when it was promoted, one
+   * `TRANSITION_BEATS` beat before its own beat 0 — 0.43s at 140bpm — so a
+   * frame-loop stall could lose the first note of every attempt.
+   */
+  #syncAutoplay(): void {
+    if (this.#autoplay === "off") {
+      if (this.#autoplayScheduled.size > 0) this.#cancelAutoplay();
+      return;
+    }
+
+    /*
+     * No sink, nothing to do — and crucially, nothing to *record* either.
+     *
+     * A tier chosen on the live microphone switches the source asynchronously,
+     * so there are frames with a mode set and no sink yet. Marking those
+     * attempts as scheduled would leave them permanently marked and silently
+     * unplayed, because the plan is only ever built once per attempt.
+     */
+    const hasSink = this.#micMocked || this.#provider instanceof TestGuitarInputProvider;
+    if (!hasSink) return;
+
+    const live = [this.#current, this.#next].filter(
+      (attempt): attempt is ActiveAttempt => attempt !== null
+    );
+    for (const attempt of live) {
+      if (this.#autoplayScheduled.has(attempt.timelineKey)) continue;
+      const performance = planAutoPerformance({
+        targets: attempt.runtime.targets,
+        mode: this.#autoplay,
+        seed: this.#autoplaySeed,
+        attemptIndex: attempt.attemptIndex,
+      });
+      this.#autoplayScheduled.set(attempt.timelineKey, performance);
+      this.#scheduleAutoPerformance(attempt, performance);
+    }
+
+    // Drop finished attempts, so the map cannot grow across a 16-slot run.
+    const alive = new Set(
+      [this.#current, this.#next, this.#previous]
+        .filter((attempt): attempt is ActiveAttempt => attempt !== null)
+        .map((attempt) => attempt.timelineKey)
+    );
+    for (const key of this.#autoplayScheduled.keys()) {
+      if (!alive.has(key)) this.#autoplayScheduled.delete(key);
+    }
+  }
+
+  /**
+   * Hands one planned performance to whichever fake input is driving.
+   *
+   * Two sinks, one plan and one piece of timing maths. `TestGuitarInputProvider`
+   * takes already-judged discrete events, which is what makes the browser suite
+   * deterministic; the synthetic mic takes real sine plucks that Tuninator's
+   * own detection has to find, which is what makes the demo honest.
+   *
+   * Both emit a real note-off. The test path schedules an explicit `release`,
+   * without which `TimelineModel.endPlayed` is never called and every played
+   * bar grows from its attack to the playhead until it is pruned — the "notes
+   * that never stop ringing" this replaces.
+   */
+  #scheduleAutoPerformance(attempt: ActiveAttempt, performance: AutoPerformance): void {
+    const synth = this.#micMocked ? this.#synth : null;
+    const testProvider = this.#provider instanceof TestGuitarInputProvider ? this.#provider : null;
+    if (!synth && !testProvider) return;
+
     const secondsPerBeat = this.#transport.secondsPerBeat;
-    attempt.runtime.targets.forEach((target, index) => {
-      if (mode === "scruffy" && index % 5 === 0) return;
-      const offsetBeats = mode === "perfect" ? 0 : mode === "good" ? 0.3 : 0.34;
-      const at = this.#transport.contextTimeAt(attempt.runtime.startBeat + target.startBeat);
-      const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
-      const attackTime = at + offsetBeats * secondsPerBeat + latency;
+    // The same quantity `#toBeat` subtracts from a detected event, added back
+    // so an autoplayed note is judged as landing on the target rather than
+    // early. It is also why autoplay hits are kept out of the calibration log.
+    const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
+    const earliest = this.#audio.now() + AUTOPLAY_SCHEDULE_LEAD_SECONDS;
+
+    performance.gestures.forEach((gesture: AutoGesture, index: number) => {
+      const attackTime =
+        this.#transport.contextTimeAt(attempt.runtime.startBeat + gesture.beat) + latency;
+      // Already past: `osc.start()` would clamp to now and compress the
+      // envelope, and the test provider's queue would fire it out of order.
+      if (attackTime <= earliest) return;
+
+      const slotSeconds = gesture.durationBeats * secondsPerBeat;
       if (testProvider) {
-        testProvider.schedule([{ at: attackTime, kind: "attack", midi: target.midi }]);
-      } else if (synth) {
-        // A hair short of the full duration, so consecutive notes at the same
-        // pitch still get a real onset each rather than reading as one long
-        // sustain -- the recognizer needs an amplitude dip to find the second
-        // attack.
-        const duration = Math.max(0.12, target.durationBeats * secondsPerBeat * 0.85);
-        synth.pluck(target.midi, attackTime, duration);
+        const id = `auto-${attempt.timelineKey}-${index}`;
+        testProvider.schedule([
+          { at: attackTime, kind: "attack", midi: gesture.midi, id },
+          { at: attackTime + slotSeconds, kind: "release", id },
+        ]);
+        return;
       }
+
+      /*
+       * The synthetic pluck has to leave real silence before the next attack:
+       * Tuninator ends a Note only after `tracking.releaseGraceMs` of it, and a
+       * Note that never ends never becomes a `release`. Take the gap out of the
+       * slot, then clamp — the floor is what keeps a fast passage audible at
+       * all, at the cost of separation it cannot have.
+       */
+      const sounding = Math.min(
+        AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS,
+        Math.max(AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS, slotSeconds - AUTOPLAY_PLUCK_GAP_SECONDS)
+      );
+      synth?.pluck(gesture.midi, attackTime, sounding);
     });
+  }
+
+  /** Un-schedules everything both sinks still have pending. */
+  #cancelAutoplay(): void {
+    this.#autoplayScheduled.clear();
+    if (this.#provider instanceof TestGuitarInputProvider) this.#provider.clearSchedule();
+    this.#synth?.cancelFrom(this.#audio.now());
   }
 }

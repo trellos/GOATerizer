@@ -411,6 +411,21 @@ try {
 
   await page.click("#dev-autoplay-perfect");
 
+  // Picking a tier switches the input source only when the current source
+  // cannot perform it — a live microphone cannot, the deterministic test
+  // provider can. Everything below this point asserts exact outcomes, which is
+  // only meaningful while injected events (not real detection) are driving, so
+  // pin that here rather than discovering it as flakiness later.
+  check(
+    "choosing a tier leaves the deterministic provider alone",
+    (await dev(page, "input mocked")) === "no",
+    (await dev(page, "input mocked")) ?? ""
+  );
+  check(
+    "the panel marks which tier is running",
+    (await page.getAttribute("#dev-autoplay-perfect", "data-selected")) === "true"
+  );
+
   // Wait for the goat to be a few footholds up rather than for a wall-clock
   // guess: the attempt starts on the next measure boundary plus a lead-in.
   const waypointMid = await waitForDev(
@@ -465,6 +480,15 @@ try {
   const slotStars = page.locator('#hud-history .history-slot[data-ordinal="0"] .slot-stars');
   await slotStars.filter({ hasText: "★★★" }).waitFor({ timeout: 5000 }).catch(() => {});
   check("three stars for a flawless attempt", (await slotStars.textContent()) === "★★★");
+
+  // Autoplay schedules an explicit release for every note it plays. Without
+  // one, a played bar grows from its attack to the playhead until it is pruned
+  // -- which is what this counter counts, and why it must stay at zero.
+  check(
+    "no played note is left ringing",
+    (await dev(page, "unreleased played")) === "0",
+    `unreleased played ${await dev(page, "unreleased played")}`
+  );
 
   /* --- a failing attempt --------------------------------------------- */
 
@@ -624,19 +648,145 @@ try {
   // injected note events -- Tuninator's real onset/pitch detection has to find
   // them. `waitForDev` polls rather than sleeping a guess, because detection
   // happens on Tuninator's own analysis cadence, not the test's.
-  const synthJudged = await waitForDev(
-    synth,
-    "perfect/good/miss",
-    (value) => Number((value ?? "0/0/0").split("/")[0]) >= 3,
-    15000
-  );
+  // Perfect *or* Good. On this path the plucks are judged on Tuninator's own
+  // onset estimate, so pinning Perfect specifically would make the suite a
+  // detection-latency regression test -- and the pluck envelope is exactly what
+  // this change reshapes. What is being asserted is that the recognizer found
+  // the notes and the judge scored them, not which side of 0.18 beats they fell.
+  const hits = (value) => {
+    const [perfect, good] = (value ?? "0/0/0").split("/");
+    return Number(perfect) + Number(good);
+  };
+  const synthJudged = await waitForDev(synth, "perfect/good/miss", (value) => hits(value) >= 3, 15000);
   check(
     "the real recognizer detects and judges the synthetic plucks",
-    Number((synthJudged ?? "0/0/0").split("/")[0]) >= 3,
+    hits(synthJudged) >= 3,
     `judged ${synthJudged}`
+  );
+
+  // Nothing schedules a release on this path: the plucks decay to silence and
+  // Tuninator's own `noteEnded` is what ends the bar. It already held before
+  // the envelope changed, so this is a guard rather than a fix -- a non-zero
+  // count means the pluck stopped giving the recognizer a note end to find.
+  check(
+    "the recognizer ends every synthetic note",
+    (await dev(synth, "unreleased played")) === "0",
+    `unreleased played ${await dev(synth, "unreleased played")}`
   );
   check("no page errors on the synthetic path", synthErrors.length === 0, synthErrors.join(" | "));
   await synth.close();
+
+  /* ==================================================================== */
+  /* Part 5 — the imperfect tiers actually fail, and the demo link works   */
+  /* ==================================================================== */
+
+  // On the deterministic sink, so "50% correct" can be asserted rather than
+  // hoped for. `?autoplay=` also means no click: the mode is live from the
+  // first attempt, which is the path a shared demo link takes.
+  const tiers = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const tierErrors = [];
+  tiers.on("pageerror", (error) => tierErrors.push(String(error)));
+  await tiers.goto(`${BASE}/?dev=1&input=test&autoplay=25&seed=7&level=3`, {
+    waitUntil: "networkidle",
+  });
+  await tiers.click("#start-play");
+  await tiers.waitForTimeout(800);
+  await tiers.click("#pregame-play");
+
+  check(
+    "an ?autoplay= link arrives with the tier already selected",
+    (await tiers.getAttribute("#dev-autoplay-25", "data-selected")) === "true"
+  );
+
+  // Wait for the plan rather than for a wall-clock guess, then for the failures
+  // it promises to actually land.
+  const planned = await waitForDev(tiers, "autoplay plan", (value) => (value ?? "—") !== "—");
+  check("the tier plans a mix, not just hits", /wrong/.test(planned ?? ""), planned ?? "");
+
+  /*
+   * Sample across the attempt rather than reading once.
+   *
+   * The three outcomes do not arrive together — at 25% the first event is
+   * usually a wrong note, well before any target has had time to expire — and
+   * a zero-star attempt ends the run, after which the per-attempt readouts go
+   * back to "—". So watch the counters while they are live and keep the high
+   * water mark, which is what the assertions are actually about.
+   */
+  const peak = { hit: 0, missed: 0, wrong: 0 };
+  let sawLiveAttempt = false;
+  for (let i = 0; i < 250; i += 1) {
+    const judged = await dev(tiers, "perfect/good/miss");
+    if (judged && judged !== "—") {
+      sawLiveAttempt = true;
+      const [perfect, good, missed] = judged.split("/").map(Number);
+      peak.hit = Math.max(peak.hit, perfect + good);
+      peak.missed = Math.max(peak.missed, missed);
+      peak.wrong = Math.max(peak.wrong, Number(await dev(tiers, "wrong notes")) || 0);
+    } else if (sawLiveAttempt) {
+      // The attempt is over -- a zero-star one ends the run -- so the peaks are
+      // now the whole attempt rather than a snapshot part-way through it.
+      break;
+    }
+    await tiers.waitForTimeout(100);
+  }
+
+  const seen = `${peak.hit} hit / ${peak.missed} missed / ${peak.wrong} wrong`;
+  check("25% still plays some notes right", peak.hit > 0, seen);
+  check("25% misses most of them", peak.missed > peak.hit, seen);
+  check("25% plays audible wrong notes", peak.wrong > 0, seen);
+  check(
+    "a fumbling autoplay still leaves no note ringing",
+    (await dev(tiers, "unreleased played")) === "0",
+    `unreleased played ${await dev(tiers, "unreleased played")}`
+  );
+  await tiers.screenshot({ path: path.join(SHOTS, "08-autoplay-25.png") });
+  check("no page errors on the autoplay path", tierErrors.length === 0, tierErrors.join(" | "));
+  await tiers.close();
+
+  /* ==================================================================== */
+  /* Part 6 — a tier chosen on the live mic switches to a source that can  */
+  /*          actually perform it, instead of silently doing nothing       */
+  /* ==================================================================== */
+
+  const livePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const livePageErrors = [];
+  livePage.on("pageerror", (error) => livePageErrors.push(String(error)));
+  await livePage.goto(`${BASE}/?dev=1&seed=7`, { waitUntil: "networkidle" });
+  await livePage.click("#start-play");
+  await livePage.waitForTimeout(1500);
+
+  check(
+    "the run starts on the real microphone, not a mock",
+    (await dev(livePage, "input mocked")) === "no",
+    (await dev(livePage, "input mocked")) ?? ""
+  );
+
+  await livePage.click("#pregame-play");
+  await livePage.waitForTimeout(500);
+  await livePage.click("#dev-autoplay-perfect");
+
+  // The switch disposes and reopens the recognizer, so it is asynchronous;
+  // wait for it rather than assuming a click is instant.
+  const mocked = await waitForDev(livePage, "input mocked", (value) => value === "yes (synthetic sine)");
+  check("choosing a tier on a live mic switches to a source that can play", Boolean(mocked));
+  check(
+    "and says so, rather than quietly scoring fake input",
+    ((await livePage.textContent("#game-input-warning")) ?? "").includes("synthetic")
+  );
+
+  const livePageJudged = await waitForDev(
+    livePage,
+    "perfect/good/miss",
+    (value) => hits(value) >= 2,
+    20000
+  );
+  check(
+    "the tier then actually plays, mid-run",
+    hits(livePageJudged) >= 2,
+    `judged ${livePageJudged}`
+  );
+  check("no page errors when switching source mid-run", livePageErrors.length === 0, livePageErrors.join(" | "));
+  await livePage.close();
 } finally {
   await browser.close();
   server.kill();

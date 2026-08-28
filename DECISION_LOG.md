@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-019: One seeded performance planner, two sinks; a tier picks its own input source
+* **Date:** 2026-08-28
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Autoplay was a loop inside `game-app.ts` with two hardcoded timing offsets and a "drop every fifth note" rule. It could not express "half correct", never played a wrong note, did nothing at all when a live microphone was the source, scheduled only one beat ahead, and — on the injected path — emitted no `release`, so every played bar grew from its attack to the playhead until it pruned. A demo mode needs a repeatable *imperfect* performance, and "imperfect" means fumbles that are provably fumbles under a judge that matches whole pitch classes across every open target.
+* **Decision:** A pure `src/dev/auto-performance.ts` turns `(targets, mode, seed, attemptIndex)` into attempt-relative gestures and never reads a clock; `game-app.ts` keeps only the two sinks and the schedule lifecycle. Tiers are `perfect` / `50` / `25` / `off`. Wrong pitches are chosen against the union of every target's *clamped* Good window, by pitch class, so octave equivalence cannot turn a fumble into a hit, and never repeat inside the wrong-note debounce, which would otherwise swallow the event and draw the bar as an ordinary played note. Picking a tier switches the source to `synth` **only when the current source cannot be a sink** — a live microphone cannot, the deterministic test provider can. Both sinks emit a real note-off.
+* **Alternatives Considered:** (a) Auto-switching away from `input=test` as well. Rejected: `scripts/browser-validate.mjs` drives its whole first run on the test provider and asserts exact outcomes ("three stars for a flawless attempt"); moving it onto real detection would trade a deterministic suite for a flaky one, and the test provider is a perfectly good sink. (b) Capping an unreleased played note's drawn length in `TimelineModel`. Rejected: a genuinely sustained note *should* grow, and a cap would hide the producer bug rather than fix it — so the producers were fixed and an `unreleased played` counter was added to the dev panel instead, which also surfaces real Tuninator dropping a `noteEnded`. (c) Seeding from `Date.now()`. Rejected: the point is a link that replays.
+* **Consequences:** Positive — the fake guitarist is unit-testable against the real `TargetJudge` with no microphone, intent and outcome agree exactly on the deterministic sink (asserted), `?dev=1&autoplay=50&seed=7` is a shareable demo, and every attempt is now scheduled a whole attempt ahead instead of one beat. Negative — up to ~64 oscillators can be scheduled at once on the synthetic path, so cancellation is mandatory rather than optional (`SyntheticGuitarSource.cancelFrom`); the synthetic path's *achieved* rate runs under the intended one, because real detection drops the odd onset, so the panel shows both; and `?seed=N` seeds the performance only — the run's key and scenario picks still come from `Math.random`, so two loads of the same link play the same fumbles against a different scenario in a different key.
+
+---
+
 #### DECISION-018: The key is spelled conventionally, not forced to sharps
 * **Date:** 2026-08-21
 * **Status:** Accepted

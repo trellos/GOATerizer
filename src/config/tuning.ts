@@ -189,3 +189,135 @@ export const ATTEMPT_BEATS = BEATS_PER_MEASURE * ATTEMPT_MEASURES;
 export const TRANSITION_BEATS = 1;
 /** Beats of lead-in between pressing Play and the first attempt's beat 1. */
 export const RUN_LEAD_IN_BEATS = 4;
+
+/* -------------------------------------------------------------------------- */
+/* Dev autoplay                                                                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Numbers for the dev-only autoplay (`src/dev/auto-performance.ts`).
+ *
+ * Nothing on the production path reads any of these: they are reachable only
+ * from `?dev=1`. They live here anyway because this file's contract is "every
+ * provisional tuning number in one place", and a second tuning file for dev
+ * values would be the beginning of two conventions.
+ *
+ * All provisional per `AGENTS.md` §17 — the GDD has no opinion on how badly a
+ * fake guitarist should play, so these are reversible defaults chosen to make
+ * each tier legible on screen, not design decisions.
+ */
+
+/**
+ * Seed used when `?seed=N` is absent.
+ *
+ * Fixed, not `Date.now()`: the point of a seeded autoplay is that
+ * `?dev=1&autoplay=50` plays the same performance every time, so a screenshot
+ * or a bug report reproduces.
+ */
+export const AUTOPLAY_DEFAULT_SEED = 1;
+
+/**
+ * Share of note opportunities each tier intends to hit.
+ *
+ * `perfect: 1` is load-bearing, not decorative: `scripts/browser-validate.mjs`
+ * asserts three stars from a flawless attempt, and ★★★ is authored at exactly
+ * `noteOpportunityCount * JUDGMENT_POINTS.perfect`.
+ *
+ * On the synthetic-mic path these are *intents*, not measurements — the real
+ * recognizer drops the occasional onset, so the achieved rate runs a little
+ * under. The deterministic test provider hits them exactly.
+ */
+export const AUTOPLAY_HIT_RATE = { perfect: 1, "50": 0.5, "25": 0.25 } as const;
+
+/**
+ * Of the opportunities a tier does *not* hit, the share played as an audible
+ * wrong pitch. The rest are simply not played.
+ *
+ * Weighted towards wrong notes because a bare missed target is nearly
+ * invisible — nothing is drawn on the played row at all — and the point of the
+ * mode is to make failure legible.
+ */
+export const AUTOPLAY_WRONG_SHARE = 0.7;
+
+/**
+ * Timing jitter on a hit, as a fraction of that target's *clamped Good* window.
+ *
+ * Below 1 so a hit is never jittered into a miss. Well above `perfect/good`
+ * (0.36 for a quarter note) so a decent share of hits land outside Perfect and
+ * the Good path gets exercised too, rather than every tier producing a wall of
+ * Perfects.
+ */
+export const AUTOPLAY_HIT_JITTER_FRACTION = 0.6;
+
+/** Chance that an eligible gap between gestures gets one extra wrong note. */
+export const AUTOPLAY_NOODLE_CHANCE = 0.35;
+/** Below this, a gap has no room for a noodle clear of both neighbours. */
+export const AUTOPLAY_NOODLE_MIN_GAP_BEATS = 1;
+
+/** How many of the nearest safe pitches a fumble picks among. */
+export const AUTOPLAY_WRONG_NOTE_CANDIDATES = 3;
+
+/**
+ * Safety margin added to every Good window when deciding which pitch classes a
+ * wrong note may not use.
+ *
+ * The planner works in exact beats; the synthetic path is judged on Tuninator's
+ * onset estimate, which can sit tens of milliseconds either side. Without the
+ * margin a "wrong" note planned just outside a window can be detected just
+ * inside it and score a Good, which would quietly delete the failure.
+ */
+export const AUTOPLAY_WRONG_NOTE_MARGIN_BEATS = 0.08;
+
+/** Minimum beats between the end of one gesture and the start of the next. */
+export const AUTOPLAY_GESTURE_GAP_BEATS = 0.08;
+
+/**
+ * A gesture this close to now is already past; skip it rather than schedule it.
+ *
+ * `osc.start()` with a past time clamps to now and compresses the envelope, and
+ * the test provider's `pump` fires a past event immediately and out of order.
+ * Both matter once a mode can be switched on mid-attempt.
+ */
+export const AUTOPLAY_SCHEDULE_LEAD_SECONDS = 0.02;
+
+/*
+ * The synthetic pluck envelope.
+ *
+ * These are set against Tuninator's own note-tracking thresholds rather than
+ * chosen by ear, because the whole job of the envelope is to give the real
+ * recognizer an unambiguous note start and note end:
+ *
+ *   - `tracking.releaseGraceMs: 90` — silence must persist this long before a
+ *     Note ends. A gap shorter than that leaves the previous note open, which
+ *     is what makes played bars grow until they are pruned.
+ *   - `tracking.minStableMs: 55`   — a Note must sound this long to be
+ *     announced at all.
+ *   - `harmony.mergeMaxGapMs: 120` — the largest silence a merge may bridge.
+ *
+ * So the gap is set above 90ms and the sounding floor comfortably above 55ms.
+ * The tightest real slot is an eighth note at 140bpm (214ms), which leaves
+ * 114ms sounding after a 100ms gap — inside both bounds. Sixteenths at speed
+ * would not fit, and no registered scenario authors them; if one ever does,
+ * the fallback below trades separation for the note existing at all.
+ */
+export const AUTOPLAY_PLUCK_ATTACK_SECONDS = 0.008;
+export const AUTOPLAY_PLUCK_PEAK_GAIN = 0.5;
+/**
+ * Where the body decays to before the release ramp starts.
+ *
+ * The old envelope ramped exponentially to 0.0001 across the whole note, which
+ * is asymptotically flat — no moment in it reads as "the note stopped", so the
+ * recognizer's note end had no fixed relationship to the requested duration.
+ * Decaying to a definite floor and then ramping linearly to true zero makes the
+ * note-off a locatable event. Measured as no worse and probably better on
+ * spurious onsets; see `src/dev/synthetic-guitar.ts` for the numbers and their
+ * (small) sample size.
+ */
+export const AUTOPLAY_PLUCK_BODY_FLOOR_GAIN = 0.05;
+export const AUTOPLAY_PLUCK_RELEASE_SECONDS = 0.025;
+/** Silence guaranteed after the release, before the next attack. > 90ms. */
+export const AUTOPLAY_PLUCK_GAP_SECONDS = 0.1;
+/** Sounding floor, comfortably above `minStableMs`. */
+export const AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS = 0.08;
+/** Cap, so a whole note at 60bpm does not drone for four seconds. */
+export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;
