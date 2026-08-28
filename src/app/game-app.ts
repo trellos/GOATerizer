@@ -1702,7 +1702,7 @@ export class GameApp {
       // One readout per class, so the panel says "—" for the one this scenario
       // is not rather than quietly reporting a zero that means nothing.
       "cans crushed/missed": attempt?.repeat
-        ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.beaned}`
+        ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.uncrushed}`
         : "—",
       "actor lane/streak": attempt
         ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`

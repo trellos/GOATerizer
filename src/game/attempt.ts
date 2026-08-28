@@ -53,6 +53,36 @@ function repeatPerformerLane(targets: readonly ResolvedTarget[]): number {
   return best;
 }
 
+/**
+ * Periods a `RepeatMinigame` performer is allowed to swing at, longest first.
+ *
+ * Every one of them divides a beat, and {@link STANDS_BACK_BEATS}' worth of
+ * flight is a whole beat, so a note on the grid arrives at the performer
+ * exactly on one of his swings. Anything not on this list would put the palm
+ * somewhere else when the can got there.
+ */
+const STRIKE_PERIODS = [1, 1 / 2, 1 / 3, 1 / 4] as const;
+
+/**
+ * How often a `RepeatMinigame` performer swings, in beats.
+ *
+ * Read from the authored grid rather than configured: his loop is the tutorial
+ * for the whole mechanic, so it has to run at the rate cans actually arrive.
+ * Quarter-note material gets a swing per beat; a scenario that drops into
+ * sixteenths gets a performer working in sixteenths, which is also the honest
+ * picture of what it is asking of the player.
+ */
+function repeatStrikePeriod(targets: readonly ResolvedTarget[]): number {
+  const beats = targets.map((target) => target.startBeat).sort((a, b) => a - b);
+  let finest: number = STRIKE_PERIODS[0];
+  for (let i = 1; i < beats.length; i += 1) {
+    const gap = (beats[i] ?? 0) - (beats[i - 1] ?? 0);
+    if (gap > 1e-6 && gap < finest) finest = gap;
+  }
+  // The longest allowed period that still fits inside the tightest gap.
+  return STRIKE_PERIODS.find((period) => period <= finest + 1e-6) ?? STRIKE_PERIODS.at(-1) ?? 1;
+}
+
 export type AttemptResult = {
   scenarioId: string;
   difficulty: number;
@@ -128,7 +158,10 @@ export class AttemptRuntime {
     // runtime never guesses: a class whose data is absent is simply not built.
     this.repeat =
       options.scenario.assetBindings.kind === "repeat"
-        ? new RepeatMinigame({ performerLane: repeatPerformerLane(this.targets) })
+        ? new RepeatMinigame({
+            performerLane: repeatPerformerLane(this.targets),
+            strikePeriodBeats: repeatStrikePeriod(this.targets),
+          })
         : null;
 
     this.judge.onEvent((judgment) => this.#onJudgment(judgment));
@@ -230,6 +263,11 @@ export class AttemptRuntime {
    * The mirror image of `#driveActor`: a projectile resolves at the strike line
    * and leaves no state behind, so it is safe — and diagnostic — to let the
    * played pitch put it where the player actually played.
+   *
+   * Every judgment produces a can, a miss included. The can was already on
+   * screen riding in on its bar before it was judged, so it has to go
+   * somewhere; a miss is the one outcome where the answer is "nowhere", and
+   * watching it stay down and roll past is the point.
    */
   #driveRepeat(judgment: JudgmentEvent): void {
     const repeat = this.repeat;
@@ -247,7 +285,9 @@ export class AttemptRuntime {
         break;
       }
       case "MissedNote":
-        repeat.miss();
+        // Its own lane, its own beat: the can stays exactly where it already
+        // was and keeps travelling with the bar it arrived in.
+        repeat.miss(judgment.target.lane, judgment.target.startBeat);
         break;
       default:
         break;

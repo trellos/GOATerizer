@@ -387,11 +387,13 @@ export class TimelineView {
       floorY: this.#bandTop + this.#bandHeight + this.#rowHeight * 0.7,
     };
     if (repeat) {
-      // A can rides in every bar that has not reached the strike line yet.
-      // Once the note is judged the performer's own state owns that can, so
-      // the two never draw the same one twice.
+      // A can rides in every bar that has not been judged yet — including one
+      // that is already past the strike line but still inside its window, so a
+      // late hit or an expiring miss hands its can over without it blinking
+      // out at the line and back in a moment later. Once the note is judged the
+      // performer's own state owns that can, so the two never draw one twice.
       const pending = snapshot.targets
-        .filter((note) => note.outcome === null && note.startBeat >= nowBeat)
+        .filter((note) => note.outcome === null)
         .map((note) => ({
           x: this.#x(note.startBeat, nowBeat),
           y: geometry.laneY(note.lane),

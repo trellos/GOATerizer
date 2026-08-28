@@ -44,8 +44,8 @@ describe("the repeat performer", () => {
     const repeat = crusher();
     repeat.place(3, 1);
     expect(repeat.state.crushed).toBe(1);
-    expect(repeat.state.beaned).toBe(0);
-    expect(repeat.state.cans[0]).toMatchObject({ lane: 3, crushed: true, wobbly: false });
+    expect(repeat.state.uncrushed).toBe(0);
+    expect(repeat.state.cans[0]).toMatchObject({ lane: 3, fate: "crushed", wobbly: false });
     expect(repeat.state.lastCrushBeat).toBe(1);
   });
 
@@ -54,23 +54,51 @@ describe("the repeat performer", () => {
     repeat.place(5, 1);
     // Two lanes above the crusher, which is what "you overshot by a third"
     // looks like before the player has time to think about it.
-    expect(repeat.state.cans[0]).toMatchObject({ lane: 5, crushed: false });
+    expect(repeat.state.cans[0]).toMatchObject({ lane: 5, fate: "wrong" });
     expect(repeat.state.crushed).toBe(0);
-    expect(repeat.state.beaned).toBe(1);
+    expect(repeat.state.uncrushed).toBe(1);
   });
 
   it("spawns an unplaceable note's can wobbling rather than snapping it to a lane", () => {
     const repeat = crusher();
     repeat.place(null, 1);
-    expect(repeat.state.cans[0]).toMatchObject({ wobbly: true, crushed: false });
+    expect(repeat.state.cans[0]).toMatchObject({ wobbly: true, fate: "wrong" });
+  });
+
+  it("leaves a missed note's can in its bar rather than lifting it", () => {
+    const repeat = crusher();
+    repeat.miss(6, 2);
+    // The can exists — it was already on screen — but it is never placed, so it
+    // rides its own lane at bar height and goes past him untouched.
+    expect(repeat.state.cans[0]).toMatchObject({ lane: 6, fate: "missed", bornBeat: 2 });
+    expect(repeat.state.uncrushed).toBe(1);
+    expect(repeat.state.crushed).toBe(0);
   });
 
   it("does not punish a missed note with a second failure", () => {
     const repeat = crusher();
-    repeat.miss();
-    expect(repeat.state.cans).toHaveLength(0);
-    expect(repeat.state.beaned).toBe(0);
+    repeat.miss(3, 2);
+    // Nothing hits him and nothing lands on the pile: the note is already its
+    // own punishment in the score.
     expect(repeat.state.crushed).toBe(0);
+    expect(repeat.state.pile).toBe(0);
+    expect(repeat.state.lastCrushBeat).toBeLessThan(0);
+  });
+
+  it("swings once per beat by default, and at whatever the grid asks otherwise", () => {
+    expect(crusher().strikePeriodBeats).toBe(1);
+    expect(new RepeatMinigame({ performerLane: 3, strikePeriodBeats: 0.5 }).state
+      .strikePeriodBeats).toBe(0.5);
+    // A nonsense period would freeze or invert the loop, so it falls back.
+    expect(new RepeatMinigame({ performerLane: 3, strikePeriodBeats: 0 }).strikePeriodBeats).toBe(1);
+  });
+
+  it("ignores a miss once the attempt is over", () => {
+    const repeat = crusher();
+    repeat.complete(false, 16);
+    repeat.miss(3, 16.5);
+    expect(repeat.state.cans).toHaveLength(0);
+    expect(repeat.state.uncrushed).toBe(0);
   });
 
   it("drops cans once they have flown off, and keeps the pile", () => {
@@ -229,6 +257,20 @@ describe("Can Crushing, played", () => {
     expect(attempt.repeat!.performerLane).toBe(attempt.targets[0]!.lane);
   });
 
+  it("swings at a rate the authored grid actually lands on", () => {
+    // The loop is the tutorial: his palm has to be down whenever a can can
+    // arrive, so the period has to divide the tightest gap in the material.
+    for (const difficulty of LEVELS) {
+      const { attempt } = harness(difficulty);
+      const period = attempt.repeat!.strikePeriodBeats;
+      expect(period).toBeGreaterThan(0);
+      for (const target of attempt.targets) {
+        const swings = target.startBeat / period;
+        expect(Math.abs(swings - Math.round(swings))).toBeLessThan(1e-6);
+      }
+    }
+  });
+
   it("crushes every can on a flawless attempt", () => {
     const h = harness(1);
     for (const target of h.attempt.targets) {
@@ -238,7 +280,7 @@ describe("Can Crushing, played", () => {
     }
     h.advanceTo(16);
     expect(h.attempt.repeat!.state.crushed).toBe(h.attempt.targets.length);
-    expect(h.attempt.repeat!.state.beaned).toBe(0);
+    expect(h.attempt.repeat!.state.uncrushed).toBe(0);
     expect(h.attempt.result?.stars).toBe(3);
   });
 
@@ -251,7 +293,7 @@ describe("Can Crushing, played", () => {
     h.advanceTo(target.startBeat + 0.001);
 
     const can = h.attempt.repeat!.state.cans.at(-1)!;
-    expect(can.crushed).toBe(false);
+    expect(can.fate).toBe("wrong");
     expect(can.wobbly).toBe(false);
     expect(can.lane).toBeGreaterThan(h.attempt.repeat!.performerLane);
   });
@@ -265,7 +307,7 @@ describe("Can Crushing, played", () => {
     h.playAt(target.midi + 4, target.startBeat);
     h.advanceTo(target.startBeat + 0.001);
 
-    expect(h.attempt.repeat!.state.cans.at(-1)).toMatchObject({ wobbly: true, crushed: false });
+    expect(h.attempt.repeat!.state.cans.at(-1)).toMatchObject({ wobbly: true, fate: "wrong" });
   });
 });
 

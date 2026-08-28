@@ -10,15 +10,18 @@ scenario panel has since been reduced to a backdrop — the mechanic replaced it
 so the climb's route, footholds, climber and effects are no longer drawn at all
 (§6, DECISION-023).
 
-What is built differs from the design as first written in three places, each
-noted inline below and in `DECISION_LOG.md` (DECISION-020 to 022):
+What is built differs from the design as first written in four places, each
+noted inline below and in `DECISION_LOG.md` (DECISION-020 to 022, 028):
 
 1. **Can Crushing's material is one pitch.** §5 assumed a can could be authored
    on any lane. It cannot while the performer is stationary — see §5.
-2. **The crusher stands further back than the goat.** 1.2 beats rather than
-   34px, because the can's flight *is* the read — see §5.
+2. **The crusher stands a beat back from the strike line**, not 34px, because
+   the can's flight *is* the read — see §5.
 3. **The trophy is a goat-head bust.** Ornament tiers as designed; the art is
    canvas-free inline SVG rather than a sprite — see §7.
+4. **The crusher never stops moving, and the can has to be lifted to him.** The
+   first build of §5 was tested and did not read at all — see §5,
+   DECISION-028.
 
 The rest of the document is the design as agreed, and the open questions in §8
 are still open.
@@ -190,13 +193,63 @@ rhythm alone, which is what a REPEAT exercise is anyway. A test pins it
 (`tests/can-crushing.test.ts`). The between-measures walk relaxes this to "one
 lane per measure"; it is the first thing worth building next here.
 
-**He stands 1.2 beats back from the strike line, not 34px.** The goat's offset
+**He stands one beat back from the strike line, not 34px.** The goat's offset
 is small on purpose — it lands where you played. But the crusher's read is the
 can's *flight*: born in its bar at the strike line, scrolling left at exactly
 the bars' speed, and either arriving in his hands or passing over his head. At
 34px that flight is under a third of a beat and the crush is over before the eye
-finds it. At 1.2 beats it is roughly 800ms at 90bpm, there are two cans in the
-air at once during eighths, and an overshoot is legible as it happens.
+finds it. At a beat it is roughly 670ms at 90bpm, there are two cans in the air
+at once during eighths, and an overshoot is legible as it happens.
+
+It is a *whole* beat rather than the 1.2 it was first built at, because the
+swing below has to meet the cans: a whole beat of flight maps a note on the grid
+onto a swing on the grid. A fraction puts every can in his hands while his hand
+is somewhere else.
+
+### The rewrite that made it read (DECISION-028)
+
+Everything above was built, screenshotted and shipped, and then failed the only
+test that counts: shown the result, the reader could not tell it was a can being
+crushed. Three things were wrong, and all three were about *motion*, not art.
+
+**He only moved when he succeeded.** He idled with his arms up and dropped them
+for a third of a beat when a can happened to land. So the animation that
+explains the game only ever played *after* the player had already done the
+thing, and a player who had never crushed a can was shown nothing to aim at.
+
+Now the hand loops to his forehead and back forever, hit or miss, note or no
+note. That loop is the instruction: it names the place and the instant a can has
+to occupy. It is phase-locked to the authored note grid — one swing per
+`strikePeriodBeats`, derived from the tightest gap in the material — so the palm
+is down on every grid position a can can arrive at. Quarter-note material gets a
+swing a beat; a scenario that drops into sixteenths gets a man working in
+sixteenths, which is also an honest picture of what it is asking for.
+
+**The can was never in a place worth crushing.** It rode at bar level, so a
+crush was a can at his feet becoming squat. Now a *placed* can rises out of its
+bar over its beat of flight into the gap under his palm. The lift is a constant
+offset above the can's own lane, which is the whole trick: a can played a lane
+high clears his head, a lane low goes past his hip, and the size of the gap is
+the size of the interval the player missed by — with no code anywhere that knows
+what an interval is.
+
+**Nothing connected the crush to the score.** A crushed can blinked out and the
+pile silently incremented. Now it drops from his brow onto the heap, so the
+player watches every point they scored land in the thing that becomes the
+trophy.
+
+The failure states changed with them. A missed note used to produce *nothing* —
+the can riding in simply vanished at the strike line, which is the one outcome
+with no feedback at all. Every note now carries a can from the moment it appears
+until something happens to it: lifted and crushed, lifted to the wrong height
+and sailing past, or never lifted — tipping over and rolling past his boots
+while the palm comes down on air.
+
+**Screenshots cannot check any of this.** The swing is phase-locked to the grid,
+so a burst of frames at a fixed interval aliases against it and comes back with
+his arm in the same position every time; a whole pass was spent debugging a
+loop that was working. The geometry is pinned in `tests/repeat-layer.test.ts`
+instead, by driving the layer against a context that records where it drew.
 
 A can also rides in every bar that has not reached the strike line yet, which is
 the "the note bar is a container" premise made literal: what is coming at you is
