@@ -49,6 +49,7 @@ const CRUSHER = {
   can: "#dfe4ec",
   canDark: "#8c93a3",
   canLabel: "#e05a5a",
+  shorts: "#3b5a74",
   spark: "#fff2b8",
   pile: "rgba(223,228,236,0.75)",
   outline: "#151a20",
@@ -77,8 +78,9 @@ const STANDS_BACK_BEATS = 1;
  */
 const BODY_ROWS = 1.5;
 
-/** A can's height, as a multiple of a row. */
-const CAN_ROWS = 0.5;
+/** A can's height, as a multiple of a row, and its width as a fraction of that. */
+const CAN_ROWS = 0.45;
+const CAN_ASPECT = 0.46;
 
 /**
  * How high above its own lane a placed can rides, centre to bar, as a multiple
@@ -166,11 +168,11 @@ export function drawRepeatPerformer(
   /** Where his palm lands: on the lid of a can held at the crush height. */
   const palmAbove = lift + canSize / 2;
   /**
-   * He stands half a head left of the crush point rather than centred on it, so
-   * the can he is holding covers the front of his face instead of all of it.
-   * A can as wide as a head, dead centre, reads as a head.
+   * He stands most of a head-radius left of the crush point rather than centred
+   * on it, so the can he is holding covers the front of his face instead of all
+   * of it. A can as wide as a head, dead centre, reads as a head.
    */
-  const bodyX = homeX - geometry.rowHeight * BODY_ROWS * 0.5 * 0.27;
+  const bodyX = homeX - geometry.rowHeight * FACE_OFFSET_ROWS;
 
   // How far through the current swing he is, 0..1, palm on the can at 0.
   // Phase-locked to the note grid rather than accumulated, so a dropped frame
@@ -201,7 +203,10 @@ export function drawRepeatPerformer(
     const since = age(can) - STANDS_BACK_BEATS;
     return since >= 0 && since < crushBeats + fallBeats;
   }).length;
-  drawPile(ctx, Math.max(0, state.pile - falling), bodyX, geometry);
+  // The heap sits a can's width in front of him rather than under his boots,
+  // which is where the crushed cans fall to and keeps it off his silhouette.
+  const pileX = homeX + canSize * 1.4;
+  drawPile(ctx, Math.max(0, state.pile - falling), pileX, geometry);
 
   // Everything he does not touch goes behind him, and the one can he does goes
   // in front. That ordering is itself part of the read: the can in front of the
@@ -251,9 +256,18 @@ export function drawRepeatPerformer(
     } else if (sinceContact < crushBeats + fallBeats) {
       // ...and down it goes, onto the pile. Accelerating, because a can that
       // drifts down reads as floating rather than as something dropped.
+      // Forward as well as down, so it drops clear of him and onto the heap
+      // instead of sliding down through his face and chest.
       const t = (sinceContact - crushBeats) / fallBeats;
       const from = homeY - lift;
-      drawCan(ctx, homeX, from + (geometry.floorY - from) * (t * t), canSize, "crushed", 0);
+      drawCan(
+        ctx,
+        homeX + (pileX - homeX) * t,
+        from + (geometry.floorY - from) * (t * t),
+        canSize,
+        "crushed",
+        0
+      );
     }
     // After that it belongs to the pile, which is drawn from the count.
   }
@@ -265,15 +279,82 @@ function ease(t: number): number {
 }
 
 /**
+ * The figure, as fractions of his own height.
+ *
+ * Written out as proportions rather than sprinkled through the drawing code
+ * because the first version was not a figure at all — the "elbow" was the
+ * midpoint between the shoulder and wherever the hand had got to, so raising
+ * the hand simply lengthened both bones and the arm ended up nearly as long as
+ * the man. Bones have fixed lengths here and the elbow is solved for, which is
+ * what makes the swing a fold rather than a stretch.
+ *
+ * Roughly a four-head figure: shorter than life, which suits a character forty
+ * pixels tall, but with the joints where a person's are. The head stays a
+ * little large on purpose — it has to stay wider than the can he holds against
+ * it, or the can reads as his head.
+ */
+const FIGURE = {
+  hip: 0.46,
+  shoulder: 0.78,
+  headCentre: 0.875,
+  headR: 0.125,
+  shoulderHalf: 0.155,
+  hipHalf: 0.105,
+  /** Half a leg's width, and how far its centre sits off the midline. */
+  legHalf: 0.045,
+  legSpread: 0.072,
+  shorts: 0.15,
+  upperArm: 0.2,
+  foreArm: 0.22,
+  palmR: 0.055,
+  limb: 0.055,
+} as const;
+
+/** How far left of the crush point he stands, so the can covers his face and not his head. */
+const FACE_OFFSET_ROWS = BODY_ROWS * FIGURE.headR * 0.8;
+
+type Point = { x: number; y: number };
+
+/**
+ * The elbow, for a shoulder and a hand — the standard two-bone solve.
+ *
+ * The elbow is placed on the side the sign selects, which for this figure is
+ * always outward: an elbow winging away from the body is most of what makes the
+ * swing legible when the whole man is forty pixels tall, and it is also where a
+ * real one goes when you put your palm on your own forehead.
+ */
+function solveElbow(shoulder: Point, hand: Point, upper: number, fore: number): Point {
+  const dx = hand.x - shoulder.x;
+  const dy = hand.y - shoulder.y;
+  // Clamped inside the reachable annulus, so a target the arm cannot make
+  // straightens or folds it fully instead of producing a NaN.
+  const d = Math.min(upper + fore, Math.max(Math.abs(upper - fore) + 1e-6, Math.hypot(dx, dy)));
+  const along = (d * d + upper * upper - fore * fore) / (2 * d);
+  const out = Math.sqrt(Math.max(0, upper * upper - along * along));
+  const ux = dx / (Math.hypot(dx, dy) || 1);
+  const uy = dy / (Math.hypot(dx, dy) || 1);
+  return {
+    x: shoulder.x + ux * along + -uy * out,
+    y: shoulder.y + uy * along + ux * out,
+  };
+}
+
+/**
  * The performer.
  *
- * One arm loops: up over the head, then down onto the forehead, then up again,
- * once per {@link RepeatVisualState.strikePeriodBeats}. The other braces. The
- * loop is the mechanic's entire tutorial, so it runs whether or not there is
- * anything to crush — an idle crusher would teach the player nothing until they
- * had already succeeded, which is the wrong way round.
+ * One arm loops: palm on the can at his brow, up and out to the side, then back
+ * down onto the next one, once per {@link RepeatVisualState.strikePeriodBeats}.
+ * The other braces. The loop is the mechanic's entire tutorial, so it runs
+ * whether or not there is anything to crush — an idle crusher would teach the
+ * player nothing until they had already succeeded, which is the wrong way
+ * round.
  *
- * @param phase 0..1 through the swing, palm on the forehead at 0.
+ * The hand travels on an arc about the shoulder rather than straight up,
+ * because the arm's reach is barely longer than the distance from his shoulder
+ * to his own forehead: a purely vertical swing has only a few pixels of travel
+ * in it, and swinging out to the side buys the silhouette the rest.
+ *
+ * @param phase 0..1 through the swing, palm on the can at 0.
  */
 function drawCrusher(
   ctx: CanvasRenderingContext2D,
@@ -285,88 +366,114 @@ function drawCrusher(
   triumphant: boolean
 ): void {
   const h = rowHeight * BODY_ROWS;
-  const w = h * 0.5;
-  const palmR = w * 0.16;
-  // The palm comes to rest ON the lid, not centred on it: a hand whose middle
-  // is at the top of the can looks like it went through the can.
-  const contactY = -contact.above + palmR;
-
-  // Phase 0 is contact. He holds there, winds back up, then drops onto the next
-  // one. The hold is what makes it a hit: without it the palm is already
-  // climbing while the flattened can is still under it, and the two stop
-  // looking like one event.
-  const raised =
-    phase < HOLD
-      ? 0
-      : phase < HOLD + WIND_UP
-        ? (phase - HOLD) / WIND_UP
-        : 1 - ease((phase - HOLD - WIND_UP) / (1 - HOLD - WIND_UP));
-  const handX = contact.dx;
-  const handY = contactY - raised * h * 0.55;
+  const palmR = h * FIGURE.palmR;
+  const headR = h * FIGURE.headR;
+  const headY = -h * FIGURE.headCentre;
+  const hipY = -h * FIGURE.hip;
+  const shoulderY = -h * FIGURE.shoulder;
+  const reach = h * (FIGURE.upperArm + FIGURE.foreArm);
+  const shoulder = { x: h * FIGURE.shoulderHalf, y: shoulderY };
 
   ctx.save();
   ctx.translate(x, baseY);
 
-  // Legs and torso. He stands ON the bar, like the goat does.
+  // Legs, then torso. He stands ON the bar, like the goat does.
   ctx.fillStyle = CRUSHER.skinShade;
-  ctx.fillRect(-w * 0.28, -h * 0.34, Math.max(1, w * 0.16), h * 0.34);
-  ctx.fillRect(w * 0.12, -h * 0.34, Math.max(1, w * 0.16), h * 0.34);
+  const legHalf = h * FIGURE.legHalf;
+  for (const side of [-1, 1]) {
+    // Spread far enough apart to read as two legs. At this size a pair set any
+    // closer merges into a single trunk, which is most of what made the first
+    // proportioned pass look spindly.
+    ctx.fillRect(side * h * FIGURE.legSpread - legHalf, hipY, Math.max(1, legHalf * 2), -hipY);
+  }
+
+  // Shorts, which are mostly here to break the torso off the legs — a single
+  // unbroken column from shoulder to bar does not read as a standing man.
+  ctx.fillStyle = CRUSHER.shorts;
+  ctx.fillRect(-h * FIGURE.hipHalf, hipY - h * 0.02, h * FIGURE.hipHalf * 2, h * FIGURE.shorts);
 
   ctx.fillStyle = CRUSHER.vest;
-  ctx.fillRect(-w * 0.34, -h * 0.72, w * 0.68, h * 0.4);
+  ctx.beginPath();
+  ctx.moveTo(-h * FIGURE.shoulderHalf, shoulderY);
+  ctx.lineTo(h * FIGURE.shoulderHalf, shoulderY);
+  ctx.lineTo(h * FIGURE.hipHalf, hipY);
+  ctx.lineTo(-h * FIGURE.hipHalf, hipY);
+  ctx.closePath();
+  ctx.fill();
 
   // Head, headband, hair.
-  const headR = w * 0.3;
-  const headY = -h * 0.86;
   ctx.fillStyle = CRUSHER.skin;
   ctx.beginPath();
   ctx.arc(0, headY, headR, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = CRUSHER.hair;
-  ctx.fillRect(-headR, headY - headR * 1.1, headR * 2, headR * 0.55);
+  ctx.fillRect(-headR, headY - headR * 1.05, headR * 2, headR * 0.5);
   ctx.fillStyle = CRUSHER.band;
-  ctx.fillRect(-headR, headY - headR * 0.55, headR * 2, headR * 0.4);
+  ctx.fillRect(-headR, headY - headR * 0.55, headR * 2, headR * 0.38);
 
   ctx.strokeStyle = CRUSHER.skin;
-  ctx.lineWidth = Math.max(1.5, w * 0.16);
+  ctx.lineWidth = Math.max(1.5, h * FIGURE.limb);
   ctx.lineCap = "round";
-  const shoulderY = -h * 0.68;
+  ctx.lineJoin = "round";
 
-  if (triumphant) {
-    // The attempt is over and he passed. Both arms up, and the loop stops —
-    // he is done working.
+  /**
+   * One arm, always solved on his right and then mirrored if it is his left, so
+   * both elbows wing away from the body rather than both leaning the same way.
+   * `hand` is given in that same right-hand frame.
+   */
+  const drawArm = (side: number, hand: Point): void => {
+    const from = { x: h * FIGURE.shoulderHalf, y: shoulderY };
+    const elbow = solveElbow(from, hand, h * FIGURE.upperArm, h * FIGURE.foreArm);
     ctx.beginPath();
-    ctx.moveTo(-w * 0.32, shoulderY);
-    ctx.lineTo(-w * 0.75, shoulderY - h * 0.4);
-    ctx.moveTo(w * 0.32, shoulderY);
-    ctx.lineTo(w * 0.75, shoulderY - h * 0.4);
+    ctx.moveTo(side * from.x, from.y);
+    ctx.lineTo(side * elbow.x, elbow.y);
+    ctx.lineTo(side * hand.x, hand.y);
     ctx.stroke();
-  } else {
-    // Bracing arm, held out on the far side from the incoming cans so it never
-    // sits between the player and the gap.
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.32, shoulderY);
-    ctx.lineTo(-w * 0.7, shoulderY + h * 0.16);
-    ctx.stroke();
-
-    // The working arm: shoulder, elbow winging out to the side, palm above the
-    // can. Two segments, so the arm folds as it comes down instead of
-    // telescoping — the elbow swinging wide is most of what makes the loop
-    // legible when the whole man is forty pixels tall.
-    const elbowX = Math.max(handX, w * 0.32) + w * 0.75;
-    const elbowY = (shoulderY + handY) / 2;
-    ctx.beginPath();
-    ctx.moveTo(w * 0.32, shoulderY);
-    ctx.lineTo(elbowX, elbowY);
-    ctx.lineTo(handX, handY);
-    ctx.stroke();
-
-    // The palm itself. A blob, but it is the thing the player is timing to, so
-    // it gets to be the widest part of the arm.
     ctx.fillStyle = CRUSHER.skin;
     ctx.beginPath();
-    ctx.arc(handX, handY, palmR, 0, Math.PI * 2);
+    ctx.arc(side * hand.x, hand.y, palmR, 0, Math.PI * 2);
     ctx.fill();
+  };
+
+  if (triumphant) {
+    // The attempt is over and he passed. Both arms up, and the loop stops — he
+    // is done working.
+    const up = { x: h * 0.3, y: shoulderY - reach * 0.9 };
+    drawArm(1, up);
+    drawArm(-1, up);
+  } else {
+    // The bracing arm hangs on the far side from the incoming cans, so it never
+    // sits between the player and the gap.
+    drawArm(-1, { x: h * 0.22, y: shoulderY + reach * 0.75 });
+
+    // Phase 0 is contact. He holds there, winds back up, then comes down on the
+    // next one. The hold is what makes it a hit: without it the palm is already
+    // climbing while the flattened can is still under it, and the two stop
+    // looking like one event.
+    const raised =
+      phase < HOLD
+        ? 0
+        : phase < HOLD + WIND_UP
+          ? (phase - HOLD) / WIND_UP
+          : 1 - ease((phase - HOLD - WIND_UP) / (1 - HOLD - WIND_UP));
+
+    // The palm comes to rest ON the can's lid, not centred on it: a hand whose
+    // middle is at the top of the can looks like it went through the can.
+    const restX = contact.dx;
+    const restY = -contact.above + palmR;
+    const toRest = Math.hypot(restX - shoulder.x, restY - shoulder.y);
+    const restAngle = Math.atan2(restY - shoulder.y, restX - shoulder.x);
+    // Out to the side he takes the cans from, and further from the shoulder:
+    // the arm unfolds as it lifts, which is the change the eye actually reads.
+    // Out rather than back over his head, which is the other natural windup but
+    // puts the upper arm straight across his face at this size.
+    const angle = restAngle + raised * 0.85;
+    const radius = toRest + (reach * 0.95 - toRest) * raised;
+
+    drawArm(1, {
+      x: shoulder.x + Math.cos(angle) * radius,
+      y: shoulder.y + Math.sin(angle) * radius,
+    });
   }
 
   ctx.restore();
@@ -393,7 +500,7 @@ function drawCan(
   spin: number
 ): void {
   const crushed = pose === "crushed";
-  const w = crushed ? size * 0.9 : size * 0.52;
+  const w = crushed ? size * 0.9 : size * CAN_ASPECT;
   const h = crushed ? size * 0.3 : size;
   const rim = Math.max(1, h * 0.14);
 

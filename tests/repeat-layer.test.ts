@@ -59,18 +59,24 @@ type Op = {
   h: number;
 };
 
+type Point = { x: number; y: number };
+
 /**
  * A canvas context that records where things landed.
  *
  * Only the transform operations this layer actually uses are modelled —
  * translate, rotate, save, restore — which is enough to resolve every draw to
- * an absolute point. Anything else is a no-op: the test is about position, not
- * about paint.
+ * an absolute point. Stroked paths are captured whole, because the limbs are
+ * polylines and the interesting facts about them are the lengths between their
+ * points. Anything else is a no-op: the test is about position, not paint.
  */
-function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[] } {
+function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[]; strokes: Point[][] } {
   const ops: Op[] = [];
+  const strokes: Point[][] = [];
+  let path: Point[] = [];
   let state = { x: 0, y: 0, rotation: 0 };
   const stack: (typeof state)[] = [];
+  const at = (x: number, y: number) => ({ x: state.x + x, y: state.y + y });
   const ctx = {
     save: () => void stack.push({ ...state }),
     restore: () => void (state = stack.pop() ?? state),
@@ -88,18 +94,19 @@ function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[] } {
     arc: (x: number, y: number, r: number) => {
       ops.push({ kind: "arc", x: state.x + x, y: state.y + y, rotation: state.rotation, w: r, h: r });
     },
-    beginPath: () => {},
+    beginPath: () => void (path = []),
     closePath: () => {},
-    moveTo: () => {},
-    lineTo: () => {},
-    stroke: () => {},
+    moveTo: (x: number, y: number) => void path.push(at(x, y)),
+    lineTo: (x: number, y: number) => void path.push(at(x, y)),
+    stroke: () => void strokes.push(path.slice()),
     fill: () => {},
     set fillStyle(_: unknown) {},
     set strokeStyle(_: unknown) {},
     set lineWidth(_: unknown) {},
     set lineCap(_: unknown) {},
+    set lineJoin(_: unknown) {},
   };
-  return { ctx: ctx as unknown as CanvasRenderingContext2D, ops };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, ops, strokes };
 }
 
 function stateWith(overrides: Partial<RepeatVisualState> = {}): RepeatVisualState {
@@ -117,7 +124,8 @@ function stateWith(overrides: Partial<RepeatVisualState> = {}): RepeatVisualStat
   };
 }
 
-const CAN = ROW * 0.5;
+const CAN = ROW * 0.45;
+const CAN_W = CAN * 0.46;
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
 /**
@@ -126,21 +134,33 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
  * proportions quietly found that instead.
  */
 const isFlatCan = (op: Op) => op.kind === "rect" && near(op.w, CAN * 0.9) && near(op.h, CAN * 0.3);
-const isTallCan = (op: Op) => op.kind === "rect" && near(op.w, CAN * 0.52) && near(op.h, CAN);
+const isTallCan = (op: Op) => op.kind === "rect" && near(op.w, CAN_W) && near(op.h, CAN);
 
 function flatCan(ops: readonly Op[]): Op | undefined {
   return ops.filter(isFlatCan).at(-1);
-}
-
-/** The palm, which is the smaller of the two circles he is made of. */
-function palm(ops: readonly Op[]): Op | undefined {
-  return ops.filter((op) => op.kind === "arc").sort((a, b) => a.w - b.w)[0];
 }
 
 function draw(state: RepeatVisualState, beat: number): Op[] {
   const { ctx, ops } = recorder();
   drawRepeatPerformer(ctx, state, GEOMETRY, beat);
   return ops;
+}
+
+const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * The working arm: shoulder, elbow, hand.
+ *
+ * Both arms are three-point polylines, so it is picked out by reaching further
+ * right than the other — the crusher works on the side the cans come from, and
+ * braces on the other.
+ */
+function workingArm(state: RepeatVisualState, beat: number): [Point, Point, Point] {
+  const { ctx, strokes } = recorder();
+  drawRepeatPerformer(ctx, state, GEOMETRY, beat);
+  const arms = strokes.filter((path) => path.length === 3);
+  const arm = arms.sort((a, b) => (b.at(-1)?.x ?? 0) - (a.at(-1)?.x ?? 0))[0];
+  return arm as [Point, Point, Point];
 }
 
 describe("the crush point", () => {
@@ -175,19 +195,19 @@ describe("a can the player placed correctly", () => {
 
   it("has the palm on it at that instant, and not a moment before", () => {
     const point = repeatCrushPoint(crushing, GEOMETRY);
-    const palmAt = (beat: number) => palm(draw(crushing, beat))!;
+    const handAt = (beat: number) => workingArm(crushing, beat)[2];
 
-    const onContact = palmAt(1);
+    const onContact = handAt(1);
     expect(onContact.x).toBeCloseTo(point.x, 5);
     // Resting on the lid: above the can's middle by half a can, less its own
     // radius, so the hand meets the top rather than passing through it.
     expect(onContact.y).toBeLessThan(point.y);
     expect(point.y - onContact.y).toBeLessThan(ROW * 0.5);
 
-    // Mid-swing it is a long way up. Half a period after contact is the top of
-    // the wind-up, which is what makes the gap under it visible from across the
-    // screen.
-    expect(palmAt(1.5).y).toBeLessThan(onContact.y - ROW * 0.4);
+    // Mid-swing it has swung clear, up and out to the side. Not up alone: his
+    // reach is barely longer than the distance from his shoulder to his own
+    // forehead, so a purely vertical swing has almost no travel in it.
+    expect(dist(handAt(1.5), onContact)).toBeGreaterThan(ROW * 0.3);
   });
 
   it("drops out of his hands and onto the floor", () => {
@@ -201,9 +221,39 @@ describe("a can the player placed correctly", () => {
 
   it("keeps swinging whether or not there is anything to crush", () => {
     const idle = stateWith();
-    const low = palm(draw(idle, 0))!;
-    const high = palm(draw(idle, 0.5))!;
-    expect(low.y - high.y).toBeGreaterThan(ROW * 0.4);
+    expect(dist(workingArm(idle, 0)[2], workingArm(idle, 0.5)[2])).toBeGreaterThan(ROW * 0.3);
+  });
+
+  it("swings an arm of fixed length, hung off a shoulder that does not move", () => {
+    // The defect this pins: the first build placed the elbow at the midpoint
+    // between the shoulder and wherever the hand had got to, so lifting the
+    // hand lengthened both bones and the arm ended up nearly as long as the
+    // man. Bones are bones.
+    const idle = stateWith();
+    const arms = [0, 0.15, 0.3, 0.5, 0.7, 0.9].map((phase) => workingArm(idle, phase));
+    const [shoulder, elbow, hand] = arms[0]!;
+    const upper = dist(shoulder, elbow);
+    const fore = dist(elbow, hand);
+
+    for (const arm of arms) {
+      expect(arm[0].x).toBeCloseTo(shoulder.x, 5);
+      expect(arm[0].y).toBeCloseTo(shoulder.y, 5);
+      expect(dist(arm[0], arm[1])).toBeCloseTo(upper, 5);
+      expect(dist(arm[1], arm[2])).toBeCloseTo(fore, 5);
+    }
+  });
+
+  it("has an arm a person could have", () => {
+    // Shoulder to fingertip is a bit under half a standing height. An arm
+    // approaching the whole height of the man is the stretching bug back.
+    const [shoulder, elbow, hand] = workingArm(stateWith(), 0.5);
+    const head = draw(stateWith(), 0.5)
+      .filter((op) => op.kind === "arc")
+      .sort((a, b) => b.w - a.w)[0]!;
+    const standing = GEOMETRY.laneY(PERFORMER_LANE) - (head.y - head.w);
+    const reach = dist(shoulder, elbow) + dist(elbow, hand);
+    expect(reach / standing).toBeGreaterThan(0.35);
+    expect(reach / standing).toBeLessThan(0.5);
   });
 });
 
@@ -250,7 +300,7 @@ describe("a can nobody played at", () => {
     const can = draw(missed, 1).filter((op) => isTallCan(op) && op.rotation !== 0).at(-1);
     expect(can).toBeDefined();
     // Resting on the bar it arrived in, nowhere near his hands.
-    expect(can!.y).toBeCloseTo(bar - (CAN * 0.52) / 2, 5);
+    expect(can!.y).toBeCloseTo(bar - CAN_W / 2, 5);
     expect(bar - point.y).toBeGreaterThan(ROW);
   });
 
