@@ -94,6 +94,9 @@ function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[]; strokes: Point[
     arc: (x: number, y: number, r: number) => {
       ops.push({ kind: "arc", x: state.x + x, y: state.y + y, rotation: state.rotation, w: r, h: r });
     },
+    ellipse: (x: number, y: number, rx: number, ry: number) => {
+      ops.push({ kind: "arc", x: state.x + x, y: state.y + y, rotation: state.rotation, w: rx, h: ry });
+    },
     beginPath: () => void (path = []),
     closePath: () => {},
     moveTo: (x: number, y: number) => void path.push(at(x, y)),
@@ -125,7 +128,7 @@ function stateWith(overrides: Partial<RepeatVisualState> = {}): RepeatVisualStat
 }
 
 const CAN = ROW * 0.45;
-const CAN_W = CAN * 0.46;
+const CAN_W = CAN * 0.42;
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
 /**
@@ -133,7 +136,7 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
  * the crusher's headband is also a wide flat rectangle and matching on
  * proportions quietly found that instead.
  */
-const isFlatCan = (op: Op) => op.kind === "rect" && near(op.w, CAN * 0.9) && near(op.h, CAN * 0.3);
+const isFlatCan = (op: Op) => op.kind === "rect" && near(op.w, CAN * 0.75) && near(op.h, CAN * 0.3);
 const isTallCan = (op: Op) => op.kind === "rect" && near(op.w, CAN_W) && near(op.h, CAN);
 
 function flatCan(ops: readonly Op[]): Op | undefined {
@@ -155,12 +158,21 @@ const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
  * right than the other — the crusher works on the side the cans come from, and
  * braces on the other.
  */
-function workingArm(state: RepeatVisualState, beat: number): [Point, Point, Point] {
+function arms(state: RepeatVisualState, beat: number): [Point, Point, Point][] {
   const { ctx, strokes } = recorder();
   drawRepeatPerformer(ctx, state, GEOMETRY, beat);
-  const arms = strokes.filter((path) => path.length === 3);
-  const arm = arms.sort((a, b) => (b.at(-1)?.x ?? 0) - (a.at(-1)?.x ?? 0))[0];
-  return arm as [Point, Point, Point];
+  return strokes.filter((path) => path.length === 3) as [Point, Point, Point][];
+}
+
+function workingArm(state: RepeatVisualState, beat: number): [Point, Point, Point] {
+  return arms(state, beat).sort((a, b) => b[2].x - a[2].x)[0]!;
+}
+
+/** His own midline: the head is drawn on it, and it is the biggest round shape. */
+function midline(state: RepeatVisualState, beat: number): number {
+  return draw(state, beat)
+    .filter((op) => op.kind === "arc")
+    .sort((a, b) => b.w - a.w)[0]!.x;
 }
 
 describe("the crush point", () => {
@@ -243,6 +255,24 @@ describe("a can the player placed correctly", () => {
     }
   });
 
+  it("never folds an elbow inward through his own body", () => {
+    // A two-bone solve has two answers, and choosing between them by rotating
+    // the shoulder-to-hand line picks the wrong one whenever the hand is low:
+    // the bracing arm's elbow ended up inside its own shoulder, which is not a
+    // direction an elbow goes. Both arms, right through the swing.
+    const idle = stateWith();
+    for (const phase of [0, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.97]) {
+      const centre = midline(idle, phase);
+      for (const [shoulder, elbow] of arms(idle, phase)) {
+        const shoulderOut = shoulder.x - centre;
+        const elbowOut = elbow.x - centre;
+        // Same side of him as its own shoulder, and no closer to the middle.
+        expect(Math.sign(elbowOut)).toBe(Math.sign(shoulderOut));
+        expect(Math.abs(elbowOut)).toBeGreaterThanOrEqual(Math.abs(shoulderOut));
+      }
+    }
+  });
+
   it("has an arm a person could have", () => {
     // Shoulder to fingertip is a bit under half a standing height. An arm
     // approaching the whole height of the man is the stretching bug back.
@@ -250,7 +280,7 @@ describe("a can the player placed correctly", () => {
     const head = draw(stateWith(), 0.5)
       .filter((op) => op.kind === "arc")
       .sort((a, b) => b.w - a.w)[0]!;
-    const standing = GEOMETRY.laneY(PERFORMER_LANE) - (head.y - head.w);
+    const standing = GEOMETRY.laneY(PERFORMER_LANE) - (head.y - head.h);
     const reach = dist(shoulder, elbow) + dist(elbow, hand);
     expect(reach / standing).toBeGreaterThan(0.35);
     expect(reach / standing).toBeLessThan(0.5);

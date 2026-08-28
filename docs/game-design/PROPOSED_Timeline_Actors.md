@@ -249,7 +249,13 @@ while the palm comes down on air.
 the arm as a shoulder, a hand, and an "elbow" halfway between them, so raising
 the hand lengthened both segments and the arm came out nearly as long as he was
 tall. He is now built from joints at human fractions of his height with bones of
-fixed length, and the elbow is solved for. That constraint also shapes the
+fixed length, and the elbow is solved for — on the side a fixed pole vector
+picks, not by rotating the shoulder-to-hand line. That distinction matters: the
+rotation follows the hand, so it points outward for a raised hand and *inward*
+for a low one, and the bracing arm bent its elbow through his own ribs. His head
+is an ellipse for the same class of reason — a circular head wide enough not to
+be swamped by the can he holds against it is also as wide as his shoulders, and
+the working arm then appears to come out from behind his head. That constraint also shapes the
 swing: his reach is barely longer than the distance from his shoulder to his own
 forehead, so a purely vertical wind-up has almost no travel in it, and the hand
 arcs out to the side instead — which is where the elbow winging wide comes from,

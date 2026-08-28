@@ -78,9 +78,17 @@ const STANDS_BACK_BEATS = 1;
  */
 const BODY_ROWS = 1.5;
 
-/** A can's height, as a multiple of a row, and its width as a fraction of that. */
+/**
+ * A can's height as a multiple of a row, and its width as a fraction of that —
+ * upright, then splayed out once it has been flattened.
+ *
+ * The crushed width is not much more than double the upright one, because a can
+ * that spreads to twice the width of his head stops reading as a can he is
+ * holding and starts reading as a plank across his face.
+ */
 const CAN_ROWS = 0.45;
-const CAN_ASPECT = 0.46;
+const CAN_ASPECT = 0.42;
+const CAN_CRUSHED_ASPECT = 0.75;
 
 /**
  * How high above its own lane a placed can rides, centre to bar, as a multiple
@@ -295,14 +303,21 @@ function ease(t: number): number {
  */
 const FIGURE = {
   hip: 0.46,
-  shoulder: 0.78,
+  shoulder: 0.8,
   headCentre: 0.875,
-  headR: 0.125,
-  shoulderHalf: 0.155,
+  /**
+   * The head is an ellipse, not a circle. A circular head wide enough not to be
+   * swamped by the can he holds against it is also as wide as his shoulders, so
+   * the working arm comes out from *behind* his head — a real head is a good
+   * deal narrower than it is tall, and that is what leaves the shoulders room.
+   */
+  headRX: 0.1,
+  headRY: 0.125,
+  shoulderHalf: 0.145,
   hipHalf: 0.105,
   /** Half a leg's width, and how far its centre sits off the midline. */
-  legHalf: 0.045,
-  legSpread: 0.072,
+  legHalf: 0.042,
+  legSpread: 0.065,
   shorts: 0.15,
   upperArm: 0.2,
   foreArm: 0.22,
@@ -310,32 +325,49 @@ const FIGURE = {
   limb: 0.055,
 } as const;
 
+/**
+ * Which way the elbow is allowed to break, as a direction in his own frame:
+ * outward, and a little down.
+ *
+ * A two-bone solve has two answers — the elbow can sit on either side of the
+ * line from shoulder to hand — and picking one by a fixed rotation of that line
+ * is what produced an arm bending the wrong way. The rotation follows the hand:
+ * with the hand raised it points outward, but with the hand low it points *in*,
+ * and the bracing arm's elbow folded through his own ribs. A fixed hint in body
+ * space cannot do that, because it does not depend on where the hand is.
+ */
+const ELBOW_POLE = { x: 0.944, y: 0.33 };
+
 /** How far left of the crush point he stands, so the can covers his face and not his head. */
-const FACE_OFFSET_ROWS = BODY_ROWS * FIGURE.headR * 0.8;
+const FACE_OFFSET_ROWS = BODY_ROWS * FIGURE.headRX * 0.8;
 
 type Point = { x: number; y: number };
 
 /**
- * The elbow, for a shoulder and a hand — the standard two-bone solve.
+ * The elbow, for a shoulder and a hand — the standard two-bone solve, with the
+ * side chosen by {@link ELBOW_POLE} so the joint always breaks outward.
  *
- * The elbow is placed on the side the sign selects, which for this figure is
- * always outward: an elbow winging away from the body is most of what makes the
- * swing legible when the whole man is forty pixels tall, and it is also where a
- * real one goes when you put your palm on your own forehead.
+ * Solved in his right-hand frame; the caller mirrors for the other arm, which
+ * mirrors the pole with it and gives that elbow its own outward.
  */
 function solveElbow(shoulder: Point, hand: Point, upper: number, fore: number): Point {
   const dx = hand.x - shoulder.x;
   const dy = hand.y - shoulder.y;
+  const raw = Math.hypot(dx, dy) || 1;
   // Clamped inside the reachable annulus, so a target the arm cannot make
   // straightens or folds it fully instead of producing a NaN.
-  const d = Math.min(upper + fore, Math.max(Math.abs(upper - fore) + 1e-6, Math.hypot(dx, dy)));
+  const d = Math.min(upper + fore, Math.max(Math.abs(upper - fore) + 1e-6, raw));
   const along = (d * d + upper * upper - fore * fore) / (2 * d);
   const out = Math.sqrt(Math.max(0, upper * upper - along * along));
-  const ux = dx / (Math.hypot(dx, dy) || 1);
-  const uy = dy / (Math.hypot(dx, dy) || 1);
+  const ux = dx / raw;
+  const uy = dy / raw;
+  // Perpendicular to the arm, flipped to whichever of the two solutions lies on
+  // the pole's side. This is the whole fix: the side is decided in body space,
+  // not by which way the hand happens to be pointing.
+  const side = -uy * ELBOW_POLE.x + ux * ELBOW_POLE.y >= 0 ? 1 : -1;
   return {
-    x: shoulder.x + ux * along + -uy * out,
-    y: shoulder.y + uy * along + ux * out,
+    x: shoulder.x + ux * along + -uy * out * side,
+    y: shoulder.y + uy * along + ux * out * side,
   };
 }
 
@@ -367,7 +399,8 @@ function drawCrusher(
 ): void {
   const h = rowHeight * BODY_ROWS;
   const palmR = h * FIGURE.palmR;
-  const headR = h * FIGURE.headR;
+  const headRX = h * FIGURE.headRX;
+  const headRY = h * FIGURE.headRY;
   const headY = -h * FIGURE.headCentre;
   const hipY = -h * FIGURE.hip;
   const shoulderY = -h * FIGURE.shoulder;
@@ -404,12 +437,12 @@ function drawCrusher(
   // Head, headband, hair.
   ctx.fillStyle = CRUSHER.skin;
   ctx.beginPath();
-  ctx.arc(0, headY, headR, 0, Math.PI * 2);
+  ctx.ellipse(0, headY, headRX, headRY, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = CRUSHER.hair;
-  ctx.fillRect(-headR, headY - headR * 1.05, headR * 2, headR * 0.5);
+  ctx.fillRect(-headRX, headY - headRY * 1.02, headRX * 2, headRY * 0.42);
   ctx.fillStyle = CRUSHER.band;
-  ctx.fillRect(-headR, headY - headR * 0.55, headR * 2, headR * 0.38);
+  ctx.fillRect(-headRX, headY - headRY * 0.6, headRX * 2, headRY * 0.32);
 
   ctx.strokeStyle = CRUSHER.skin;
   ctx.lineWidth = Math.max(1.5, h * FIGURE.limb);
@@ -500,7 +533,7 @@ function drawCan(
   spin: number
 ): void {
   const crushed = pose === "crushed";
-  const w = crushed ? size * 0.9 : size * CAN_ASPECT;
+  const w = size * (crushed ? CAN_CRUSHED_ASPECT : CAN_ASPECT);
   const h = crushed ? size * 0.3 : size;
   const rim = Math.max(1, h * 0.14);
 
