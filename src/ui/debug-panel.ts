@@ -8,15 +8,9 @@
  * source is driving the game.
  */
 
-export type DebugSnapshot = Record<string, string>;
+import { AUTOPLAY_MODES, type AutoplayMode } from "../dev/auto-performance.js";
 
-/**
- * How the autoplay driver plays: dead on, late enough for Good, late and
- * dropping notes, or in time on the wrong pitch. `fumbled` exists because
- * wrong-pitch feedback is a mechanic of its own in `RepeatMinigame` — the can
- * lands where you played — and nothing else here can produce a wrong note.
- */
-export type AutoplayMode = "perfect" | "good" | "scruffy" | "fumbled" | "off";
+export type DebugSnapshot = Record<string, string>;
 
 export type DebugHandlers = {
   onSourceChange: (source: "tuninator" | "synth" | "test") => void;
@@ -51,17 +45,36 @@ export class DebugPanel {
       });
     }
 
-    for (const [id, mode] of [
-      ["dev-autoplay-perfect", "perfect"],
-      ["dev-autoplay-good", "good"],
-      ["dev-autoplay-scruffy", "scruffy"],
-      ["dev-autoplay-fumbled", "fumbled"],
-      ["dev-autoplay-off", "off"],
-    ] as const) {
-      root.querySelector(`#${id}`)?.addEventListener("click", () => handlers.onAutoplay(mode));
+    // Ids are derived from the mode ids, so the buttons, the `?autoplay=` value
+    // and the mode itself cannot drift apart.
+    for (const mode of AUTOPLAY_MODES) {
+      root
+        .querySelector(`#dev-autoplay-${mode}`)
+        ?.addEventListener("click", () => handlers.onAutoplay(mode));
     }
 
     root.querySelector("#dev-close")?.addEventListener("click", () => this.setEnabled(false));
+  }
+
+  /** Marks the active tier, so the panel says which one is running. */
+  setAutoplayMode(mode: AutoplayMode): void {
+    for (const other of AUTOPLAY_MODES) {
+      const button = this.#root.querySelector(`#dev-autoplay-${other}`);
+      if (button instanceof HTMLElement) button.dataset["selected"] = String(other === mode);
+    }
+  }
+
+  /**
+   * Points the source select at what is actually driving the game.
+   *
+   * Autoplay can switch the source by itself, and a select still reading
+   * "Tuninator (live guitar)" while a synthetic sine drives the game is the
+   * same honesty problem as the banner (`AGENTS.md` §13), in miniature.
+   * Assigning `.value` does not fire `change`, so this cannot loop.
+   */
+  setSourceValue(kind: "tuninator" | "synth" | "test"): void {
+    const select = this.#root.querySelector("#dev-source");
+    if (select instanceof HTMLSelectElement) select.value = kind;
   }
 
   get enabled(): boolean {

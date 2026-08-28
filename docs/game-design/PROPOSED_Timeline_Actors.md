@@ -8,10 +8,10 @@ rough draft: the existing scale runs, plus one easy REPEAT scenario.
 Everything under "In" in §1 is now built on that branch and playable, and the
 scenario panel has since been reduced to a backdrop — the mechanic replaced it,
 so the climb's route, footholds, climber and effects are no longer drawn at all
-(§6, DECISION-022).
+(§6, DECISION-023).
 
 What is built differs from the design as first written in three places, each
-noted inline below and in `DECISION_LOG.md` (DECISION-019 to 021):
+noted inline below and in `DECISION_LOG.md` (DECISION-020 to 022):
 
 1. **Can Crushing's material is one pitch.** §5 assumed a can could be authored
    on any lane. It cannot while the performer is stationary — see §5.

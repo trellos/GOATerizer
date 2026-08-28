@@ -25,7 +25,7 @@
  * transition slides them through. What is lost is the early peek at the next
  * scenario; what replaces it, for now, is the run's own labelling. Putting the
  * peek back — as a cross-fade beginning in the last measure, say — is a real
- * option and is noted in `DECISION_LOG.md` (DECISION-022).
+ * option and is noted in `DECISION_LOG.md` (DECISION-023).
  */
 
 import type { ScenarioDefinition } from "../scenario/types.js";

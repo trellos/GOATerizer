@@ -722,12 +722,22 @@ button.chip[data-selected="true"] {
 /* Dev panel                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * The developer panel.
+ *
+ * Capped well short of the viewport, not at `100vh - 1rem`. It is a fixed
+ * overlay on the right-hand edge, and both play screens put a primary button
+ * (Play) in the bottom-right — so a panel tall enough to reach the bottom of
+ * the window swallows the click that starts the run. It grew past that once
+ * enough readouts were added, which is exactly the kind of thing nobody
+ * notices until the button stops working. It scrolls, so nothing is lost.
+ */
 #dev-panel {
   position: fixed;
   top: 0.5rem;
   right: 0.5rem;
   width: 21rem;
-  max-height: calc(100vh - 1rem);
+  max-height: 70vh;
   overflow-y: auto;
   background: rgba(8, 11, 15, 0.96);
   border: 1px solid var(--accent);

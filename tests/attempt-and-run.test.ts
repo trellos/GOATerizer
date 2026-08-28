@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { planAutoPerformance, type AutoplayMode } from "../src/dev/auto-performance.js";
 import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/game/attempt.js";
 import { rankForStars, GOAT_RANKS } from "../src/game/ranks.js";
 import { DIFFICULTY_SEQUENCE, RunState, RUN_SLOT_COUNT } from "../src/game/run.js";
@@ -245,5 +246,80 @@ describe("run shell", () => {
     expect(rankForStars(0)).toBe("Hairless Baby Lamb");
     expect(rankForStars(48)).toBe("GOAT Markhor");
     expect(new Set(GOAT_RANKS).size).toBe(49);
+  });
+});
+
+/**
+ * Autoplay, end to end, through the same sink the app uses.
+ *
+ * The planner's own tests prove the gestures are well-formed; these prove the
+ * tiers mean what they claim once a real judge, a real score and a real star
+ * meter have had them — which is the only definition of "50% correct" that
+ * matters. Scheduling `attack` + `release` pairs rather than bare attacks
+ * mirrors `#scheduleAutoPerformance` exactly, releases included.
+ */
+function playAutoPerformance(difficulty: number, mode: AutoplayMode, seed = 7) {
+  const startBeat = 20;
+  const h = harness(difficulty, startBeat);
+  const performance = planAutoPerformance({
+    targets: h.attempt.targets,
+    mode,
+    seed,
+    attemptIndex: 0,
+  });
+
+  performance.gestures.forEach((gesture, index) => {
+    const at = (startBeat + gesture.beat) * SECONDS_PER_BEAT;
+    const id = `auto-${index}`;
+    h.provider.schedule([
+      { at, kind: "attack", midi: gesture.midi, id },
+      { at: at + gesture.durationBeats * SECONDS_PER_BEAT, kind: "release", id },
+    ]);
+  });
+
+  // Small steps, so the queue drains in order and `tick` expires targets on
+  // time rather than all at once at the end.
+  for (let beat = 0; beat <= 16; beat += 0.125) h.advanceTo(beat);
+  const result = h.attempt.result;
+  if (!result) throw new Error("attempt did not complete");
+  return { performance, result };
+}
+
+describe("autoplay tiers", () => {
+  it("plays a flawless attempt at 100%, worth three stars", () => {
+    // The unit-level guard on browser-validate's "three stars for a flawless
+    // attempt": if this tier ever stops being perfect, the browser suite starts
+    // failing for a reason that has nothing to do with the browser.
+    for (const difficulty of [1, 2, 3, 4]) {
+      const { result } = playAutoPerformance(difficulty, "perfect");
+      expect(result).toMatchObject({ missed: 0, wrongNotes: 0, good: 0, stars: 3 });
+      expect(result.passed).toBe(true);
+    }
+  });
+
+  it("fumbles audibly at 50%: some hits, some wrong notes, some misses", () => {
+    const { result } = playAutoPerformance(3, "50");
+    expect(result.perfect + result.good).toBeGreaterThan(0);
+    expect(result.missed).toBeGreaterThan(0);
+    expect(result.wrongNotes).toBeGreaterThan(0);
+    expect(result.stars).toBeLessThan(3);
+  });
+
+  it("hits less often at 25% than at 50%, on the same seed", () => {
+    for (const seed of [1, 7, 42]) {
+      const half = playAutoPerformance(3, "50", seed).result;
+      const quarter = playAutoPerformance(3, "25", seed).result;
+      expect(quarter.perfect + quarter.good).toBeLessThan(half.perfect + half.good);
+      expect(quarter.stars).toBeLessThanOrEqual(half.stars);
+    }
+  });
+
+  it("intends exactly what the judge then sees, on the deterministic sink", () => {
+    // The test provider injects already-judged events, so intent and outcome
+    // must agree exactly here. Any drift means the planner and the judge
+    // disagree about what counts as a hit.
+    const { performance, result } = playAutoPerformance(2, "50");
+    expect(result.perfect + result.good).toBe(performance.counts.hits);
+    expect(result.missed).toBe(performance.counts.wrong + performance.counts.dropped);
   });
 });

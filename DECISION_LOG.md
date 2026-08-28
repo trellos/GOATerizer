@@ -4,7 +4,7 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-025: The frame loop is uncapped, and only the JavaScript half is ours to promise
+#### DECISION-027: The frame loop is uncapped, and only the JavaScript half is ours to promise
 * **Date:** 2026-08-23
 * **Status:** Accepted
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -15,18 +15,18 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-024: A timing check with its own screen, at 90bpm, on quarter notes
+#### DECISION-026: A timing check with its own screen, at 90bpm, on quarter notes
 * **Date:** 2026-08-23
 * **Status:** Accepted
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
-* **Context:** DECISION-022b put the calibration in pregame, and pregame is the wrong room for it. The bass loop is playing and the instruction is "noodle", so a note played there is as likely to be aimed at the music as at the beat — and at 120bpm+ a player cannot tell whether being off the timeline is the rig or their own hands, which is the exact confusion the measurement exists to resolve.
+* **Context:** DECISION-024 put the calibration in pregame, and pregame is the wrong room for it. The bass loop is playing and the instruction is "noodle", so a note played there is as likely to be aimed at the music as at the beat — and at 120bpm+ a player cannot tell whether being off the timeline is the rig or their own hands, which is the exact confusion the measurement exists to resolve.
 * **Decision:** Its own screen, off the start screen, with four choices that each rule out a way of measuring the wrong thing. **Quarter notes, not eighths** — a sample is matched to the nearest beat, so an offset past half a beat folds onto the wrong one; quarters at 90bpm give ±333ms of headroom before that, eighths would give ±167ms, which is inside the range of a bad Bluetooth rig, and eighths add the player's own subdivision error to a measurement that is not about subdivision. **90bpm, pinned** — a fixed reference is comparable between sessions, it is the game's own default, and hand synchronisation gets measurably worse below about 75bpm where the gaps are long enough that a player estimates rather than entrains. **The game's own quarter pulse, not a special click** — a sound's perceived onset depends on its attack, so calibrating against a sharper click than the one played over would bake in the difference. **Nothing on screen moves on the beat** — a visual pulse is a second cue, and a player given two cues splits the difference, which would make this a measurement of that blend rather than of the audio offset the judge compensates. Two bars count in, one bar is played and thrown away (the first notes of any tapping task are finding the tempo, not playing at it), four bars are measured. `CalibrationSession` unwraps against its own running median, which roughly doubles what can be resolved past the fold-over.
 * **Alternatives Considered:** (a) Pairing the k-th played note with the k-th expected beat instead of rounding, which removes the fold-over entirely. Rejected: guitar onset detection drops notes — a re-struck open string may not register a second attack at all — and one dropped note shifts every pairing after it. Nearest-beat is free of that, and unwrapping recovers most of the range. (b) A mic loopback, still the honest way to isolate rig latency from the player. Not this: browsers apply echo cancellation to `getUserMedia` by default and it exists specifically to remove speaker sound from the mic. It remains the next step, with `echoCancellation: false`.
 * **Consequences:** Positive — the offset and the spread are reported as two separate numbers in the player's own words ("your offset", "your consistency"), which answers "is that me or the game?" directly rather than making them infer it. The spread also gates the offset: too loose and the screen says play more evenly instead of handing over a number. Negative — what is measured is *not* pure rig latency. It includes the player's own anticipation, which is typically 20-50ms early for a musician. That is deliberate for a game, where the goal is that "on the beat" means what the player feels it means, but it does mean the stored trim mixes two things and is not portable to a different pair of hands. The screen is named and worded for that; the code says so where the number is defined.
 
 ---
 
-#### DECISION-023: One clock, and it is the one the player hears
+#### DECISION-025: One clock, and it is the one the player hears
 * **Date:** 2026-08-23
 * **Status:** Accepted
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -37,18 +37,18 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-022b: The player measures their own rig, and the game remembers
+#### DECISION-024: The player measures their own rig, and the game remembers
 * **Date:** 2026-08-23
 * **Status:** Accepted
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
-* **Context:** DECISION-023 fixes the part of the latency the browser knows about. The rest — a USB interface's own buffering, an amp in the chain, Bluetooth headphones the browser under-reports — is invisible to `AudioContext` and was a dev-only number in a hidden panel that reset on every reload. There was no way for a player to find out how late they were, and no way for the game to keep the answer.
+* **Context:** DECISION-025 fixes the part of the latency the browser knows about. The rest — a USB interface's own buffering, an amp in the chain, Bluetooth headphones the browser under-reports — is invisible to `AudioContext` and was a dev-only number in a hidden panel that reset on every reload. There was no way for a player to find out how late they were, and no way for the game to keep the answer.
 * **Decision:** Calibrate in pregame, against the beat grid. Pregame already runs the transport, the drums and the microphone, so every note the player plays there is measured against the nearest beat (`offBeatMs`) and fed to the existing `TimingDeltaLog`. A Timing block shows both halves of the compensation — what the browser reported and what the player added — and, once there are at least eight notes clustered tightly enough that the median describes a rig rather than a warm-up, offers to apply the measured bias. The result is remembered in `localStorage`, clamped to ±500ms.
 * **Alternatives Considered:** (a) A mic loopback: play a click, detect it in the input, subtract. It is the gold standard and it measures the true round trip with no reliance on browser reporting — but browsers apply echo cancellation to `getUserMedia` by default and it exists specifically to remove speaker sound from the mic, so the measurement is fighting the platform. Worth revisiting with `echoCancellation: false`, and noted as the next step if playing along proves too coarse. (b) Auto-applying the bias without asking. Rejected: it would change judgment mid-run, silently, on the strength of a player who might just be rushing.
 * **Consequences:** Positive — the question "how much latency do I have?" is answerable by anyone, in the room, with their own guitar, and the answer survives a reload. The dev panel's trim now goes through the same setter, so the two controls cannot disagree. Negative — the measurement is only valid up to half a beat (±333ms at 90bpm), because past that `Math.round` picks the next beat and the error folds over; a worse rig has to calibrate at a slower tempo, and nothing but the readout tells the player so. It also assumes the player is aiming at beats, which in pregame — where the instruction is "noodle" — they may not be.
 
 ---
 
-#### DECISION-022: The scenario panel is a backdrop, and `ClimbMinigame` is deleted
+#### DECISION-023: The scenario panel is a backdrop, and `ClimbMinigame` is deleted
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -59,7 +59,7 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-021: The shelf holds trophies, and stars are earned against two different metrics
+#### DECISION-022: The shelf holds trophies, and stars are earned against two different metrics
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -70,7 +70,7 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-020: Authored pitch places terrain; played pitch places projectiles
+#### DECISION-021: Authored pitch places terrain; played pitch places projectiles
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -81,7 +81,7 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-019: The timeline is where the scenario happens
+#### DECISION-020: The timeline is where the scenario happens
 * **Date:** 2026-08-22
 * **Status:** Proposed (drafted on `claude/timeline-actors-draft`)
 * **Owner:** Trevor (agent-assisted, Claude Opus 5)
@@ -89,6 +89,14 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 * **Decision:** Put the actor **on the bars**. `TimelineActor` is a small pure class owned by `AttemptRuntime` beside the minigame class, fed the same judgment stream: it stands on the lane of the note being judged, dies on a miss or a wrong note, and is reborn at minimum size on the next good one. Size is `min(1, sqrt(streak / 12))` — notes 1–5 feel enormous, note 25 still nudges — and past the cap the streak buys small stars sparking off it instead of mass. Fallen actors mill on a floor strip below the band, capped at eight, so a bad patch fills the screen rather than emptying it. Nothing about the actor can end a run, gate a star, or make the next note harder: it is a *display of* the streak, not a second rule system.
 * **Alternatives Considered:** (a) Contour-tracing locomotion — the actor walking the melodic line continuously. Deferred: at 140bpm eighths there are 214ms between notes, which reads, but sixteenths would be 107ms and no shipped scenario authors them yet, so the case cannot be tested. Discrete jumps until it can. (b) Keeping the waypoint routes as the actor's path. Rejected: a waypoint is a position in the *art panel*, not a note, and the actor's position has to come from the lane. The 93 authored waypoints stay, unread, behind the class switch — deleting them on the strength of an untested prototype is not a trade worth making.
 * **Consequences:** Positive — one gaze covers the notation and the payoff, and the streak is one readable object that grows, decorates and dies. Negative — two presentations of the same run now exist in one build (the strip's climber and the timeline's actor), which is deliberate for comparison but is duplicated state until one wins. The live actor's decorations and the trophy's ornaments are separate systems that must not share art, and nothing but this note enforces that.
+#### DECISION-019: One seeded performance planner, two sinks; a tier picks its own input source
+* **Date:** 2026-08-28
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** Autoplay was a loop inside `game-app.ts` with two hardcoded timing offsets and a "drop every fifth note" rule. It could not express "half correct", never played a wrong note, did nothing at all when a live microphone was the source, scheduled only one beat ahead, and — on the injected path — emitted no `release`, so every played bar grew from its attack to the playhead until it pruned. A demo mode needs a repeatable *imperfect* performance, and "imperfect" means fumbles that are provably fumbles under a judge that matches whole pitch classes across every open target.
+* **Decision:** A pure `src/dev/auto-performance.ts` turns `(targets, mode, seed, attemptIndex)` into attempt-relative gestures and never reads a clock; `game-app.ts` keeps only the two sinks and the schedule lifecycle. Tiers are `perfect` / `50` / `25` / `off`. Wrong pitches are chosen against the union of every target's *clamped* Good window, by pitch class, so octave equivalence cannot turn a fumble into a hit, and never repeat inside the wrong-note debounce, which would otherwise swallow the event and draw the bar as an ordinary played note. Picking a tier switches the source to `synth` **only when the current source cannot be a sink** — a live microphone cannot, the deterministic test provider can. Both sinks emit a real note-off.
+* **Alternatives Considered:** (a) Auto-switching away from `input=test` as well. Rejected: `scripts/browser-validate.mjs` drives its whole first run on the test provider and asserts exact outcomes ("three stars for a flawless attempt"); moving it onto real detection would trade a deterministic suite for a flaky one, and the test provider is a perfectly good sink. (b) Capping an unreleased played note's drawn length in `TimelineModel`. Rejected: a genuinely sustained note *should* grow, and a cap would hide the producer bug rather than fix it — so the producers were fixed and an `unreleased played` counter was added to the dev panel instead, which also surfaces real Tuninator dropping a `noteEnded`. (c) Seeding from `Date.now()`. Rejected: the point is a link that replays.
+* **Consequences:** Positive — the fake guitarist is unit-testable against the real `TargetJudge` with no microphone, intent and outcome agree exactly on the deterministic sink (asserted), `?dev=1&autoplay=50&seed=7` is a shareable demo, and every attempt is now scheduled a whole attempt ahead instead of one beat. Negative — up to ~64 oscillators can be scheduled at once on the synthetic path, so cancellation is mandatory rather than optional (`SyntheticGuitarSource.cancelFrom`); the synthetic path's *achieved* rate runs under the intended one, because real detection drops the odd onset, so the panel shows both; and `?seed=N` seeds the performance only — the run's key and scenario picks still come from `Math.random`, so two loads of the same link play the same fumbles against a different scenario in a different key.
 
 ---
 

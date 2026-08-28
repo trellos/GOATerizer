@@ -6,11 +6,16 @@ A browser guitar game where the guitar is the controller. Real notes, played on 
 real instrument, detected by [Tuninator](https://github.com/trellos/Tuninator),
 make a stupid pixel goat climb a mountain.
 
-This repository currently contains the **Rocky Ascent vertical slice**: one full
-run shell with one scenario playable at difficulties 1–4, live guitar input, a
-continuous musical clock, pregame, timeline, judgment, scoring, stars and
-results. `docs/game-design/` is the design authority; `AGENTS.md` is the
-repository's working agreement.
+This repository currently contains a **vertical slice**: a full run shell, five
+scenarios across two minigame classes covering difficulties 1–6, live guitar
+input, a continuous musical clock, pregame, a timing check, timeline, judgment,
+scoring, stars and results. `docs/game-design/` is the design authority;
+`AGENTS.md` is the repository's working agreement.
+
+The characters now live **on the timeline itself** rather than in a scenario
+panel beside it — the goat stands on the note bars and climbs them, the can
+crusher stands at one lane and catches what you throw at him. That work is
+drafted and documented in `docs/game-design/PROPOSED_Timeline_Actors.md`.
 
 ---
 
@@ -107,11 +112,19 @@ tables at the top of that script.
    on is the same rectangle you play on. None of it stops the beat.
 3. **Play** starts the run on the next measure boundary plus a lead-in. Targets
    slide in from the right, cross the strike line on their beat, and leave to
-   the left. Hit them and a streak of good energy flies up into the scenario and
-   the goat takes one foothold. Miss, or play the wrong note, and it wobbles and
-   stays put.
+   the left. The goat stands on the bar you just hit and jumps to the next one,
+   growing with the streak; a miss drops it to the floor and the next good note
+   spawns a new one. The scenario behind it all is a backdrop.
 4. Four measures, 0–3 stars. Zero stars ends the run and tells you what kind of
-   lamb you are.
+   lamb you are. Each passed minigame puts a trophy on the shelf in the top bar
+   — bare at one star, horns at two, a crown at three.
+
+**Timing check** (from the start screen) measures how far your notes land from
+the beat, so "the game feels late" can be told apart from "I am playing late".
+It reports two numbers: your offset, which is your rig and your feel together,
+and your consistency, which is only you and decides whether the offset can be
+trusted at all. See `DECISION_LOG.md` (DECISION-026) for why quarter notes at
+90bpm, and why nothing on that screen moves on the beat.
 
 ### Developer flags
 
@@ -121,8 +134,12 @@ Dev tooling is gated behind `?dev=1` and never reachable from normal play.
 |---|---|
 | `?dev=1` | Show the developer panel (transport, detection, judgment, latency, scenario progress) |
 | `?dev=1&input=test` | Drive the game from the **deterministic test provider** instead of a guitar. Bypasses Tuninator entirely — injects already-judged note events. The UI says so, loudly, the whole time |
-| `?dev=1&input=synth` | Drive the game from a **synthetic sine-wave microphone**, through the real Tuninator recognizer. For environments that cannot grant microphone access (this repo was built and calibrated partly in one) but still need the actual detection/latency pipeline exercised, not bypassed. "Autoplay perfect/good/scruffy" schedules real sine plucks instead of injected events. The UI says so, loudly, the whole time |
+| `?dev=1&input=synth` | Drive the game from a **synthetic sine-wave microphone**, through the real Tuninator recognizer. For environments that cannot grant microphone access (this repo was built and calibrated partly in one) but still need the actual detection/latency pipeline exercised, not bypassed. Autoplay schedules real sine plucks instead of injected events. The UI says so, loudly, the whole time |
+| `?dev=1&autoplay=perfect\|50\|25` | **Play the game for you**, so you can watch what playing looks like without a guitar. `perfect` takes every note dead on. `50` and `25` take that share of the note opportunities and fumble the rest: most fumbles are played as an audible wrong pitch — which never consumes the target, so it costs you a red bar *and* a miss — some are simply not played, and the occasional extra wrong note gets noodled into a gap. Picking a tier switches the input source to `synth` if a live microphone is selected, since a microphone cannot play anything; `input=test` is left alone, because it can. With no `input=` at all, the link implies `input=synth` |
+| `?dev=1&seed=N` | Picks a different seeded autoplay performance. The same `N` fumbles the same notes in the same places every time, so a screenshot or a bug report reproduces |
 | `?dev=1&level=N` | Force every slot to difficulty *N*, for tuning one level without grinding up to it. Which scenario fills it is still whatever the registry's difficulty pool picks — no longer always Rocky Ascent now that companion scenarios share levels with it |
+| `?dev=1&scenario=<id>` | Pin every slot that scenario authors to it, so one scenario can be looked at without rerolling the run. Slots it does not author fall back to normal random selection. Unknown ids are refused with a console warning rather than silently ignored |
+| `?dev=1&calibrateOffsetMs=N` | On the timing check only: fake a player whose notes land *N* ms from the click, which is how that screen is testable without a guitar. Deliberately not one of the autoplay tiers — those describe what share of the *targets* a fake guitarist takes, and the check has no targets |
 
 ---
 
@@ -137,13 +154,21 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
                                               │  normalised guitar events
                                               ▼
                                      AttemptRuntime
-                            (TargetJudge, AttemptScore, StarMeter, ClimbMinigame)
-                                              │  judgment + energy
-                     ┌────────────────────────┼────────────────────────┐
-                     ▼                        ▼                        ▼
-              TimelineModel              EnergyLayer            ScenarioStripView
-              (Key + Tab views)
+                    (TargetJudge, AttemptScore, StarMeter, TimelineActor)
+                                              │  judgment
+                     ┌────────────────────────┴────────────────────────┐
+                     ▼                                                 ▼
+              TimelineModel  ──▶  TimelineView                ScenarioBackdropView
+              (Key + Tab)        (notes + the actor)            (background only)
 ```
+
+`EnergyLayer` hangs off the run rather than the attempt: it flies the stars
+earned by a finished attempt into the trophy shelf, and nothing else.
+
+Everything the player sees or is judged on runs on the beat they are **hearing**
+— `beatAt(now − outputLatency − trim)` — while audio is scheduled in raw
+transport time. One clock each, named, because mixing them made the timeline lead
+the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 
 | Path | What lives there |
 |---|---|
@@ -151,8 +176,8 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
 | `src/music/` | Degrees, keys, transposition, guitar fingerings, pitch maths |
 | `src/input/` | The `GuitarInputProvider` boundary, the Tuninator adapter, the deterministic test provider |
 | `src/game/` | Target resolution, judgment, score, stars, the attempt, the 16-slot run, ranks |
-| `src/scenario/` | Scenario schema and loader, the registry, `ClimbMinigame` |
-| `src/ui/` | Timeline model and views, scenario strip, energy streaks, dev panel |
+| `src/scenario/` | Scenario schema and loader, the registry, the minigame classes (`RepeatMinigame`, `TimelineActor`) |
+| `src/ui/` | Timeline model and views, the actor and performer layers, the scenario backdrop, trophies, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
 | `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
 
@@ -163,9 +188,14 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
   into attack / retune / sustain / release events in audio-clock time. Nothing
   downstream knows Tuninator exists; nothing in the adapter knows what a scale
   degree is. GOATerizer implements no pitch detection of its own.
-- **`ClimbMinigame` contains no scenario-specific asset names.** It is handed a
-  route, class asset *slots* and class parameters. Rocky Ascent decides those
-  slots hold goats and boulders.
+- **A minigame class contains no scenario-specific asset names.** It is handed
+  class asset *slots* and class parameters. Rocky Ascent decides its slots hold
+  goats; Can Crushing decides its `repeatTarget` is a beer can.
+- **Authored pitch places terrain; played pitch places projectiles.** The goat
+  lands on the lane of the note it was *asked* for, so one flub can never strand
+  it somewhere the next note is unreachable from. A can appears at the lane you
+  *actually played*, so a wrong note says how you were wrong — see
+  `DECISION_LOG.md` (DECISION-021).
 - **The timeline has one model and two views.** Key View and Tablature View
   render the same `TimelineModel`; there is no second scoring engine.
 - **The pitch space is one octave, root to root.** Eight lanes, authored as
@@ -173,13 +203,16 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
   and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).
 - **Timing is derived, never accumulated.** One anchor plus a linear map, so a
   tempo change is exact and a dropped frame moves nothing.
-- **Scenario data drives content.** Adding another `ClimbMinigame` scenario means
-  a JSON file, art, and one line in `src/scenario/registry.ts`.
+- **Scenario data drives content.** Adding another scenario of a class that
+  already exists means a JSON file, art, and one line in
+  `src/scenario/registry.ts`.
 
 ### Adding a scenario
 
 1. Author `docs/scenarios/<id>/<id>.scenario.json` — supported levels, prompts
-   in scale-degree tokens, star thresholds, waypoints, asset bindings.
+   in scale-degree tokens, star thresholds, asset bindings, and whatever else
+   the declared `minigameClass` requires (a climb authors a route; a repeat
+   scenario authors none, and the loader refuses one).
 2. Drop art in `public/assets/scenarios/<id>/`, and record its provenance in
    `docs/assets/ASSET_SOURCES.md`.
 3. Add one entry to `src/scenario/registry.ts`.
@@ -202,17 +235,26 @@ presented as design.
 | Score values | `src/config/tuning.ts` | Perfect 100, Good 40, Miss 0 |
 | Star thresholds | each level's `stars` block in the scenario JSON | 45% / 80% / 100% of the all-Perfect maximum |
 | Bass grammar | `src/audio/bass-line.ts` | One diatonic chord per measure, one note per beat |
-| Latency trim | `src/config/tuning.ts`, live in the dev panel | 0ms on top of the measured `outputLatency + baseLatency` |
+| Latency trim | measured by the timing check, kept in `localStorage`; `src/config/tuning.ts` holds the un-measured default | 0ms on top of the browser's `outputLatency + baseLatency` |
+| Streak bonus toward the second star | `src/config/tuning.ts` | 1 point per unbroken note against 10 for a Perfect — 10% of any attempt's own maximum |
 
 ---
 
 ## Known limits of this slice
 
-- **One scenario.** Rocky Ascent authors L1–4. Slots needing L5–7 are left
-  explicitly unfilled and the run ends there as a *content limit*, rather than
-  fabricating exercise data the designer has not written.
-- **One minigame class.** `ClimbMinigame` is complete; the other five are
-  named in the model and not implemented.
+- **Nothing authors L7.** The run's difficulty sequence ends on it, so a run
+  that gets that far ends as a *content limit* rather than fabricating exercise
+  data the designer has not written. The ladder is also not monotonic in note
+  count: the `_high` scenarios sit two levels above the normal ones and reuse
+  their phrase tables, so the densest material in the game is an L4.
+- **Two minigame classes.** `RepeatMinigame` and the shared `TimelineActor` are
+  built; TRAVERSE, THREE-STEP, PERFORM and BATTLE are named in the model and not
+  implemented. `ClimbMinigame`'s runtime was deleted when the actors moved onto
+  the timeline — its scenarios still declare the class, and their route data is
+  still authored and validated, but nothing reads it (DECISION-023).
+- **The actors are a draft.** They are drawn from the scenarios' own placeholder
+  art where it exists (the goat) and from canvas primitives where it does not
+  yet (the can crusher).
 - **Placeholder art is original CC0 work**, not the third-party packs the
   scenario file names — see `docs/assets/ASSET_SOURCES.md` for why and for how
   to swap them in.
