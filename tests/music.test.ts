@@ -20,10 +20,12 @@ import {
   keyShortName,
   laneOfMidi,
   lanePositionOfMidi,
+  parseKeyName,
   tonicMidi,
   type RunKey,
 } from "../src/music/keys.js";
 import { midiToName, type PitchClassIndex } from "../src/music/pitch.js";
+import { parseTempo, TEMPOS } from "../src/config/tempos.js";
 import { resolveTargets } from "../src/game/targets.js";
 import { ROCKY_ASCENT } from "../src/scenario/registry.js";
 
@@ -222,6 +224,77 @@ describe("target resolution", () => {
       if (majorish) {
         expect(intervals).toEqual(reference.map((t) => t.midi - reference[0]!.midi));
       }
+    }
+  });
+});
+
+describe("written key names", () => {
+  it("reads the flat key a link asks for", () => {
+    expect(parseKeyName("Eb")).toEqual({ tonic: 3, mode: "major" });
+    expect(parseKeyName("eb")).toEqual({ tonic: 3, mode: "major" });
+    expect(parseKeyName("Eb minor")).toEqual({ tonic: 3, mode: "minor" });
+    expect(parseKeyName("ebm")).toEqual({ tonic: 3, mode: "minor" });
+    expect(parseKeyName("eb-min")).toEqual({ tonic: 3, mode: "minor" });
+    expect(parseKeyName("EbMajor")).toEqual({ tonic: 3, mode: "major" });
+  });
+
+  it("defaults to major, as a chord chart does", () => {
+    expect(parseKeyName("G")).toEqual({ tonic: 7, mode: "major" });
+    expect(parseKeyName("F#")).toEqual({ tonic: 6, mode: "major" });
+  });
+
+  it("accepts enharmonics as the pitch class they are, and spells them its own way", () => {
+    const sharp = parseKeyName("D#")!;
+    expect(sharp).toEqual(parseKeyName("Eb"));
+    // Spelling on screen follows the key, not the request.
+    expect(keyShortName(sharp)).toBe("Eb");
+    expect(keyDisplayName(sharp)).toBe("Eb major");
+  });
+
+  it("wraps around the octave rather than falling off it", () => {
+    expect(parseKeyName("Cb")).toEqual({ tonic: 11, mode: "major" });
+    expect(parseKeyName("B#")).toEqual({ tonic: 0, mode: "major" });
+  });
+
+  it("round-trips every key it can display", () => {
+    for (const { key } of KEY_WEIGHTS) {
+      expect(parseKeyName(keyShortName(key))).toEqual(key);
+      expect(parseKeyName(keyDisplayName(key))).toEqual(key);
+    }
+  });
+
+  it("returns null for anything it cannot read", () => {
+    for (const bad of ["", "H", "Eb7", "Eb dorian", "42", "Ebbb", "minor"]) {
+      expect(parseKeyName(bad)).toBeNull();
+    }
+  });
+});
+
+describe("written tempo requests", () => {
+  it("reads an id or a display name", () => {
+    expect(parseTempo("ibex")).toBe("ibex");
+    expect(parseTempo("Markhor GOAT")).toBe("markhor-goat");
+    expect(parseTempo("markhor-goat")).toBe("markhor-goat");
+    expect(parseTempo("baby lamb")).toBe("baby-lamb");
+  });
+
+  it("reads a bpm as the tempo choice nearest it", () => {
+    expect(parseTempo("120")).toBe("ibex");
+    expect(parseTempo("100")).toBe("cashmere");
+    expect(parseTempo("300")).toBe("markhor-goat");
+    expect(parseTempo("10")).toBe("baby-lamb");
+  });
+
+  it("maps every choice's own bpm back to itself", () => {
+    for (const tempo of TEMPOS) {
+      expect(parseTempo(String(tempo.bpm))).toBe(tempo.id);
+      expect(parseTempo(tempo.id)).toBe(tempo.id);
+    }
+  });
+
+  it("returns null for anything it cannot read", () => {
+    for (const bad of ["", "presto", "-90", "fast"]) {
+      expect(parseTempo(bad)).toBeNull();
     }
   });
 });

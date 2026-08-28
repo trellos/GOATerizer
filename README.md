@@ -113,6 +113,23 @@ tables at the top of that script.
 4. Four measures, 0–3 stars. Zero stars ends the run and tells you what kind of
    lamb you are.
 
+### Setup links
+
+Two parameters set the run up before you get there. Neither is dev-only: both
+name a choice the pregame already offers by hand, so a pre-set link is a
+shortcut into normal play, not a way around it. It is what makes "the Eb one
+again" a link rather than a rerolling contest — Eb major is a weight-3 key.
+
+| Parameter | Effect |
+|---|---|
+| `?key=Eb` | Start in that key instead of a weighted random one. Written how you'd write it on a chart: `Eb`, `eb`, `Ebm`, `Eb minor`, `F#`, `Gbm`. Major when no mode is written. Enharmonics are accepted and then spelled the game's way — ask for `D#` and the readouts say `Eb` |
+| `?tempo=120` | Start at that tempo instead of Billy Goat. Takes a bpm, an id (`ibex`), or a name (`Markhor GOAT`). A bpm that isn't one of the five snaps to the nearest — the five tempos are design and high scores are tracked per tempo, so `?tempo=100` means "about there", not a sixth tempo |
+
+Both set the starting point, not a pin: Reroll still rolls a fresh random key,
+and the tempo chips still switch tempo. A value that can't be read is ignored
+with a console warning and the game starts as it would have — a typo in a link
+shouldn't refuse to start the game.
+
 ### Developer flags
 
 Dev tooling is gated behind `?dev=1` and never reachable from normal play.

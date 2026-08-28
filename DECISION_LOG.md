@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-020: `?key=` and `?tempo=` are setup links, not developer flags
+* **Date:** 2026-08-28
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** The run key is rolled from a weighted table (`config/key-weighting.ts`) and the tempo starts on Billy Goat, so practising one particular key — Eb major, weight 3 out of ~132 — means rerolling until it comes up. Every existing URL parameter in the game is gated behind `?dev=1`, which raised whether pre-setting the key and tempo belongs behind that gate too.
+* **Decision:** `?key=` and `?tempo=` are ungated. Both name a choice the pregame already offers by hand (Reroll, the tempo chips), so a pre-set link is a shortcut into normal play rather than a way around it. They set the *starting point* only: Reroll still rolls a fresh weighted-random key, the chips still switch tempo, and nothing pins the setup for the rest of the run. Parsing lives with the thing being parsed — `parseKeyName` in `music/keys.ts`, `parseTempo` in `config/tempos.ts` — and `game-app.ts` only reads the params and applies them. Key names are read as a guitarist writes them (`Eb`, `ebm`, `Eb minor`, `F#`), major when no mode is given; enharmonics are accepted and then spelled by the existing `usesFlats` convention (DECISION-018), so `?key=D#` shows `Eb`. A bpm that is not one of the five tempo choices snaps to the nearest choice. Unreadable values warn to the console and are ignored.
+* **Alternatives Considered:** (a) Gating both behind `?dev=1`. Rejected: dev flags exist for things unreachable from normal play (injected input, forced difficulty, autoplay); a key and a tempo the player can already pick are not that. (b) Honouring an arbitrary `?tempo=100` literally. Rejected: the five tempos are design (GDD §3.4) and high scores are tracked per tempo, so a sixth bpm would invent a tempo the scoreboard has no column for — snapping keeps the request meaningful without doing that. (c) Treating the params as a pin that Reroll respects. Rejected: Reroll is an explicit player action with one meaning, and a Reroll button that re-rolls the same key would be broken; the link is the starting point, the pregame is still in charge. (d) Rejecting a spelling like `D#` in a flat key. Rejected: the pitch class is unambiguous, and refusing to start over a spelling preference would be hostile to a hand-written link.
+* **Consequences:** Positive — "the Eb one again" is a shareable link, the awkward keys become practisable without grinding the reroll button, and the two parsers are unit-tested (round-tripping every key in the weight table through `keyShortName`/`keyDisplayName`) rather than living as inline string handling in the app shell. Negative — a key reached by link bypasses the weighting the distribution was tuned around, so a player who links their way to one key sees none of the variety the table exists to produce; and the enharmonic acceptance means the URL and the on-screen readout can legitimately disagree (`?key=D#` → `Eb`), which is correct notation but reads as the game ignoring the link.
+
+---
+
 #### DECISION-019: One seeded performance planner, two sinks; a tier picks its own input source
 * **Date:** 2026-08-28
 * **Status:** Accepted
