@@ -40,9 +40,9 @@ import { mod } from "../music/pitch.js";
  * The ids are also the `?autoplay=` values and the dev-button id suffixes, so
  * there is one vocabulary rather than three that have to be kept in step.
  */
-export type AutoplayMode = "perfect" | "50" | "25" | "off";
+export type AutoplayMode = "perfect" | "75" | "50" | "25" | "off";
 
-export const AUTOPLAY_MODES: readonly AutoplayMode[] = ["perfect", "50", "25", "off"];
+export const AUTOPLAY_MODES: readonly AutoplayMode[] = ["perfect", "75", "50", "25", "off"];
 
 export function parseAutoplayMode(value: string | null): AutoplayMode | null {
   return AUTOPLAY_MODES.find((mode) => mode === value) ?? null;
