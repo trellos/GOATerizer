@@ -1,12 +1,12 @@
 /**
  * Which rhythmic grid an authored phrase actually sits on.
  *
- * The drums use this to tell the player what is coming: a quarter-note pulse is
- * enough to find beat 1, but it says nothing about whether the next four
- * measures are eighths, sixteenths or triplets — and by the time the first
- * sixteenth arrives it is far too late to start counting. Signalling the grid
- * one attempt ahead is what turns "surprise, sixteenths" into "here comes the
- * sixteenth feel, get ready".
+ * The drums use this to state the feel of the minigame the player is in: a
+ * quarter-note pulse is enough to find beat 1, but it says nothing about whether
+ * the eight measures ahead are eighths, sixteenths or triplets — and by the time
+ * the first sixteenth arrives it is far too late to start counting. What comes
+ * out of here picks the rhythm variant of the beat (`audio/drum-pattern.ts`), so
+ * the whole kit subdivides the way the exercise does for as long as it lasts.
  *
  * Read off the note *positions*, not the duration names. A phrase can be
  * written in eighths and still land on the sixteenth grid (a dotted figure), and
@@ -23,8 +23,6 @@ import { DURATION_BEATS, type PromptEvent } from "../scenario/types.js";
 export type Subdivision = "eighth" | "sixteenth" | "triplet";
 
 export type SubdivisionSet = ReadonlySet<Subdivision>;
-
-export const NO_SUBDIVISIONS: SubdivisionSet = new Set<Subdivision>();
 
 /**
  * How far off a grid position a note may sit and still count as on it.
@@ -69,16 +67,4 @@ export function subdivisionsOf(prompt: readonly PromptEvent[]): SubdivisionSet {
 
   if (found.has("sixteenth")) found.add("eighth");
   return found;
-}
-
-/** The grids of several phrases at once — what the drums should be marking. */
-export function unionSubdivisions(...sets: readonly SubdivisionSet[]): SubdivisionSet {
-  const union = new Set<Subdivision>();
-  for (const set of sets) for (const entry of set) union.add(entry);
-  return union;
-}
-
-/** Stable id for a set, so a caller can tell "changed" from "same" cheaply. */
-export function subdivisionKey(set: SubdivisionSet): string {
-  return (["eighth", "sixteenth", "triplet"] as const).filter((entry) => set.has(entry)).join("+");
 }

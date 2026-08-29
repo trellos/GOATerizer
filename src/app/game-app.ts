@@ -24,7 +24,7 @@
 import { AudioEngine } from "../audio/audio-engine.js";
 import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
-import { drumPatternFor } from "../audio/drum-pattern.js";
+import { BACKBEAT_PATTERN, drumPatternForAttempt } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { BackingDuck } from "../game/backing-duck.js";
 import { Transport } from "../audio/transport.js";
@@ -52,7 +52,6 @@ import {
 } from "../config/tuning.js";
 import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
-import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
 import {
   CALIBRATION_BPM,
   CalibrationSession,
@@ -194,8 +193,8 @@ export class GameApp {
   readonly #duck = new BackingDuck();
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
-  /** Which subdivision grid the kit is currently marking. See `#refreshDrumGrid`. */
-  #drumGridKey = "";
+  /** Which beat the kit is currently playing. See `#refreshDrumBeat`. */
+  #drumPatternId = "";
 
   /* Input ------------------------------------------------------------ */
   #provider: GuitarInputProvider | null = null;
@@ -622,6 +621,12 @@ export class GameApp {
     if (context && master && !this.#drums) {
       this.#drums = new DrumPlayer(context, this.#transport, master);
     }
+    // Pregame has no attempt, so this lands on the bare pulse — which is what a
+    // fresh `DrumPlayer` plays anyway. Stated rather than left implicit so the
+    // recorded pattern id matches what is actually sounding: the id is the
+    // guard `#refreshDrumBeat` uses, and one that disagrees with the kit would
+    // skip the first real beat change of a run.
+    this.#refreshDrumBeat();
     this.#regenerateBass();
     this.#bass?.start();
     this.#drums?.start();
@@ -930,7 +935,7 @@ export class GameApp {
     }
     // No bass. It is a musical loop, and a player will phrase against it.
     this.#bass?.stop();
-    this.#refreshDrumGrid();
+    this.#refreshDrumBeat();
     this.#drums?.start();
 
     this.#calibration = null;
@@ -1192,6 +1197,7 @@ export class GameApp {
     const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
     this.#resetDuck();
+    this.#refreshDrumBeat();
     this.#queueNextAttempt();
     this.#updateHud();
     this.#showScreen("game");
@@ -1225,35 +1231,38 @@ export class GameApp {
     const current = this.#current;
     if (!run || !current) {
       this.#next = null;
-      this.#refreshDrumGrid();
       return;
     }
     this.#next = this.#createAttempt(run.nextSlot, current.runtime.endBeat + TRANSITION_BEATS);
-    this.#refreshDrumGrid();
   }
 
   /**
-   * Points the kit at the rhythmic grid of what is being played *and* what is
-   * coming next.
+   * Points the kit at the beat of the minigame being played.
    *
-   * The union of the two is what makes the signal useful: a sixteenth run
-   * announces itself during the attempt before it, and — because that attempt
-   * then becomes the current one — the marking carries on underneath it rather
-   * than stopping at the moment it is needed most.
+   * One beat per minigame, chosen from its difficulty and the feel of its own
+   * notes (`audio/drum-pattern.ts`). Deliberately *only* the current attempt:
+   * this used to mark the union of the current and next attempt's grids so a
+   * sixteenth run announced itself a minigame early, and that look-ahead is
+   * gone — the beat now describes the exercise in hand rather than trailing the
+   * next one, which is also why this is called where `#current` changes and no
+   * longer from `#queueNextAttempt`.
    *
-   * Guarded on the resulting key: `setPattern` re-schedules the queued tail, so
-   * calling it when nothing changed would restate the kit every transition.
+   * With no attempt — pregame, the timing check, the end of a run — the bare
+   * pulse plays, which is the same four-beat skeleton every rung is built on.
+   *
+   * Guarded on the pattern's id: `setPattern` throws away and re-schedules the
+   * queued tail, so calling it when the beat has not actually changed would
+   * restate the kit at every transition.
    */
-  #refreshDrumGrid(): void {
-    const grids = [this.#current, this.#next]
-      .filter((attempt): attempt is ActiveAttempt => attempt !== null)
-      .map((attempt) => subdivisionsOf(attempt.runtime.level.prompt));
-    const combined = unionSubdivisions(...grids);
-    const key = subdivisionKey(combined);
-    if (key === this.#drumGridKey) return;
+  #refreshDrumBeat(): void {
+    const attempt = this.#current;
+    const pattern = attempt
+      ? drumPatternForAttempt(attempt.runtime.difficulty, attempt.runtime.level.prompt)
+      : BACKBEAT_PATTERN;
+    if (pattern.id === this.#drumPatternId) return;
 
-    this.#drumGridKey = key;
-    this.#drums?.setPattern(drumPatternFor(combined));
+    this.#drumPatternId = pattern.id;
+    this.#drums?.setPattern(pattern);
   }
 
   #onAttemptEvent(attempt: ActiveAttempt, event: AttemptEvent): void {
@@ -1346,6 +1355,7 @@ export class GameApp {
     // duck across would tell the player something untrue about the notes in
     // front of them.
     this.#resetDuck();
+    this.#refreshDrumBeat();
     this.#timeline.removeTargets(attempt.timelineKey);
     if (!this.#current) {
       this.#finishRun("content-limit");
@@ -1422,7 +1432,7 @@ export class GameApp {
     // never be judged, and would play over the results screen.
     this.#cancelAutoplay();
     // Back to the bare pulse: there is no upcoming phrase to warn about.
-    this.#refreshDrumGrid();
+    this.#refreshDrumBeat();
 
     const summary = run.summary;
     const tempo = tempoById(this.#setup.tempoId);
@@ -1725,6 +1735,11 @@ export class GameApp {
       stars: attempt ? String(attempt.starMeter.stars) : "—",
       // One readout per class, so the panel says "—" for the one this scenario
       // is not rather than quietly reporting a zero that means nothing.
+      // Which beat is playing and how far the bass has stepped back: both are
+      // things you can hear but not see, so the panel is where you check that
+      // what you are hearing is what the code thinks it is playing.
+      "drum beat": this.#drumPatternId || "—",
+      "bass duck": `${this.#duck.gain.toFixed(2)} (${this.#duck.misses} missed)`,
       "cans crushed/missed": attempt?.repeat
         ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.uncrushed}`
         : "—",
