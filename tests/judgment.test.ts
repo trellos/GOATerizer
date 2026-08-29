@@ -238,6 +238,125 @@ describe("wrong notes", () => {
   });
 });
 
+/**
+ * Note endings.
+ *
+ * The judge reports a release that lands near where the target ends, and does
+ * nothing else with it. These tests are as much about what a release must *not*
+ * do — resolve, re-resolve or re-score anything — as about when it fires, since
+ * that is the property the score and the star thresholds depend on.
+ */
+describe("releases", () => {
+  // L1 is quarter notes: duration 1 beat, Good window +-0.5 either side of the
+  // target's start, and therefore also of its end.
+  const end = (target: ResolvedTarget) => target.startBeat + target.durationBeats;
+
+  it("reports a note let go where the target ends", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target));
+
+    expect(harness.types()).toEqual(["PerfectNote", "TargetResolved", "NoteReleasedOnTime"]);
+    const released = harness.events[2];
+    expect(released?.type === "NoteReleasedOnTime" && released.beatDelta).toBe(0);
+    expect(released?.type === "NoteReleasedOnTime" && released.target.opportunityIndex).toBe(2);
+  });
+
+  it("signs the delta so an early release is negative", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target) - 0.3);
+    const released = harness.events.find((event) => event.type === "NoteReleasedOnTime");
+    expect(released?.type === "NoteReleasedOnTime" && released.beatDelta).toBeCloseTo(-0.3, 9);
+  });
+
+  it("accepts anything inside the target's own Good window of the end", () => {
+    const targets = levelTargets(1);
+    for (const offset of [-0.45, -0.2, 0, 0.2, 0.45]) {
+      const target = targets[2]!;
+      const harness = makeJudge(levelTargets(1));
+      const id = harness.play(target.midi, target.startBeat);
+      harness.judge.release(id, end(target) + offset);
+      expect(harness.types()).toContain("NoteReleasedOnTime");
+    }
+  });
+
+  it("says nothing about a note dropped or held far past the end", () => {
+    const targets = levelTargets(1);
+    for (const offset of [-0.75, 0.75]) {
+      const target = targets[2]!;
+      const harness = makeJudge(levelTargets(1));
+      const id = harness.play(target.midi, target.startBeat);
+      harness.judge.release(id, end(target) + offset);
+      expect(harness.types()).not.toContain("NoteReleasedOnTime");
+    }
+  });
+
+  it("says nothing about letting go of a wrong note", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    // A semitone off: judged wrong, resolves nothing, so there is no target
+    // whose end it could be released on time against.
+    const id = harness.play(target.midi + 1, target.startBeat);
+    harness.judge.release(id, end(target));
+    expect(harness.types()).toEqual(["WrongNote"]);
+  });
+
+  it("says nothing about a release for a note it never saw attacked", () => {
+    const harness = makeJudge(levelTargets(1));
+    harness.judge.release("never-attacked", 1);
+    expect(harness.types()).toEqual([]);
+  });
+
+  it("reports at most one release per played note", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target));
+    harness.judge.release(id, end(target));
+    harness.judge.release(id, end(target) + 5); // and not by taking another branch
+    expect(harness.events.filter((event) => event.type === "NoteReleasedOnTime")).toHaveLength(1);
+  });
+
+  it("never resolves, re-resolves or reopens a target", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[2]!;
+    const id = harness.play(target.midi, target.startBeat);
+    const openBefore = harness.judge.openTargetCount;
+
+    harness.judge.release(id, end(target));
+
+    expect(harness.judge.openTargetCount).toBe(openBefore);
+    expect(harness.judge.outcomes[2]).toBe("perfect");
+    expect(harness.events.filter((event) => event.type === "TargetResolved")).toHaveLength(1);
+  });
+
+  it("cannot be earned by letting go of a note whose target was missed", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[2]!;
+    // Right pitch, far too late: judged a wrong note, and its target expires.
+    harness.judge.tick(target.startBeat + 0.6);
+    const id = harness.play(target.midi, target.startBeat + 0.7);
+    harness.judge.release(id, end(target));
+    expect(harness.types()).not.toContain("NoteReleasedOnTime");
+  });
+
+  it("scores nothing", () => {
+    const target = levelTargets(1)[2]!;
+    const score = new AttemptScore({ streakBonusEligible: true });
+    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 });
+    const before = score.snapshot;
+
+    score.apply({ type: "NoteReleasedOnTime", target, attackId: "a", beatDelta: 0 });
+    expect(score.snapshot).toEqual(before);
+    expect(score.judgmentPoints).toBe(before.judgmentPoints);
+  });
+});
+
 describe("dense subdivisions stay unambiguous", () => {
   it("assigns each eighth-note attack to its own target at L4", () => {
     const targets = levelTargets(4);

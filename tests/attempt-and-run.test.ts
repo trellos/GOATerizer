@@ -59,10 +59,16 @@ function harness(difficulty: number, startBeat = 20) {
   const playAt = (midi: number, attemptBeat: number, offsetBeats = 0) => {
     const at = (startBeat + attemptBeat + offsetBeats) * SECONDS_PER_BEAT;
     clock.time = Math.max(clock.time, at);
-    provider.attack(midi, at);
+    return provider.attack(midi, at);
   };
 
-  return { attempt, provider, events, advanceTo, playAt, clock };
+  const releaseAt = (id: string, attemptBeat: number) => {
+    const at = (startBeat + attemptBeat) * SECONDS_PER_BEAT;
+    clock.time = Math.max(clock.time, at);
+    provider.release(id, at);
+  };
+
+  return { attempt, provider, events, advanceTo, playAt, releaseAt, clock };
 }
 
 /** Plays a whole level perfectly, note by note, advancing the clock as it goes. */
@@ -100,6 +106,30 @@ describe("a whole attempt", () => {
     });
     expect(result.score).toBeGreaterThan(0);
     expect(result.judgmentPoints).toBe(ROCKY_ASCENT.levels.get(1)!.stars.star3Threshold);
+  });
+
+  it("is worth exactly the same when every note is also released on time", () => {
+    // The load-bearing invariant behind `NoteReleasedOnTime`. A release feeds
+    // the backing-track duck and nothing else, and this is the assertion that
+    // says so where it actually matters: authored star thresholds are
+    // denominated in judgment points against a maximum of
+    // `noteOpportunityCount * JUDGMENT_POINTS.perfect`, so if a clean release
+    // were ever worth a single point, ★★★ would become reachable on a
+    // performance that was not flawless — and it would happen by a different
+    // amount on every scenario, depending on how sustained its material is.
+    const h = harness(1);
+    for (const target of h.attempt.targets) {
+      h.advanceTo(target.startBeat);
+      const id = h.playAt(target.midi, target.startBeat);
+      h.advanceTo(target.startBeat + 0.001);
+      h.releaseAt(id, target.startBeat + target.durationBeats);
+    }
+    h.advanceTo(ATTEMPT_BEATS);
+    const withReleases = h.attempt.result!;
+    const withoutReleases = playFlawlessly(1).result;
+
+    expect(withReleases.judgmentPoints).toBe(ROCKY_ASCENT.levels.get(1)!.stars.star3Threshold);
+    expect(withReleases).toEqual(withoutReleases);
   });
 
   it.each([1, 2, 3, 4])("can be three-starred at L%i", (difficulty) => {

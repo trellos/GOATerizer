@@ -13,6 +13,11 @@
  *   - **Reroll.** A new key and a new line adopt the transport's current phase.
  *   - **Tempo change.** The transport re-anchors at the same beat, so only the
  *     already-scheduled tail is wrong; it is cancelled and re-scheduled.
+ *
+ * A third thing it survives without restarting is being ducked mid-phrase — see
+ * {@link BassPlayer.setDuck}. The line keeps playing exactly as scheduled; only
+ * the master level moves, so the bass never loses its place because the player
+ * did.
  */
 
 import type { BassLine } from "./bass-line.js";
@@ -22,6 +27,28 @@ import type { Transport } from "./transport.js";
 
 const TICK_MS = 25;
 const LOOKAHEAD_S = 0.15;
+
+/**
+ * The bass's own level, before anything ducks it.
+ *
+ * Subordinate by design: the bass is context, not a second target track. This
+ * is the one place that decision lives — {@link BassPlayer.setDuck} scales this
+ * number rather than replacing it, so tuning "how loud is the bass" stays a
+ * one-line edit here and does not have to be reconciled with whatever the duck
+ * happens to be doing at the time.
+ */
+const BASE_OUTPUT_GAIN = 0.34;
+
+/**
+ * How long the duck takes to move to a new level, in seconds.
+ *
+ * Stepping a gain node's value is an instantaneous discontinuity in the
+ * waveform, which is a click — and it would land on exactly the beat the player
+ * just missed, so the game would answer every mistake with a pop. Long enough
+ * to be inaudible as an edge, short enough that the drop still reads as a
+ * response to *that* note rather than as a slow fade.
+ */
+const DUCK_RAMP_SECONDS = 0.04;
 
 type ScheduledVoice = {
   startTime: number;
@@ -37,18 +64,53 @@ export class BassPlayer {
   #timer: ReturnType<typeof setInterval> | null = null;
   #scheduledThroughBeat = 0;
   #voices: ScheduledVoice[] = [];
+  #duck = 1;
 
   constructor(context: AudioContext, transport: Transport, destination: AudioNode) {
     this.#context = context;
     this.#transport = transport;
     this.#output = context.createGain();
-    // Subordinate by design: the bass is context, not a second target track.
-    this.#output.gain.value = 0.34;
+    this.#output.gain.value = BASE_OUTPUT_GAIN;
     this.#output.connect(destination);
   }
 
   get line(): BassLine | null {
     return this.#line;
+  }
+
+  /** The duck multiplier currently applied, in 0..1. */
+  get duck(): number {
+    return this.#duck;
+  }
+
+  /**
+   * Scales the bass's own level by `multiplier`, ramped rather than stepped.
+   *
+   * The multiplier comes from `game/backing-duck.ts`, which decides *how much*
+   * the band should get out of the player's way. This method only knows how to
+   * do it without clicking, and deliberately does not know why: 1 is the bass
+   * playing at the level it was designed to sit at, and everything below that is
+   * somebody else's judgment about the performance.
+   *
+   * It multiplies {@link BASE_OUTPUT_GAIN} rather than assigning an absolute
+   * gain, so the duck cannot silently become the place the bass's level is
+   * decided. Repeats of the value already in force are dropped, so a caller can
+   * push the duck's current gain after every judgment event without stacking a
+   * ramp per note.
+   */
+  setDuck(multiplier: number): void {
+    const next = Math.min(1, Math.max(0, multiplier));
+    if (next === this.#duck) return;
+    this.#duck = next;
+
+    const now = this.#context.currentTime;
+    const gain = this.#output.gain;
+    // Anchor at where the ramp has actually got to before starting a new one,
+    // or an interrupted ramp restarts from wherever the last one was *aiming*
+    // and jumps. Four misses in quick succession is exactly that case.
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(BASE_OUTPUT_GAIN * next, now + DUCK_RAMP_SECONDS);
   }
 
   /**

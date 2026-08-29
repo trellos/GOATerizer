@@ -198,10 +198,14 @@ export class AttemptRuntime {
   /**
    * Normalised guitar input.
    *
-   * Only attacks and revisions reach judgment. Sustain updates carry bend data
-   * that no Rocky Ascent target asks about, and releases matter to duration
-   * grading, which this scenario does not use — both are forwarded to nothing
-   * rather than being turned into extra played notes.
+   * Attacks, revisions and releases reach judgment. Sustain updates carry bend
+   * data that no Rocky Ascent target asks about and are forwarded to nothing.
+   *
+   * Releases used to be dropped here on the grounds that nothing graded note
+   * duration. Something does now — not duration grading, but the backing-track
+   * duck (`game/backing-duck.ts`), which treats letting a note go at the right
+   * moment as evidence that the player is on top of the phrase. A release still
+   * cannot resolve, re-resolve or re-score a target; see `judgment.ts`.
    */
   handleGuitarEvent(event: GuitarInputEvent): void {
     if (this.#complete) return;
@@ -211,6 +215,9 @@ export class AttemptRuntime {
         break;
       case "retune":
         this.judge.retune(event.id, event.midi);
+        break;
+      case "release":
+        this.judge.release(event.id, this.toAttemptBeat(this.#toBeat(event.contextTime)));
         break;
       default:
         break;
@@ -291,6 +298,12 @@ export class AttemptRuntime {
         // was and keeps travelling with the bar it arrived in.
         repeat.miss(judgment.target.lane, judgment.target.startBeat);
         break;
+      case "NoteReleasedOnTime":
+        // Explicitly nothing. The can for this note was already placed when the
+        // attack was judged, and the crusher gets exactly one swing per note
+        // opportunity; a second event for the same note must not put a second
+        // can on the belt. The release only feeds the backing-track duck.
+        break;
       default:
         break;
     }
@@ -314,6 +327,12 @@ export class AttemptRuntime {
         break;
       case "WrongNote":
         this.actor.fall(judgment.atBeat);
+        break;
+      case "NoteReleasedOnTime":
+        // Explicitly nothing. The actor already landed on this target's lane
+        // when the attack was judged, and it moves once per note opportunity —
+        // a release must not advance the goat a second time, which would let a
+        // sustained note carry it further than the phrase does.
         break;
       default:
         break;

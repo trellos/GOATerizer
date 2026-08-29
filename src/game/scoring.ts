@@ -114,6 +114,24 @@ export class AttemptScore {
         this.#score += SCORE_VALUES.wrongNote;
         if (this.#wrongBreaksStreak) this.#streak = 0;
         break;
+      case "NoteReleasedOnTime":
+        /*
+         * Explicitly worth nothing, and this case exists to say so out loud
+         * rather than let a `default` decide it by accident.
+         *
+         * A release is a second event about a note that has already been scored
+         * at its attack, so any value here would be paid twice for one note.
+         * Judgment points are the units authored star thresholds are written in
+         * (`config/tuning.ts`), and ★★★ is authored at exactly
+         * `noteOpportunityCount * JUDGMENT_POINTS.perfect` — so a single point
+         * here would not just inflate the score, it would make three stars
+         * reachable on a performance that is not flawless, and would do it
+         * differently on every scenario depending on how sustained its material
+         * happens to be. It would break the streak counters for the same
+         * reason. What a clean release actually feeds is the backing-track duck
+         * in `game/backing-duck.ts`, which is not a scoring system.
+         */
+        break;
       default:
         break;
     }

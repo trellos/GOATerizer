@@ -26,6 +26,7 @@ import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
 import { drumPatternFor } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
+import { BackingDuck } from "../game/backing-duck.js";
 import { Transport } from "../audio/transport.js";
 import {
   planAutoPerformance,
@@ -185,6 +186,12 @@ export class GameApp {
   readonly #audio = new AudioEngine();
   readonly #transport = new Transport(() => this.#audio.now());
   #bass: BassPlayer | null = null;
+  /**
+   * How far the backing has stepped out of the player's way. See
+   * `game/backing-duck.ts`: it is reset per attempt, so one object outlives
+   * every attempt rather than being rebuilt with each.
+   */
+  readonly #duck = new BackingDuck();
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
   /** Which subdivision grid the kit is currently marking. See `#refreshDrumGrid`. */
@@ -1184,6 +1191,7 @@ export class GameApp {
     // is the one the constant names however much latency their rig has.
     const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
+    this.#resetDuck();
     this.#queueNextAttempt();
     this.#updateHud();
     this.#showScreen("game");
@@ -1252,6 +1260,12 @@ export class GameApp {
     switch (event.type) {
       case "judgment": {
         const judgment = event.judgment;
+        // The backing bass steps back when the player is missing and comes
+        // back as they recover. Applied for every judgment rather than only
+        // the ones that move the ladder: `apply` returns the gain in force
+        // either way, and `setDuck` ignores a value it is already at, so this
+        // needs no branching and cannot drift out of step with the ladder.
+        this.#bass?.setDuck(this.#duck.apply(judgment));
         if (judgment.type === "PerfectNote" || judgment.type === "GoodNote") {
           // Calibration samples come from a human and a real guitar only.
           // Autoplay -- discrete or synthetic -- schedules its attacks at the
@@ -1328,12 +1342,22 @@ export class GameApp {
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
+    // A new minigame starts on a full band. Carrying the previous attempt's
+    // duck across would tell the player something untrue about the notes in
+    // front of them.
+    this.#resetDuck();
     this.#timeline.removeTargets(attempt.timelineKey);
     if (!this.#current) {
       this.#finishRun("content-limit");
       return;
     }
     this.#queueNextAttempt();
+  }
+
+  /** Full band again: the ladder and the gain it drives, together. */
+  #resetDuck(): void {
+    this.#duck.reset();
+    this.#bass?.setDuck(1);
   }
 
   #flyStarsToHistory(ordinal: number, stars: number): void {
