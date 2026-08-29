@@ -100,9 +100,14 @@ export type DrumPattern = {
  * Not a set: a level tests triplets *or* sixteenths, never both (see
  * {@link rhythmVariantFor}), so the kit commits to one feel and stays in it.
  */
-export type RhythmVariant = "straight" | "sixteenth" | "triplet";
+export type RhythmVariant = "quarters" | "eighth" | "sixteenth" | "triplet";
 
-export const RHYTHM_VARIANTS: readonly RhythmVariant[] = ["straight", "sixteenth", "triplet"];
+export const RHYTHM_VARIANTS: readonly RhythmVariant[] = [
+  "quarters",
+  "eighth",
+  "sixteenth",
+  "triplet",
+];
 
 /** The difficulty range the ladder covers, matching `DIFFICULTY_SEQUENCE`. */
 export const MIN_INTENSITY = 1;
@@ -139,7 +144,8 @@ export function rhythmVariantFor(prompt: readonly PromptEvent[]): RhythmVariant 
   const grids = subdivisionsOf(prompt);
   if (grids.has("triplet")) return "triplet";
   if (grids.has("sixteenth")) return "sixteenth";
-  return "straight";
+  if (grids.has("eighth")) return "eighth";
+  return "quarters";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -168,7 +174,11 @@ type OrnamentSlot = {
  * it is what makes a shuffle feel like a shuffle rather than a stumble.
  */
 const ORNAMENT_GRIDS: Readonly<Record<RhythmVariant, readonly OrnamentSlot[]>> = {
-  straight: [{ offset: 0.5, voice: "hat", level: 1 }],
+  // Nothing between the beats. Quarter-note material gets a quarter-note kit,
+  // because a subdivision the exercise does not contain is not information —
+  // it is the drummer counting something the player is not playing.
+  quarters: [],
+  eighth: [{ offset: 0.5, voice: "hat", level: 1 }],
   sixteenth: [
     { offset: 0.25, voice: "tick", level: 0.62 },
     { offset: 0.5, voice: "hat", level: 0.95 },
@@ -397,7 +407,12 @@ function level(value: number): number {
 
 function buildPattern(id: string, spec: IntensitySpec, variant: RhythmVariant): DrumPattern {
   const slots = ORNAMENT_GRIDS[variant];
-  const pickup = slots[slots.length - 1];
+  // Where a pickup or a ghost lands: the last slot of the variant's own grid,
+  // so the lead-in states the feel too. `quarters` ornaments nothing but still
+  // needs somewhere to put one, and the `and` is the only place a pickup can
+  // go in music that has no smaller division — otherwise the upper rungs would
+  // silently lose their pickups on quarter-note material.
+  const pickupOffset = slots[slots.length - 1]?.offset ?? 0.5;
   const pulseGain = Math.max(spec.gain, PULSE_FLOOR);
   const hits: DrumHit[] = [];
 
@@ -426,8 +441,9 @@ function buildPattern(id: string, spec: IntensitySpec, variant: RhythmVariant): 
       // landing on top of a kick. It is placed on the variant's own grid, which
       // means the fill states the feel of the exercise as loudly as anything
       // else in the pattern does.
-      slots.forEach((slot, index) => {
-        const last = index === slots.length - 1;
+      const fillSlots = slots.length > 0 ? slots : [{ offset: 0.5 }];
+      fillSlots.forEach((slot, index) => {
+        const last = index === fillSlots.length - 1;
         const voice: DrumVoice = last ? "floor" : "tom";
         const base = last ? VOICE_LEVELS.floor : VOICE_LEVELS.tom;
         add(beat + slot.offset, voice, base * spec.gain);
@@ -441,11 +457,11 @@ function buildPattern(id: string, spec: IntensitySpec, variant: RhythmVariant): 
       }
     }
 
-    if (pickup && spec.kickPickups.includes(beat)) {
-      add(beat + pickup.offset, "kick", VOICE_LEVELS.kickPickup * spec.gain);
+    if (spec.kickPickups.includes(beat)) {
+      add(beat + pickupOffset, "kick", VOICE_LEVELS.kickPickup * spec.gain);
     }
-    if (pickup && spec.ghostSnares.includes(beat)) {
-      add(beat + pickup.offset, "snare", VOICE_LEVELS.ghostSnare * spec.gain);
+    if (spec.ghostSnares.includes(beat)) {
+      add(beat + pickupOffset, "snare", VOICE_LEVELS.ghostSnare * spec.gain);
     }
   }
 
@@ -501,4 +517,4 @@ export function drumPatternForAttempt(
 }
 
 /** The pulse on its own: pregame, the timing check, and after a run ends. */
-export const BACKBEAT_PATTERN: DrumPattern = buildPattern("pulse", PULSE_SPEC, "straight");
+export const BACKBEAT_PATTERN: DrumPattern = buildPattern("pulse", PULSE_SPEC, "quarters");

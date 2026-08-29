@@ -219,12 +219,27 @@ const MASTER_TAP = () => {
       highpass.type = "highpass";
       highpass.frequency.value = 800;
       const small = this.createAnalyser();
+      // A third meter, band-limited to roughly 1-5 kHz.
+      //
+      // The 800 Hz high-pass above passes everything up to Nyquist, which turns
+      // out not to be the question: a hi-hat living entirely above 7 kHz reads
+      // as strong energy there and is still barely audible on a laptop, because
+      // small speakers roll off at the *top* as well as the bottom. This is the
+      // band they are honest in, and it is what "the kit is audible" has to
+      // mean if the check is going to catch a thin one.
+      const band = this.createBiquadFilter();
+      band.type = "bandpass";
+      band.frequency.value = 2200;
+      band.Q.value = 0.5;
+      const midAnalyser = this.createAnalyser();
       tap.connect(realDestination);
       tap.connect(full);
       tap.connect(highpass);
       highpass.connect(small);
+      tap.connect(band);
+      band.connect(midAnalyser);
       Object.defineProperty(this, "destination", { get: () => tap });
-      window.__masterTap = { full, small };
+      window.__masterTap = { full, small, mid: midAnalyser };
     }
   };
 };
@@ -236,14 +251,20 @@ async function measureOutput(page, ms) {
     if (!taps) return null;
     const bufFull = new Float32Array(taps.full.fftSize);
     const bufSmall = new Float32Array(taps.small.fftSize);
-    const peaks = { full: 0, small: 0 };
+    const bufMid = new Float32Array(taps.mid.fftSize);
+    const peaks = { full: 0, small: 0, mid: 0 };
     const series = [];
+    const seriesMid = [];
     const started = performance.now();
     while (performance.now() - started < windowMs) {
       taps.full.getFloatTimeDomainData(bufFull);
       taps.small.getFloatTimeDomainData(bufSmall);
+      taps.mid.getFloatTimeDomainData(bufMid);
       let pf = 0;
       let ps = 0;
+      let pm = 0;
+      for (let i = 0; i < bufMid.length; i += 1) pm = Math.max(pm, Math.abs(bufMid[i]));
+      peaks.mid = Math.max(peaks.mid, pm);
       for (let i = 0; i < bufFull.length; i += 1) {
         pf = Math.max(pf, Math.abs(bufFull[i]));
         ps = Math.max(ps, Math.abs(bufSmall[i]));
@@ -251,13 +272,23 @@ async function measureOutput(page, ms) {
       peaks.full = Math.max(peaks.full, pf);
       peaks.small = Math.max(peaks.small, ps);
       series.push(ps);
+      seriesMid.push(pm);
       await new Promise((resolve) => setTimeout(resolve, 16));
     }
-    const onsets = series.filter((v, i) => i > 0 && v > 0.05 && series[i - 1] <= 0.05).length;
+    const count = (arr, threshold) =>
+      arr.filter((v, i) => i > 0 && v > threshold && arr[i - 1] <= threshold).length;
+    const onsets = count(series, 0.05);
+    // Counted in the band a small speaker reproduces, not in everything above
+    // 800 Hz. This is what makes "the eighths are marked" an audibility claim
+    // as well as a timing one: a subdivision hit that exists only above 7 kHz
+    // is scheduled, sounds, and never crosses this line.
+    const onsetsSmallSpeaker = count(seriesMid, 0.05);
     return {
       peakFull: peaks.full,
       peakAudible: peaks.small,
+      peakSmallSpeaker: peaks.mid,
       onsetsPerSecond: onsets / (windowMs / 1000),
+      onsetsPerSecondSmallSpeaker: onsetsSmallSpeaker / (windowMs / 1000),
     };
   }, ms);
 }
@@ -597,6 +628,10 @@ try {
     await crush.click("#start-play");
     await crush.waitForTimeout(1500);
     await crush.click("#pregame-play");
+    // The readout is written on the next frame, so reading it in the same turn
+    // as the click is a race — one that stayed hidden until the suite grew
+    // enough pages to be slower than it.
+    await crush.waitForTimeout(300);
 
     check("the repeat scenario fills a slot", (await dev(crush, "scenario")) === "Can Crushing L2");
     await crush.click("#dev-autoplay-perfect");
@@ -680,6 +715,59 @@ try {
     );
     if (wantsApply) await shotWithoutDevPanel(cal, "09-timing-check.png");
     await cal.close();
+  }
+
+  /* ==================================================================== */
+  /* Part 1d — the beat states the feel of the minigame being played      */
+  /* ==================================================================== */
+
+  // The gap this closes. The pulse measurement above happens in *pregame*,
+  // which always plays the bare quarter-note pattern, so it reported "one
+  // transient per beat" no matter what the kit did once a run started. The
+  // subdivision layer was scheduled, sounded, and never measured — and when it
+  // turned out to be inaudible on a real speaker, nothing failed.
+  //
+  // So this measures a minigame. Rocky Ascent L1 is quarter notes and L4 has
+  // eighths in it, and the kit is supposed to say so: one transient per beat
+  // under the first, two under the second.
+  {
+    for (const [level, perBeat, what] of [
+      [1, 1, "quarter-note material gets a quarter-note beat"],
+      [4, 2, "material with eighths in it gets the eighths marked"],
+    ]) {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+      await page.addInitScript(MASTER_TAP);
+      await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent&level=${level}`, {
+        waitUntil: "networkidle",
+      });
+      await page.click("#start-play");
+      await page.waitForTimeout(1200);
+      await page.click("#pregame-play");
+      await page.waitForTimeout(2500);
+
+      const bpm = Number(await dev(page, "bpm"));
+      const beatsPerSecond = bpm / 60;
+      const heard = await measureOutput(page, 4000);
+      const expected = beatsPerSecond * perBeat;
+      check(
+        `L${level}: ${what}`,
+        heard !== null &&
+          Math.abs(heard.onsetsPerSecondSmallSpeaker - expected) < expected * 0.3,
+        `${heard?.onsetsPerSecondSmallSpeaker.toFixed(2)}/s in the 1-5kHz band ` +
+          `against ${expected.toFixed(2)} expected at ${bpm}bpm`
+      );
+      check(
+        `L${level}: and the kit is audible on a small speaker while it does it`,
+        heard !== null && heard.peakSmallSpeaker > 0.2,
+        `peak in the 1-5kHz band ${heard?.peakSmallSpeaker.toFixed(3)}`
+      );
+      check(
+        `L${level}: without the mix clipping`,
+        heard !== null && heard.peakFull < 1,
+        `peak ${heard?.peakFull.toFixed(3)}`
+      );
+      await page.close();
+    }
   }
 
   /* ==================================================================== */

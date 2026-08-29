@@ -245,7 +245,21 @@ export class DrumPlayer {
 
   /** Very short high-passed noise. Marks the eighths without masking anything. */
   #hat(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.045, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
+    // Two bursts, and the lower one is the point.
+    //
+    // This was a single 7 kHz burst at 0.4, which is what a hi-hat looks like
+    // on a spectrum and not what one sounds like on a laptop. Small speakers
+    // roll off hard at the top as well as the bottom, so a hat living entirely
+    // above 7 kHz measures present and is heard as a faint shimmer — playtest
+    // feedback was that the drums were "not obvious" and that nothing was
+    // arriving between the beats, when in fact every one of those hits was
+    // being scheduled and sounded.
+    //
+    // The body at 3.2 kHz is what carries it; the bright burst on top is what
+    // still makes it a hat rather than a click. Together they are audible in
+    // the band every speaker actually reproduces.
+    this.#noiseBurst(at, 0.05, velocity * 0.55, { type: "bandpass", frequency: 3200, Q: 0.7 });
+    this.#noiseBurst(at, 0.035, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
   }
 
   /**
@@ -256,7 +270,13 @@ export class DrumPlayer {
    * being clearly a *different* sound — separated by timbre, not volume.
    */
   #sixteenthTick(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.022, velocity * 0.16, { type: "highpass", frequency: 11000, Q: 0.7 });
+    // Centred at 6 kHz rather than high-passed at 11 kHz. The old placement was
+    // above where most laptop and phone speakers reproduce anything at all, so
+    // the sixteenth grid — the one feel a player most needs warning of — was
+    // the least audible thing in the kit. It stays shorter and brighter than
+    // the hat, which is what separates the two by timbre; it is no longer
+    // separated from it by being inaudible.
+    this.#noiseBurst(at, 0.022, velocity * 0.42, { type: "bandpass", frequency: 6000, Q: 0.6 });
   }
 
   /**

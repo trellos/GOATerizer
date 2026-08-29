@@ -75,17 +75,17 @@ function beatsOf(pattern: DrumPattern, voice: string): number[] {
 }
 
 describe("choosing the rhythm variant from the notes", () => {
-  it("plays the default beat when the phrase only lands on beats", () => {
-    expect(rhythmVariantFor(prompt([0, "quarter", 1], [1, "half", 2]))).toBe("straight");
+  it("plays a quarter-note beat when the phrase only lands on beats", () => {
+    // Nothing between the beats, because the exercise has nothing between the
+    // beats. A subdivision the material does not contain is the drummer
+    // counting something the player is not playing.
+    expect(rhythmVariantFor(prompt([0, "quarter", 1], [1, "half", 2]))).toBe("quarters");
   });
 
-  it("does not let eighths alone select a variant", () => {
-    // Every straight pattern already subdivides in eighths, so an eighth phrase
-    // is exactly what "straight" describes. The two named variants are reserved
-    // for the feels that are genuinely hard to count.
+  it("marks the eighths when the phrase has eighths in it", () => {
     const eighths = prompt([0, "eighth", 0.5], [0.5, "eighth", 0.5]);
     expect(subdivisionsOf(eighths).has("eighth")).toBe(true);
-    expect(rhythmVariantFor(eighths)).toBe("straight");
+    expect(rhythmVariantFor(eighths)).toBe("eighth");
   });
 
   it("selects the sixteenth variant from a single sixteenth", () => {
@@ -103,7 +103,7 @@ describe("choosing the rhythm variant from the notes", () => {
   it("ignores rests, which are not note opportunities", () => {
     const events = prompt([0, "quarter", 1]);
     events.push({ ...events[0]!, index: 1, type: "rest", startBeat: 0.25, degree: null });
-    expect(rhythmVariantFor(events)).toBe("straight");
+    expect(rhythmVariantFor(events)).toBe("quarters");
   });
 
   it("stays total on a phrase that should not exist, and picks triplets", () => {
@@ -120,7 +120,7 @@ describe("choosing the rhythm variant from the notes", () => {
   });
 
   it("reads an empty phrase without complaint", () => {
-    expect(rhythmVariantFor([])).toBe("straight");
+    expect(rhythmVariantFor([])).toBe("quarters");
   });
 });
 
@@ -151,7 +151,7 @@ describe("selecting a beat for a minigame", () => {
   it("takes the rung from the difficulty and the feel from the notes", () => {
     const level = ROCKY_ASCENT.levels.get(3)!;
     // Rocky Ascent L3 is eighths, which is the default beat, at rung 3.
-    expect(drumPatternForAttempt(level.difficulty, level.prompt).id).toBe("L3/straight");
+    expect(drumPatternForAttempt(level.difficulty, level.prompt).id).toBe("L3/eighth");
     expect(drumPatternForAttempt(6, prompt([0.25, "sixteenth", 0.25])).id).toBe("L6/sixteenth");
     expect(drumPatternForAttempt(1, prompt([1 / 3, "quarter", 1 / 3])).id).toBe("L1/triplet");
   });
@@ -166,11 +166,11 @@ describe("selecting a beat for a minigame", () => {
   it("clamps rather than throws for a difficulty off the ladder", () => {
     // Dev overrides, a future eighth rung, a bad scenario file: all of these
     // reach this function mid-run, and none of them may end the run.
-    expect(drumPatternAt(0, "straight").id).toBe("L1/straight");
-    expect(drumPatternAt(-3, "straight").id).toBe("L1/straight");
-    expect(drumPatternAt(99, "straight").id).toBe("L7/straight");
-    expect(drumPatternAt(3.4, "straight").id).toBe("L3/straight");
-    expect(drumPatternAt(Number.NaN, "straight").id).toBe("L1/straight");
+    expect(drumPatternAt(0, "eighth").id).toBe("L1/eighth");
+    expect(drumPatternAt(-3, "eighth").id).toBe("L1/eighth");
+    expect(drumPatternAt(99, "eighth").id).toBe("L7/eighth");
+    expect(drumPatternAt(3.4, "eighth").id).toBe("L3/eighth");
+    expect(drumPatternAt(Number.NaN, "eighth").id).toBe("L1/eighth");
   });
 });
 
@@ -230,7 +230,7 @@ describe("what every pattern guarantees", () => {
 describe("the rhythm variant reshapes the whole bar", () => {
   it("keeps a straight pattern on the eighth grid", () => {
     for (const intensity of INTENSITIES) {
-      const pattern = drumPatternAt(intensity, "straight");
+      const pattern = drumPatternAt(intensity, "eighth");
       for (const hit of pattern.hits) {
         expect(isNear(offsetWithinBeat(hit.startBeat), [0, 0.5]), `L${intensity}`).toBe(true);
       }
@@ -280,13 +280,13 @@ describe("the rhythm variant reshapes the whole bar", () => {
     // A pickup kick lands on the last slot of the beat: the `and` straight, the
     // `a` in sixteenths, the third partial in a shuffle. The fill follows the
     // same rule, which is what makes the top rung state the feel loudest.
-    expect(beatsOf(drumPatternAt(4, "straight"), "kick")).toContain(0.5);
+    expect(beatsOf(drumPatternAt(4, "eighth"), "kick")).toContain(0.5);
     expect(beatsOf(drumPatternAt(4, "sixteenth"), "kick")).toContain(0.75);
     expect(
       beatsOf(drumPatternAt(4, "triplet"), "kick").some((beat) => Math.abs(beat - 2 / 3) < 1e-6)
     ).toBe(true);
 
-    expect(beatsOf(drumPatternAt(7, "straight"), "floor")).toEqual([3.5]);
+    expect(beatsOf(drumPatternAt(7, "eighth"), "floor")).toEqual([3.5]);
     expect(beatsOf(drumPatternAt(7, "sixteenth"), "tom")).toEqual([3.25, 3.5]);
     expect(beatsOf(drumPatternAt(7, "sixteenth"), "floor")).toEqual([3.75]);
     expect(beatsOf(drumPatternAt(7, "triplet"), "tom")[0]).toBeCloseTo(3 + 1 / 3, 9);
@@ -315,13 +315,13 @@ describe("the ladder escalates", () => {
   });
 
   it("starts half-time and ends with the whole kit", () => {
-    const minimal = drumPatternAt(1, "straight");
+    const minimal = drumPatternAt(1, "eighth");
     // One kick, one snare, and nothing that is not the pulse or the grid.
     expect(beatsOf(minimal, "kick")).toEqual([0]);
     expect(beatsOf(minimal, "snare")).toEqual([2]);
     expect(new Set(minimal.hits.map((hit) => hit.voice))).toEqual(new Set(["kick", "snare", "hat"]));
 
-    const rage = drumPatternAt(7, "straight");
+    const rage = drumPatternAt(7, "eighth");
     expect(beatsOf(rage, "crash")).toEqual([0, 2]);
     expect(beatsOf(rage, "ride")).toEqual([1, 3]);
     expect(beatsOf(rage, "kick")).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3]);
@@ -330,7 +330,7 @@ describe("the ladder escalates", () => {
   it("brings the backbeat in at rung 2 and keeps it from there", () => {
     for (const intensity of INTENSITIES.filter((value) => value >= 2)) {
       // On the beat only: the ghost snares of the higher rungs are not it.
-      const backbeat = beatsOf(drumPatternAt(intensity, "straight"), "snare").filter(
+      const backbeat = beatsOf(drumPatternAt(intensity, "eighth"), "snare").filter(
         Number.isInteger
       );
       expect(backbeat, `L${intensity}`).toEqual([1, 3]);
@@ -339,7 +339,7 @@ describe("the ladder escalates", () => {
 
   it("holds cymbals and toms back for the rungs that need them", () => {
     for (const intensity of INTENSITIES) {
-      const voices = new Set(drumPatternAt(intensity, "straight").hits.map((hit) => hit.voice));
+      const voices = new Set(drumPatternAt(intensity, "eighth").hits.map((hit) => hit.voice));
       expect(voices.has("crash"), `L${intensity}`).toBe(intensity >= 6);
       expect(voices.has("ride"), `L${intensity}`).toBe(intensity >= 5);
       expect(voices.has("floor"), `L${intensity}`).toBe(intensity === 7);

@@ -37,7 +37,7 @@ const LOOKAHEAD_S = 0.15;
  * one-line edit here and does not have to be reconciled with whatever the duck
  * happens to be doing at the time.
  */
-const BASE_OUTPUT_GAIN = 0.34;
+const BASE_OUTPUT_GAIN = 0.46;
 
 /**
  * How long the duck takes to move to a new level, in seconds.
@@ -53,6 +53,8 @@ const DUCK_RAMP_SECONDS = 0.04;
 type ScheduledVoice = {
   startTime: number;
   osc: OscillatorNode;
+  /** The octave doubling. Cancelled and reaped with its fundamental. */
+  octave: OscillatorNode;
   gain: GainNode;
 };
 
@@ -176,7 +178,18 @@ export class BassPlayer {
     const seconds = durationBeats * this.#transport.secondsPerBeat;
     const stopTime = startTime + seconds;
 
+    // Two oscillators: the written pitch, and the octave above it.
+    //
+    // The line is voiced at 40-75 Hz so it sits under the guitar, and a laptop
+    // speaker reproduces almost none of that. A sawtooth was already chosen so
+    // the ear could reconstruct the missing fundamental from its harmonics, but
+    // a saw's harmonics fall away as 1/n and the octave — the one partial that
+    // most defines the note — arrives at half amplitude and then goes through a
+    // low-pass. Doubling it explicitly puts real energy at 80-150 Hz, which is
+    // where a small speaker starts being honest, and is what turns the part
+    // from a rumble into something with pitch and attack.
     const osc = this.#context.createOscillator();
+    const octave = this.#context.createOscillator();
     // Sawtooth, not triangle. The line is voiced at 40-75 Hz so it sits under
     // the guitar (see bass-line.ts), and almost no speaker a browser game is
     // played on reproduces that fundamental at all — a laptop rolls off hard
@@ -186,6 +199,13 @@ export class BassPlayer {
     // was being rendered and simply not heard.
     osc.type = "sawtooth";
     osc.frequency.value = midiToFrequency(midi);
+    octave.type = "sawtooth";
+    octave.frequency.value = midiToFrequency(midi + 12);
+
+    // Under the fundamental, so the part still reads as bass rather than as a
+    // second melody competing with the guitar for the midrange.
+    const octaveGain = this.#context.createGain();
+    octaveGain.gain.value = 0.42;
 
     const gain = this.#context.createGain();
     // A plucked-ish envelope. Short attack so the beat is unmistakable, decay
@@ -202,12 +222,16 @@ export class BassPlayer {
     filter.frequency.value = 1200;
 
     osc.connect(filter);
+    octave.connect(octaveGain);
+    octaveGain.connect(filter);
     filter.connect(gain);
     gain.connect(this.#output);
     osc.start(startTime);
+    octave.start(startTime);
     osc.stop(stopTime + 0.05);
+    octave.stop(stopTime + 0.05);
 
-    this.#voices.push({ startTime, osc, gain });
+    this.#voices.push({ startTime, osc, gain, octave });
   }
 
   /** Silences anything scheduled but not yet sounding. */
@@ -216,10 +240,14 @@ export class BassPlayer {
     const surviving: ScheduledVoice[] = [];
     for (const voice of this.#voices) {
       if (voice.startTime > now) {
-        try {
-          voice.osc.stop(now);
-        } catch {
-          // Already stopped; nothing to do.
+        // Both oscillators, or a cancelled note keeps sounding its octave —
+        // which is exactly what a reroll or a tempo change would leave behind.
+        for (const source of [voice.osc, voice.octave]) {
+          try {
+            source.stop(now);
+          } catch {
+            // Already stopped; nothing to do.
+          }
         }
         voice.gain.disconnect();
       } else {

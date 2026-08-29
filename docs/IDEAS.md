@@ -30,14 +30,13 @@ does not come back round as a new one.
 These are all cases where the machinery exists, is tested, and has nothing to
 run on. They are cheap to close and each one lights up something already built.
 
-### Nothing selects a drum rhythm variant
+### Nothing selects the sixteenth or triplet drum variant
 
-Every drum rung has three feels — straight, sixteenth, triplet — and the
-variant is read off the authored notes (DECISION-031). **All 20 authored levels
-across all five scenarios resolve to `straight`**, because the material tops out
-at eighths and eighths alone do not select a variant. So two thirds of the drum
-work is unheard in play. One scenario authored in sixteenths, and one in
-triplets, would light it up immediately. Note the content rule the loader test
+Each rung now has four feels — quarters, eighth, sixteenth, triplet — chosen
+from the authored notes (DECISION-031, revised by DECISION-033). Current
+material only ever produces the first two, because it tops out at eighths. The
+sixteenth and triplet patterns are built, tested and unheard; one scenario
+authored in each would light them up. Note the content rule the loader test
 enforces: a level must not test both.
 
 ### Nothing authors difficulty 7
@@ -49,14 +48,13 @@ monotonic in note count — the `_high` scenarios sit two levels above the norma
 ones and reuse their phrase tables, so the densest material in the game is an
 L4.
 
-### Drum rungs 6–7 are unmeasured for clipping
+### Drum rungs 6–7 are still unmeasured, though no longer unprotected
 
-The drum bus (0.85) into master (0.9) has no limiter, and rungs 6–7 stack a
-crash, a ride and a kick on every beat. Cymbal peaks are deliberately low and
-earn their size from length, and `browser-validate.mjs` measures 0.75 full-band
-today against a naive worst case of 1.35 — but L6/L7 could not be measured
-because nothing authors those difficulties. Worth re-running `measureOutput`
-against pinned L6/L7 content once it exists.
+There is now a soft clipper on the master (DECISION-033), so a loud rung cannot
+square off the output the way it could. But rungs 6–7 have still never been
+*heard*, because nothing authors those difficulties — worth measuring against
+pinned L6/L7 content once it exists, to check they read as an escalation rather
+than as the clipper working harder.
 
 ---
 
