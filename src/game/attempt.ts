@@ -1,5 +1,6 @@
 /**
- * One attempt: four measures of one scenario at one difficulty.
+ * One attempt: two passes at one scenario's four-measure phrase, at one
+ * difficulty.
  *
  * This is the join between the systems, and it is where the causal chain the
  * whole game rests on actually happens:
@@ -18,7 +19,7 @@
  * actor directly, on the beat it is judged.
  */
 
-import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
 import { laneOfMidi, type RunKey } from "../music/keys.js";
 import { RepeatMinigame } from "../scenario/minigames/repeat-minigame.js";
@@ -231,8 +232,9 @@ export class AttemptRuntime {
     // next lane it doubles as a pointer at the note that is coming.
     this.actor.aimAt(this.judge.currentTarget(beat)?.lane ?? null);
 
+    // The plan counts the authored phrase; the attempt plays it more than once.
     const measures = Math.min(
-      this.level.measurePlan.attemptMeasures,
+      this.level.measurePlan.attemptMeasures * ATTEMPT_REPEATS,
       Math.floor(beat / BEATS_PER_MEASURE)
     );
     while (this.#measuresCompleted < measures) {

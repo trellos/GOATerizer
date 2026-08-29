@@ -200,7 +200,31 @@ export const TIMELINE_HISTORY_BEATS = 4;
 /* -------------------------------------------------------------------------- */
 
 export const BEATS_PER_MEASURE = 4;
-export const ATTEMPT_MEASURES = 4;
+
+/**
+ * Measures in the authored phrase — the unit a scenario actually composes, and
+ * what a level's `measurePlan.attemptMeasures` counts.
+ */
+export const PHRASE_MEASURES = 4;
+export const PHRASE_BEATS = BEATS_PER_MEASURE * PHRASE_MEASURES;
+
+/**
+ * How many times an attempt plays that phrase.
+ *
+ * Two, because one pass at a phrase is a sight-read and nothing else. The
+ * player meets the material cold, works out where their hand goes, and the
+ * attempt is over — which is a bad way to learn an exercise and a worse way to
+ * be scored on one. Playing it twice makes the first pass the read and the
+ * second the performance, and the score is the whole thing, so getting it right
+ * the second time round redeems the first.
+ *
+ * This is a *global* rule, not a scenario setting: it is a statement about how
+ * long the player gets with any exercise, and a scenario that wanted a
+ * different answer would be asking for a different game loop.
+ */
+export const ATTEMPT_REPEATS = 2;
+
+export const ATTEMPT_MEASURES = PHRASE_MEASURES * ATTEMPT_REPEATS;
 export const ATTEMPT_BEATS = BEATS_PER_MEASURE * ATTEMPT_MEASURES;
 /** Scenario slide transition, in beats. GDD §10: exactly one beat. */
 export const TRANSITION_BEATS = 1;

@@ -158,7 +158,10 @@ Do not procedurally infer the musical exercise from the numeric difficulty level
 
 One play of one minigame.
 
-A normal attempt is four measures.
+A scenario authors a four-measure phrase, and an attempt plays that phrase
+`ATTEMPT_REPEATS` times — two, so eight measures. The repeat is a rule of the
+game loop (`src/config/tuning.ts`), expanded once in `game/targets.ts`; scenarios
+still author four measures and must not author the repeat themselves.
 
 ### Run
 
@@ -378,9 +381,12 @@ Keep score constants and star thresholds in tuning / scenario data rather than s
 
 ## 9. Scenario Measure Behavior
 
-A normal attempt is four measures.
+A scenario authors four measures, and an attempt plays them twice.
 
-A scenario may use those measures differently.
+`measurePlan.attemptMeasures` counts the **authored phrase**, not the attempt —
+the loader validates the prompt's durations against it, and the repeat is
+applied afterwards by the game loop. A scenario may use those four measures
+differently.
 
 Examples:
 

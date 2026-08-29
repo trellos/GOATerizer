@@ -138,7 +138,8 @@ Target prompts are authored in diatonic / scale-degree terms so the same level c
 
 One play of one minigame.
 
-An attempt is normally four measures of four beats.
+An attempt is normally two passes at a four-measure phrase of four beats —
+eight measures in all. See §8.
 
 ## Run
 
@@ -490,7 +491,9 @@ There is no requirement for special scenario-specific failure artwork. Failing t
 
 # 8. Measure Scope Inside Scenarios
 
-Every normal attempt lasts four measures, but how a scenario uses those four measures belongs to the **scenario/class design**, not the global game loop.
+A scenario authors a **four-measure phrase**, and a normal attempt plays that phrase twice — eight measures in all. One pass at a phrase is a sight-read and nothing else: the player meets the material cold, works out where their hand goes, and the attempt is over. Playing it twice makes the first pass the read and the second the performance, and the attempt is scored as a whole, so getting it right the second time round redeems a bad first read. The repeat count is global (`ATTEMPT_REPEATS`), not a scenario setting.
+
+How a scenario uses its four authored measures still belongs to the **scenario/class design**, not the global game loop.
 
 Examples:
 
@@ -502,7 +505,8 @@ Examples:
 The game-level system only guarantees:
 
 ```text
-AttemptLength = 4 measures
+PhraseLength  = 4 measures   (what a scenario authors)
+AttemptLength = PhraseLength x ATTEMPT_REPEATS = 8 measures
 ```
 
 The scenario's `MeasurePlan` controls:

@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-029: An attempt plays its phrase twice, and the pass bar does not scale with it
+* **Date:** 2026-08-29
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted, Claude Opus 5)
+* **Context:** "It's tough to get these mini games! Have each one repeat twice. So instead of 4 measures it's 8." One pass at a four-measure phrase is a sight-read and nothing else: the player meets the material cold, works out where their hand goes, and the attempt is over — a bad way to learn an exercise and a worse way to be scored on one.
+* **Decision:** Add a global `ATTEMPT_REPEATS = 2`, and expand it in exactly one place — `game/targets.ts`, where the authored prompt becomes resolved targets. Everything downstream (the judge, the timeline, the autoplay planner, both actor classes, the drums) reads that list and nothing else, so all of it gets the repeat for free and no scenario authors it. Star thresholds are then split deliberately: **three stars scales** (still every opportunity in the attempt at Perfect, so the perfection badge survives), **the pass bar does not** (it stays what a single clean pass was worth). That asymmetry *is* the difficulty relief — a good second pass now redeems a bad first read — and it is aimed at the gate that ends a run rather than at the badges.
+* **Alternatives Considered:** (a) Authoring eight measures in the scenario files. Rejected: it doubles every prompt, makes the repeat invisible in the data model, and means a future change to the repeat count is a re-authoring job rather than a constant. (b) Scaling every threshold by the repeat count. Mathematically identical difficulty to a four-measure attempt, so it would have delivered nothing the user asked for — the relief has to come from the pass bar staying put. (c) Leaving *all* thresholds absolute, which is the tempting one-line version. Rejected on the arithmetic: Good is 6 points against Perfect's 10, so an all-Good performance scores 60% of the doubled maximum and would clear an unscaled three-star bar. ★★★ would have been reachable without a single Perfect note.
+* **Consequences:** Positive — the first pass is the read and the second the performance, which is what a practice game should be; the phrase is still the unit a scenario composes; and a registry-wide test asserts every authored star ceiling matches `ATTEMPT_REPEATS` (it fails if the constant moves without rerunning the authoring scripts, which cannot import it because they are plain `.mjs`). Negative — a run is now twice as long in wall-clock, roughly six minutes at 90bpm rather than three, and nobody has played one end to end at that length yet. `measurePlan.attemptMeasures` in the scenario schema now counts the authored *phrase* rather than the attempt; the name is kept because it is the key in every authored file, and documented at the type instead.
+
+---
+
 #### DECISION-028: The can crusher's read is his loop, not his crush
 * **Date:** 2026-08-28
 * **Status:** Accepted

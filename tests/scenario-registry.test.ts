@@ -17,6 +17,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_REPEATS, JUDGMENT_POINTS } from "../src/config/tuning.js";
 import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
 import {
   CAN_CRUSHING,
@@ -47,6 +48,34 @@ describe("scenario registry", () => {
         "can_crushing",
       ])
     );
+  });
+
+  /**
+   * The one number the authoring scripts have to duplicate.
+   *
+   * Star thresholds are baked into the scenario JSON by `scripts/author-*.mjs`,
+   * which are plain `.mjs` and cannot import `ATTEMPT_REPEATS` from the
+   * TypeScript config — so they hard-code it. That is a silent-drift hazard:
+   * change the repeat count and every authored ceiling is quietly wrong until
+   * someone reruns the scripts. This is the guard, and it covers every scenario
+   * in the registry rather than the two that happen to have their own suites.
+   */
+  it("keeps every authored star ceiling in step with the repeat count", () => {
+    for (const scenario of SCENARIOS) {
+      for (const [difficulty, level] of scenario.levels) {
+        const onePass = level.noteOpportunityCount * JUDGMENT_POINTS.perfect;
+        const where = `${scenario.id} L${difficulty}`;
+        // Three stars is every opportunity in the attempt taken at Perfect.
+        expect(`${where}: ${level.stars.star3Threshold}`).toBe(
+          `${where}: ${onePass * ATTEMPT_REPEATS}`
+        );
+        // The pass bar is deliberately NOT scaled with the repeat: it stays
+        // what a single clean pass was worth, so a good second pass rescues a
+        // bad first read. See src/config/tuning.ts ATTEMPT_REPEATS.
+        expect(level.stars.passThreshold).toBeLessThan(onePass);
+        expect(level.stars.passThreshold).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("resolves every scenario by id", () => {

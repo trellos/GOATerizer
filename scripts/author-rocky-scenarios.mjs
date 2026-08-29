@@ -44,6 +44,13 @@ const ATTEMPT_BEATS = 16;
 /** Judgment points per outcome. Mirrors src/config/tuning.ts JUDGMENT_POINTS. */
 const POINTS_PERFECT = 10;
 /**
+ * Mirrors src/config/tuning.ts ATTEMPT_REPEATS: an attempt plays the authored
+ * phrase this many times, so the points available in one are this multiple of
+ * the phrase's own maximum. Kept in step by tests/scenario-registry.test.ts.
+ */
+const ATTEMPT_REPEATS = 2;
+
+/**
  * Provisional star fractions of the all-Perfect maximum. ★★★ is the maximum.
  *
  * The ladder these produce, and why:
@@ -399,6 +406,7 @@ for (const definition of SCENARIOS) {
     const prompt = buildPrompt(definition.phrases[level]);
     const noteCount = prompt.filter((event) => event.type === "note").length;
     const maxPoints = noteCount * POINTS_PERFECT;
+    const attemptMax = maxPoints * ATTEMPT_REPEATS;
 
     levelData.prompt = prompt;
     levelData.noteOpportunityCount = noteCount;
@@ -410,13 +418,17 @@ for (const definition of SCENARIOS) {
         "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 " +
         "(src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
       passThreshold: Math.round(maxPoints * PASS_FRACTION),
-      star2Threshold: Math.round(maxPoints * STAR2_FRACTION),
-      star3Threshold: maxPoints,
+      star2Threshold: Math.round(attemptMax * STAR2_FRACTION),
+      star3Threshold: attemptMax,
       provisional: true,
       note:
-        `PROVISIONAL. The design left thresholds TBD. Pass is ${PASS_FRACTION * 100}% and ` +
-        `two stars ${STAR2_FRACTION * 100}% of the all-Perfect maximum (${maxPoints}); three ` +
-        "stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect.",
+        `PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure ` +
+        `phrase ${ATTEMPT_REPEATS} times, so ${attemptMax} points are available. Pass is the ` +
+        `${PASS_FRACTION * 100}% of a single pass (${maxPoints}) that it always was — ` +
+        "deliberately NOT scaled, so getting the phrase right the second time round redeems " +
+        `a bad first read, which is the whole reason for the repeat. Two stars is ` +
+        `${STAR2_FRACTION * 100}% and three stars 100% of the full attempt, so ★★★ still ` +
+        "requires every note opportunity taken at Perfect.",
     };
 
     levelData.scoring = {

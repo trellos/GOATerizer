@@ -24,7 +24,8 @@ import {
   type RunKey,
 } from "../src/music/keys.js";
 import { midiToName, type PitchClassIndex } from "../src/music/pitch.js";
-import { resolveTargets } from "../src/game/targets.js";
+import { ATTEMPT_REPEATS } from "../src/config/tuning.js";
+import { phraseBeats, resolveTargets } from "../src/game/targets.js";
 import { ROCKY_ASCENT } from "../src/scenario/registry.js";
 
 const G_MINOR: RunKey = { tonic: 7, mode: "minor" };
@@ -182,36 +183,65 @@ describe("key weighting", () => {
 });
 
 describe("target resolution", () => {
+  /** Notes in one pass at the authored phrase. An attempt plays several. */
+  const L1_PHRASE_NOTES = 15;
+
   it("resolves Rocky Ascent L1 into the octave of the run key, then a second climb", () => {
     const level = ROCKY_ASCENT.levels.get(1)!;
-    const targets = resolveTargets(level, G_MINOR);
-    expect(targets).toHaveLength(15);
+    const targets = resolveTargets(level, G_MINOR).slice(0, L1_PHRASE_NOTES);
     // One full octave, then as much of a second climb as the bar allows.
     expect(targets.map((t) => t.midi)).toEqual([
       ...laneMidiNotes(G_MINOR),
       ...laneMidiNotes(G_MINOR).slice(0, 7),
     ]);
     expect(targets.map((t) => t.lane)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6]);
-    expect(targets.map((t) => t.startBeat)).toEqual([...Array(15).keys()]);
+    expect(targets.map((t) => t.startBeat)).toEqual([...Array(L1_PHRASE_NOTES).keys()]);
+  });
+
+  it("plays that phrase again, a phrase-length later, in one attempt", () => {
+    // The repeat is a rule of the game loop, not something a scenario authors:
+    // an attempt is the phrase over again, so the player's first pass is the
+    // read and the second is the performance.
+    const level = ROCKY_ASCENT.levels.get(1)!;
+    const targets = resolveTargets(level, G_MINOR);
+    const span = phraseBeats(level);
+    expect(targets).toHaveLength(L1_PHRASE_NOTES * ATTEMPT_REPEATS);
+
+    const phrase = targets.slice(0, L1_PHRASE_NOTES);
+    for (let pass = 1; pass < ATTEMPT_REPEATS; pass += 1) {
+      const again = targets.slice(pass * L1_PHRASE_NOTES, (pass + 1) * L1_PHRASE_NOTES);
+      expect(again.map((t) => t.midi)).toEqual(phrase.map((t) => t.midi));
+      expect(again.map((t) => t.startBeat)).toEqual(phrase.map((t) => t.startBeat + pass * span));
+      expect(again.map((t) => t.pass)).toEqual(again.map(() => pass));
+      // The authored index repeats; the opportunity index does not, because the
+      // judge and the timeline both key on it for the whole attempt.
+      expect(again.map((t) => t.promptIndex)).toEqual(phrase.map((t) => t.promptIndex));
+    }
+    expect(targets.map((t) => t.opportunityIndex)).toEqual([...targets.keys()]);
   });
 
   it("skips rests and keeps opportunity indices contiguous", () => {
     const level = ROCKY_ASCENT.levels.get(4)!;
     const targets = resolveTargets(level, C_MAJOR);
-    expect(targets).toHaveLength(30);
-    expect(targets.map((t) => t.opportunityIndex)).toEqual([...Array(30).keys()]);
+    expect(targets).toHaveLength(30 * ATTEMPT_REPEATS);
+    expect(targets.map((t) => t.opportunityIndex)).toEqual([
+      ...Array(30 * ATTEMPT_REPEATS).keys(),
+    ]);
     // The rest at prompt index 15 leaves a gap in promptIndex but not in
     // opportunityIndex.
     expect(targets[14]?.promptIndex).toBe(14);
     expect(targets[15]?.promptIndex).toBe(16);
     expect(targets[15]?.startBeat).toBe(8);
+    // ...and the same gap, one phrase later, on the repeat.
+    expect(targets[45]?.promptIndex).toBe(16);
+    expect(targets[45]?.startBeat).toBe(8 + phraseBeats(level));
   });
 
   it("transposes the same authored level into every key without changing its shape", () => {
     const level = ROCKY_ASCENT.levels.get(3)!;
     for (const { key } of KEY_WEIGHTS) {
       const targets = resolveTargets(level, key);
-      expect(targets).toHaveLength(23);
+      expect(targets).toHaveLength(23 * ATTEMPT_REPEATS);
       expect(targets.map((t) => t.lane)).toEqual(
         resolveTargets(level, C_MAJOR).map((t) => t.lane)
       );

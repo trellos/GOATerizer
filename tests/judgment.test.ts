@@ -64,8 +64,8 @@ describe("timing windows", () => {
     // A quarter on beat 0 followed by an eighth on beat 0.5: the quarter's
     // authored +-0.5 would swallow the eighth, so it is halved.
     const targets: ResolvedTarget[] = [
-      { opportunityIndex: 0, promptIndex: 0, startBeat: 0, durationBeats: 1, duration: "quarter", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
-      { opportunityIndex: 1, promptIndex: 1, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
+      { opportunityIndex: 0, promptIndex: 0, pass: 0, startBeat: 0, durationBeats: 1, duration: "quarter", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
+      { opportunityIndex: 1, promptIndex: 1, pass: 0, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
     ];
     const windows = computeWindows(targets);
     expect(windows[0]?.good).toBe(0.25);
@@ -244,7 +244,7 @@ describe("dense subdivisions stay unambiguous", () => {
     const harness = makeJudge(targets);
     for (const target of targets) harness.play(target.midi, target.startBeat);
 
-    expect(harness.events.filter((e) => e.type === "PerfectNote")).toHaveLength(30);
+    expect(harness.events.filter((e) => e.type === "PerfectNote")).toHaveLength(targets.length);
     expect(harness.events.filter((e) => e.type === "WrongNote")).toHaveLength(0);
     expect(harness.judge.openTargetCount).toBe(0);
   });

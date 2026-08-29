@@ -529,10 +529,10 @@
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 68,
-        "star2Threshold": 120,
-        "star3Threshold": 150,
+        "star2Threshold": 240,
+        "star3Threshold": 300,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (150); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 300 points are available. Pass is the 45% of a single pass (150) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -812,10 +812,10 @@
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 63,
-        "star2Threshold": 112,
-        "star3Threshold": 140,
+        "star2Threshold": 224,
+        "star3Threshold": 280,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (140); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 280 points are available. Pass is the 45% of a single pass (140) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1239,10 +1239,10 @@
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 104,
-        "star2Threshold": 184,
-        "star3Threshold": 230,
+        "star2Threshold": 368,
+        "star3Threshold": 460,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (230); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 460 points are available. Pass is the 45% of a single pass (230) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1796,10 +1796,10 @@
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 135,
-        "star2Threshold": 240,
-        "star3Threshold": 300,
+        "star2Threshold": 480,
+        "star3Threshold": 600,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (300); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 600 points are available. Pass is the 45% of a single pass (300) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",

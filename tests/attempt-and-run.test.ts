@@ -13,6 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
 import { planAutoPerformance, type AutoplayMode } from "../src/dev/auto-performance.js";
 import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/game/attempt.js";
 import { rankForStars, GOAT_RANKS } from "../src/game/ranks.js";
@@ -75,7 +76,7 @@ function playFlawlessly(difficulty: number): {
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(target.startBeat + 0.001);
   }
-  h.advanceTo(16);
+  h.advanceTo(ATTEMPT_BEATS);
   const result = h.attempt.result;
   if (!result) throw new Error("attempt did not complete");
   return { attempt: h.attempt, result };
@@ -83,13 +84,16 @@ function playFlawlessly(difficulty: number): {
 
 describe("a whole attempt", () => {
   it("earns three stars for a flawless L1 and updates every counter", () => {
-    const { result } = playFlawlessly(1);
+    const { attempt, result } = playFlawlessly(1);
+    // Every opportunity in the attempt, which is the authored phrase played
+    // ATTEMPT_REPEATS times over.
+    expect(attempt.targets).toHaveLength(15 * ATTEMPT_REPEATS);
     expect(result).toMatchObject({
       scenarioId: "rocky_ascent",
       difficulty: 1,
       stars: 3,
       passed: true,
-      perfect: 15,
+      perfect: attempt.targets.length,
       good: 0,
       missed: 0,
       wrongNotes: 0,
@@ -105,8 +109,40 @@ describe("a whole attempt", () => {
 
   it("fails with zero stars when nothing is played", () => {
     const h = harness(2);
-    h.advanceTo(16);
-    expect(h.attempt.result).toMatchObject({ stars: 0, passed: false, missed: 14 });
+    h.advanceTo(ATTEMPT_BEATS);
+    expect(h.attempt.result).toMatchObject({
+      stars: 0,
+      passed: false,
+      missed: h.attempt.targets.length,
+    });
+  });
+
+  it("lets a clean second pass rescue a botched first one", () => {
+    // The reason an attempt plays its phrase twice. The player meets the
+    // material cold, makes a mess of it, and the repeat is their chance to
+    // put it right — so the same performance that would have failed a
+    // single-pass attempt now clears the bar.
+    const h = harness(1);
+    const half = h.attempt.targets.length / ATTEMPT_REPEATS;
+    h.attempt.targets.forEach((target, index) => {
+      h.advanceTo(target.startBeat);
+      if (index >= half) h.playAt(target.midi, target.startBeat);
+      h.advanceTo(target.startBeat + 0.001);
+    });
+    h.advanceTo(ATTEMPT_BEATS);
+    const result = h.attempt.result!;
+
+    expect(result.missed).toBe(half);
+    expect(result.perfect).toBe(half);
+    expect(result.passed).toBe(true);
+    // And it is genuinely a rescue, not a free pass: one clean half is worth a
+    // star, not three.
+    expect(result.stars).toBeLessThan(3);
+    // The same points would have been a fail before the repeat, because the
+    // bar is deliberately still a single clean pass rather than half of two.
+    expect(result.judgmentPoints).toBeGreaterThanOrEqual(
+      ROCKY_ASCENT.levels.get(1)!.stars.passThreshold
+    );
   });
 
   it("survives with one star on a scruffy but mostly-right attempt", () => {
@@ -116,7 +152,7 @@ describe("a whole attempt", () => {
       if (index % 5 !== 0) h.playAt(target.midi, target.startBeat, 0.35); // Good
       h.advanceTo(target.startBeat + 0.4);
     });
-    h.advanceTo(16);
+    h.advanceTo(ATTEMPT_BEATS);
     const result = h.attempt.result!;
     expect(result.passed).toBe(true);
     expect(result.stars).toBeGreaterThanOrEqual(1);
@@ -279,7 +315,7 @@ function playAutoPerformance(difficulty: number, mode: AutoplayMode, seed = 7) {
 
   // Small steps, so the queue drains in order and `tick` expires targets on
   // time rather than all at once at the end.
-  for (let beat = 0; beat <= 16; beat += 0.125) h.advanceTo(beat);
+  for (let beat = 0; beat <= ATTEMPT_BEATS; beat += 0.125) h.advanceTo(beat);
   const result = h.attempt.result;
   if (!result) throw new Error("attempt did not complete");
   return { performance, result };

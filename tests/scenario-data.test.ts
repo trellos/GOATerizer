@@ -9,6 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_REPEATS } from "../src/config/tuning.js";
+
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import { formatDegreeToken } from "../src/music/degrees.js";
 import type {
@@ -189,9 +191,20 @@ describe("Rocky Ascent scenario", () => {
     const { passThreshold, star2Threshold, star3Threshold } = data.stars;
     expect(passThreshold).toBeLessThan(star2Threshold);
     expect(star2Threshold).toBeLessThan(star3Threshold);
-    // 10 judgment points per Perfect note -- see src/config/tuning.ts.
-    expect(star3Threshold).toBe(data.noteOpportunityCount * 10);
+    // 10 judgment points per Perfect note -- see src/config/tuning.ts -- across
+    // the whole attempt, which plays the authored phrase ATTEMPT_REPEATS times.
+    expect(star3Threshold).toBe(data.noteOpportunityCount * 10 * ATTEMPT_REPEATS);
     expect(data.stars.provisional).toBe(true);
+  });
+
+  it.each(LEVELS)("L%i pass bar is a single clean pass, not a scaled one", (difficulty) => {
+    // The one threshold the repeat deliberately does NOT scale. Passing is the
+    // gate that ends a run, and leaving it where a four-measure attempt put it
+    // is what lets a good second pass redeem a bad first read.
+    const data = level(difficulty);
+    const onePass = data.noteOpportunityCount * 10;
+    expect(data.stars.passThreshold).toBe(Math.round(onePass * 0.45));
+    expect(data.stars.passThreshold).toBeLessThan(onePass);
   });
 
   it("is eligible for the difficulties it authors and no others", () => {

@@ -50,8 +50,15 @@ export type PromptEvent = {
   degree: ScaleDegreeRef | null;
 };
 
-/** How a scenario uses the four measures of an attempt. */
+/** How a scenario uses the four measures it authors. */
 export type MeasurePlan = {
+  /**
+   * Measures in the authored **phrase**, which is what the loader validates the
+   * prompt's durations against — not the length of an attempt. An attempt plays
+   * the phrase `ATTEMPT_REPEATS` times, and that expansion happens once, in
+   * `game/targets.ts`. The name predates the repeat and is kept because it is
+   * the key in every authored scenario file.
+   */
   attemptMeasures: number;
   beatsPerMeasure: number;
   visualSpanMeasures: number;

@@ -8,6 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
 import { AttemptRuntime } from "../src/game/attempt.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import { formatDegreeToken } from "../src/music/degrees.js";
@@ -191,7 +192,12 @@ describe("Can Crushing scenario", () => {
     const data = CAN_CRUSHING.levels.get(difficulty)!;
     expect(data.stars.passThreshold).toBeLessThan(data.stars.star2Threshold);
     expect(data.stars.star2Threshold).toBeLessThan(data.stars.star3Threshold);
-    expect(data.stars.star3Threshold).toBe(data.noteOpportunityCount * 10);
+    // Every can in the attempt, and an attempt is the phrase ATTEMPT_REPEATS
+    // times over — the repeat buys the player a second pass, not a lower bar
+    // for the perfection badge.
+    expect(data.stars.star3Threshold).toBe(data.noteOpportunityCount * 10 * ATTEMPT_REPEATS);
+    // Pass is the exception, and is left at a single clean pass on purpose.
+    expect(data.stars.passThreshold).toBeLessThan(data.noteOpportunityCount * 10);
   });
 
   it("binds every RepeatMinigame slot to a resolvable URL", () => {
@@ -278,7 +284,7 @@ describe("Can Crushing, played", () => {
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.001);
     }
-    h.advanceTo(16);
+    h.advanceTo(ATTEMPT_BEATS);
     expect(h.attempt.repeat!.state.crushed).toBe(h.attempt.targets.length);
     expect(h.attempt.repeat!.state.uncrushed).toBe(0);
     expect(h.attempt.result?.stars).toBe(3);
