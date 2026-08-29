@@ -14,32 +14,30 @@ Do not simplify or reinterpret product behavior merely because another implement
 
 Read these documents before implementing related systems.
 
-### Overall Game Design
+**Two canonical design documents exist.** Earlier revisions of this file named
+six — `GAME_DESIGN.md`, `MINIGAME_STRUCTURE.md`, `VISUAL_ASSET_SYSTEM.md`,
+`MINIGAME_BEHAVIOR_SPEC.md`, `SCENARIO_ASSET_SLOT_BINDINGS.md` and
+`THEME_APPLICATIONS.md`. None of those paths exist; their content was folded
+into the two files below before this repository was created. The list is
+corrected here rather than left pointing at files nobody can open.
 
-`docs/game-design/GAME_DESIGN.md`
+### Game design
 
-Authoritative for:
+`docs/game-design/GOATerizer_Game_Design.md`
 
-- game flow
-- run structure
-- pregame
-- scoring concepts
-- stars
-- timeline behavior
-- key and tempo behavior
-- results / game over
-- overall terminology
+Authoritative for game flow, run structure, pregame, scoring concepts, stars,
+timeline behaviour, key and tempo behaviour, results, and overall terminology
+(§1–3). Also authoritative for what the separate minigame-structure and
+behaviour documents used to cover:
 
-### Minigame Family Structure
+- the six permanent minigame families and their musical identity — §1.2,
+  expanded per family in the slot-bindings document;
+- judgment, timing windows, sustained notes and gestures — §5;
+- reusable minigame-class behaviour, class asset slots, and measure-span /
+  visual-cycle behaviour, including reset vs persistent scenario state — §8;
+- the production rule that governs the whole art budget — §1.3:
 
-`docs/game-design/MINIGAME_STRUCTURE.md`
-
-Authoritative for:
-
-- the six permanent minigame families
-- musical identity of each family
-- level ranges
-- visual verbs
+> Lots of authored gameplay events, very few authored art assets.
 
 The six families are:
 
@@ -50,53 +48,34 @@ The six families are:
 - Straight Sixteenths → `RepeatMinigame`
 - Sixteenth Phrases → `BattleMinigame`
 
-### Visual Asset System
+### Scenario asset slot bindings and the theme catalogue
 
-`docs/game-design/VISUAL_ASSET_SYSTEM.md`
+`docs/game-design/GOATerizer_Scenario_Asset_Slot_Bindings.md`
 
-Authoritative for:
+Authoritative for which scenario belongs to which minigame class, which assets
+bind to which class slots (§1–2, the canonical slot schemas), and — theme by
+theme, from §3 — the scenario concepts, supported difficulty ranges and visual
+escalation ideas that the theme catalogue used to hold separately.
 
-- static billboard sprite constraints
-- transform / show / hide behavior
-- pose reuse
-- effect reuse
-- visual production limits
+### Proposed, not yet canonical
 
-Core production rule:
+`docs/game-design/PROPOSED_Timeline_Actors.md`
 
-> Lots of authored gameplay events, very few authored art assets.
+The actors-on-the-timeline design: the goat standing on the note bars, the
+disposable-goat failure model, the `RepeatMinigame` can crusher, and the trophy
+shelf. Built and playable, but **proposed** — it is not part of the canonical
+design until the designer folds it in, and where it differs from the two
+documents above, they win. Read it before touching the timeline actors, the
+scenario backdrop, or `RepeatMinigame`.
 
-### Minigame Behavior Specification
+### Ideas and open threads
 
-`docs/game-design/MINIGAME_BEHAVIOR_SPEC.md`
+`docs/IDEAS.md`
 
-Authoritative for:
-
-- reusable minigame-class behavior
-- class asset slots
-- gameplay-to-asset behavior
-- measure-span / visual-cycle behavior
-- reset vs persistent scenario state
-
-### Scenario Asset Slot Bindings
-
-`docs/game-design/SCENARIO_ASSET_SLOT_BINDINGS.md`
-
-Authoritative for:
-
-- which scenario belongs to which minigame class
-- which assets bind to which class slots
-
-### Theme / Scenario Catalog
-
-`docs/game-design/THEME_APPLICATIONS.md`
-
-Reference for:
-
-- scenario concepts
-- theme applications
-- supported difficulty ranges
-- visual escalation ideas
+Not authoritative for anything. The running backlog of things noticed while
+playing, plus the content gaps sitting behind finished systems (nothing selects
+a drum rhythm variant; nothing authors L7). Add to it rather than letting an
+observation live only in a conversation.
 
 ### Individual Scenario Data
 

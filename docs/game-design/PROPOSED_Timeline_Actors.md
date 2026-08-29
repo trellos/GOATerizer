@@ -24,7 +24,17 @@ noted inline below and in `DECISION_LOG.md` (DECISION-020 to 022, 028):
    DECISION-028.
 
 The rest of the document is the design as agreed, and the open questions in §8
-are still open.
+are still open. Two of them have since been written up as concrete threads in
+`docs/IDEAS.md` — the crusher's inability to move between measures, which is
+what forces Can Crushing's material onto one pitch, and the fact that a
+wrong-lane can and an unplaceable one look nearly alike at the size these render
+at.
+
+The branch this was drafted on has since moved well beyond it: attempts now play
+their phrase twice, the drum kit picks a beat per minigame, the bass ducks when
+the player is missing, and the fingering picker offers more hand positions
+(DECISION-029 to 032). None of that is part of this proposal, and none of it
+changes what is written below.
 
 The premise, in one line: **the note bar is a container, and an actor at the
 strike line has a verb.** The timeline stops being notation beside a scenario

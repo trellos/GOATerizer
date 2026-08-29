@@ -10,7 +10,9 @@ This repository currently contains a **vertical slice**: a full run shell, five
 scenarios across two minigame classes covering difficulties 1–6, live guitar
 input, a continuous musical clock, pregame, a timing check, timeline, judgment,
 scoring, stars and results. `docs/game-design/` is the design authority;
-`AGENTS.md` is the repository's working agreement.
+`AGENTS.md` is the repository's working agreement; `docs/IDEAS.md` is the
+running backlog of things noticed while playing, and of the content gaps sitting
+behind finished systems.
 
 The characters now live **on the timeline itself** rather than in a scenario
 panel beside it — the goat stands on the note bars and climbs them, the can
@@ -55,8 +57,8 @@ pins a library ref, deliberately:
 > `main`.
 
 An existing `../Tuninator` is left where it is — you may be working on the
-library — but it is not taken on trust. Setup checks that `src/index.ts` exports
-`createRecognizer`, and if it does not (a checkout on `main` is still 0.1), it
+library — but it is not taken on trust. Setup checks that the library's own
+`../Tuninator/src/index.ts` exports `createRecognizer`, and if it does not (a checkout on `main` is still 0.1), it
 exits naming the revision it found and how to move it. Without that check the
 wrong ref surfaces much later as a Vite import resolution error that mentions
 neither this script nor refs.
@@ -115,9 +117,17 @@ tables at the top of that script.
    the left. The goat stands on the bar you just hit and jumps to the next one,
    growing with the streak; a miss drops it to the floor and the next good note
    spawns a new one. The scenario behind it all is a backdrop.
-4. Four measures, 0–3 stars. Zero stars ends the run and tells you what kind of
-   lamb you are. Each passed minigame puts a trophy on the shelf in the top bar
-   — bare at one star, horns at two, a crown at three.
+   The kit changes with the minigame: the difficulty picks one of seven
+   intensity rungs, from a half-time skeleton to the whole drum kit, and the
+   feel of the authored notes picks the grid the bar subdivides on. The bass
+   listens too — miss notes and it steps out of the way, a rung quieter each
+   time, until after four it is barely there and the drums are holding the floor
+   alone. Land them, or let a note go at the right moment, and it comes back.
+4. **Eight measures** — the scenario's four-measure phrase, played twice, so the
+   first pass is the read and the second is the performance. 0–3 stars. Zero
+   stars ends the run and tells you what kind of lamb you are. Each passed
+   minigame puts a trophy on the shelf in the top bar — bare at one star, horns
+   at two, a crown at three.
 
 **Timing check** (from the start screen) measures how far your notes land from
 the beat, so "the game feels late" can be told apart from "I am playing late".
@@ -149,17 +159,19 @@ Data flows one way. Views never mutate gameplay; the analyzer never touches a
 sprite.
 
 ```
-AudioEngine ── one AudioContext ──┬── Transport ─────── BassPlayer
+AudioEngine ── one AudioContext ──┬── Transport ──────┬── BassPlayer
+                                  │                   └── DrumPlayer
                                   └── TuninatorGuitarInputProvider
                                               │  normalised guitar events
                                               ▼
                                      AttemptRuntime
                     (TargetJudge, AttemptScore, StarMeter, TimelineActor)
                                               │  judgment
-                     ┌────────────────────────┴────────────────────────┐
-                     ▼                                                 ▼
-              TimelineModel  ──▶  TimelineView                ScenarioBackdropView
-              (Key + Tab)        (notes + the actor)            (background only)
+              ┌───────────────────────────────┼───────────────────────────────┐
+              ▼                               ▼                               ▼
+       TimelineModel ──▶ TimelineView   BackingDuck ──▶ BassPlayer   ScenarioBackdropView
+       (Key + Tab)     (notes + actor)  (how loud the backing         (background only)
+                                         is allowed to be)
 ```
 
 `EnergyLayer` hangs off the run rather than the attempt: it flies the stars
@@ -172,7 +184,7 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 
 | Path | What lives there |
 |---|---|
-| `src/audio/` | `Transport` (the one clock), the bass generator and its lookahead scheduler, the shared `AudioContext` |
+| `src/audio/` | `Transport` (the one clock), the bass generator and its lookahead scheduler, the drum kit and its intensity ladder, the shared `AudioContext` |
 | `src/music/` | Degrees, keys, transposition, guitar fingerings, pitch maths |
 | `src/input/` | The `GuitarInputProvider` boundary, the Tuninator adapter, the deterministic test provider |
 | `src/game/` | Target resolution, judgment, score, stars, the attempt, the 16-slot run, ranks |
@@ -233,7 +245,10 @@ presented as design.
 | Key weighting | `src/config/key-weighting.ts` | All 24 keys, weighted toward guitar-friendly ones, nothing at zero |
 | Timing windows | `src/config/tuning.ts` | Per subdivision, in beats; Good clamped to half the gap to the nearest neighbour |
 | Score values | `src/config/tuning.ts` | Perfect 100, Good 40, Miss 0 |
-| Star thresholds | each level's `stars` block in the scenario JSON | 45% / 80% / 100% of the all-Perfect maximum |
+| Star thresholds | each level's `stars` block in the scenario JSON | Pass is 45% of a **single clean pass**, deliberately not scaled with the repeat, so a good second pass rescues a bad first read; two and three stars are 80% and 100% of the **whole attempt** |
+| Attempt length | `src/config/tuning.ts` | A four-measure authored phrase, played `ATTEMPT_REPEATS` = 2 times |
+| Drum intensity | `src/audio/drum-pattern.ts` | Seven rungs by difficulty, three rhythm variants each, one measure per loop |
+| Backing duck | `src/game/backing-duck.ts` | Five rungs, −5 dB per missed note, bottoming at −20 dB rather than silence |
 | Bass grammar | `src/audio/bass-line.ts` | One diatonic chord per measure, one note per beat |
 | Latency trim | measured by the timing check, kept in `localStorage`; `src/config/tuning.ts` holds the un-measured default | 0ms on top of the browser's `outputLatency + baseLatency` |
 | Streak bonus toward the second star | `src/config/tuning.ts` | 1 point per unbroken note against 10 for a Perfect — 10% of any attempt's own maximum |
@@ -258,6 +273,18 @@ presented as design.
 - **Placeholder art is original CC0 work**, not the third-party packs the
   scenario file names — see `docs/assets/ASSET_SOURCES.md` for why and for how
   to swap them in.
+- **Nothing selects a drum rhythm variant.** Every intensity rung has straight,
+  sixteenth and triplet versions, chosen from the authored notes — but all 20
+  authored levels resolve to `straight`, because the material tops out at
+  eighths. Two thirds of the drum work is unheard in play until a scenario is
+  authored in sixteenths or triplets.
+- **The G string offers one hand position, and cannot offer more.** The low root
+  has exactly one possible fret per string, and the register the game is written
+  in puts that below the nut on the G string in 20 of 24 keys — see
+  `DECISION_LOG.md` (DECISION-032). Not a fingering bug.
 - **No physical guitar has been played against this build.** Browser validation
   drives the deterministic provider and separately asserts that the production
   path reaches `listening` through Tuninator against a fake capture device.
+  Everything about *feel* — the latency trim, the timing windows, whether the
+  backing duck reads as supportive or as nagging — is unverified against an
+  actual instrument.
