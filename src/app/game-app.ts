@@ -1959,6 +1959,11 @@ export class GameApp {
       "actor lane/streak": attempt
         ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`
         : "—",
+      // How heavy the actor currently is. `streak` alone does not answer that:
+      // size is its square root against a cap, so the first few notes move it
+      // far more than the last few, and it is size that drives how the landing
+      // reads (`ui/timeline/actor-layer.ts`).
+      "actor size": attempt ? attempt.actor.state.size.toFixed(2) : "—",
       // Frame rate and *our share of it*, separately: a low rate beside a tiny
       // work figure is the paint, not the JavaScript, and they are fixed in
       // different places. See `ui/frame-meter.ts`.

@@ -126,9 +126,11 @@ tables at the top of that script.
    slide in from the right, cross the strike line on their beat, and leave to
    the left. The goat stands on the bar you just hit and jumps to the next one,
    growing with the streak; it lands with a squash, a puff of dust and a ring
-   out from its feet, so an arrival is an event rather than a sprite stopping. A
-   miss drops it to the floor and the next good note spawns a new one. The
-   scenario behind it all is a backdrop.
+   out from its feet, so an arrival is an event rather than a sprite stopping.
+   The longer the streak, the heavier it lands — it compresses further, stops
+   dead at the bottom for a moment before springing back, and kicks up more
+   ground. A miss drops it to the floor and the next good note spawns a new one.
+   The scenario behind it all is a backdrop.
    The kit changes with the minigame: the difficulty picks one of seven
    intensity rungs, from a half-time skeleton to the whole drum kit, and the
    feel of the authored notes picks the grid the bar subdivides on. The bass

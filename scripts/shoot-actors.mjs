@@ -170,6 +170,14 @@ async function strip(page, { count, every = 1, width, height, offsetX = 0, offse
   );
 }
 
+/** Reads a value out of the dev panel by its label. */
+async function dev(page, label) {
+  return page.evaluate((wanted) => {
+    const terms = [...(document.getElementById("dev-readouts")?.querySelectorAll("dt") ?? [])];
+    return terms.find((dt) => dt.textContent === wanted)?.nextElementSibling?.textContent ?? null;
+  }, label);
+}
+
 function save(name, dataUrl) {
   const file = path.join(OUT, `${prefix}${name}.png`);
   writeFileSync(file, Buffer.from(dataUrl.split(",")[1], "base64"));
@@ -184,16 +192,30 @@ async function shoot(browser, { name, url, scenario, plan }) {
   await page.click("#pregame-play");
   await page.waitForTimeout(400);
   await page.click("#dev-autoplay-perfect");
-  // Long enough for a streak to build, so the actor is at a size worth judging
-  // rather than at its first-note minimum.
-  await page.waitForTimeout(9000);
 
   console.log(`${name} (${scenario}):`);
-  await page.locator("#dev-panel").evaluate((el) => el.setAttribute("hidden", ""));
-  await page.screenshot({ path: path.join(OUT, `${prefix}${name}-frame.png`) });
-  console.log(`  wrote ${path.relative(REPO, path.join(OUT, `${prefix}${name}-frame.png`))}`);
-  for (const shot of plan) save(`${name}-${shot.name}`, await strip(page, shot));
-  await page.locator("#dev-panel").evaluate((el) => el.removeAttribute("hidden"));
+  // Shots run in the order given and time only moves forward, so `wait` is
+  // "how much longer than the last shot", not an absolute. That is what lets a
+  // plan hold a light landing and a heavy one from the same run: under perfect
+  // autoplay the streak only grows, so early and late *are* light and heavy.
+  for (const shot of plan) {
+    if (shot.wait) await page.waitForTimeout(shot.wait);
+    if (shot.frame) {
+      await page.locator("#dev-panel").evaluate((el) => el.setAttribute("hidden", ""));
+      await page.screenshot({ path: path.join(OUT, `${prefix}${name}-frame.png`) });
+      await page.locator("#dev-panel").evaluate((el) => el.removeAttribute("hidden"));
+      console.log(`  wrote ${path.relative(REPO, path.join(OUT, `${prefix}${name}-frame.png`))}`);
+      continue;
+    }
+    // Sampled either side of the strip, because the strip spans about eight
+    // tenths of a second and the streak can grow across it. A single reading
+    // taken before would have labelled a light capture with a size the frames
+    // do not show.
+    const before = await dev(page, "actor size");
+    save(`${name}-${shot.name}`, await strip(page, shot));
+    const after = await dev(page, "actor size");
+    if (before && before !== "—") console.log(`    (actor size ${before} → ${after})`);
+  }
   await page.close();
 }
 
@@ -209,16 +231,24 @@ try {
   await shoot(browser, {
     name: "goat",
     scenario: "Rocky Ascent",
-    url: `${BASE}/?dev=1&input=test&level=3`,
+    // Pinned: without a scenario the run picks whichever one authors this
+    // difficulty, and a Rocky shot that came back full of beer cans is how
+    // that was discovered.
+    url: `${BASE}/?dev=1&input=test&level=3&scenario=rocky_ascent`,
     plan: [
-      // One still, big, to judge how much of the lane the actor occupies.
-      { name: "still", count: 1, width: 190, height: 165, offsetX: 26, offsetY: 0, scale: 4, find: "goat" },
+      // Early, while the streak is still short and the actor is light.
       // A landing, frame by frame: the hop arc and whatever lands with it.
       // Long enough to be certain of catching one — 24 samples every other
       // rendered frame is about eight tenths of a second, comfortably more than
       // a beat at any tempo the game offers, so the strip cannot come back
       // showing only the quiet part between two hops.
-      { name: "hop", count: 24, every: 2, width: 170, height: 155, offsetX: 26, offsetY: 0, scale: 1.5, columns: 8, find: "goat" },
+      { name: "hop-light", wait: 5600, count: 24, every: 2, width: 170, height: 155, offsetX: 26, offsetY: 0, scale: 1.5, columns: 8, find: "goat" },
+      // ...and again once the streak has capped, which is the same landing at
+      // the other end of its weight range.
+      { name: "hop-heavy", wait: 7000, count: 24, every: 2, width: 170, height: 155, offsetX: 26, offsetY: 0, scale: 1.5, columns: 8, find: "goat" },
+      // One still, big, to judge how much of the lane the actor occupies.
+      { name: "still", count: 1, width: 190, height: 165, offsetX: 26, offsetY: 0, scale: 4, find: "goat" },
+      { name: "frame", frame: true },
     ],
   });
 
@@ -227,7 +257,8 @@ try {
     scenario: "Can Crushing",
     url: `${BASE}/?dev=1&input=test&level=2&scenario=can_crushing`,
     plan: [
-      { name: "still", count: 1, width: 250, height: 185, offsetX: -55, offsetY: 20, scale: 4, find: "crusher" },
+      { name: "still", wait: 9000, count: 1, width: 250, height: 185, offsetX: -55, offsetY: 20, scale: 4, find: "crusher" },
+      { name: "frame", frame: true },
       // A whole crush: cans inbound, the palm down, the flatten, the fall.
       { name: "crush", count: 16, every: 2, width: 235, height: 175, offsetX: -50, offsetY: 20, scale: 2, columns: 8, find: "crusher" },
     ],

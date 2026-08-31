@@ -126,13 +126,23 @@ cost: he is a stick figure standing next to a piece of real pixel art, and the
 gap got wider rather than narrower. The honest fix is a limb-segment sprite set
 driven by the same IK — arm, forearm, torso, head — rather than a pose cycle.
 
-### The goat has one landing, played at every size
+### A big goat overhangs the strike line
 
-The squash, dust and ring are the same shape whether the goat is at its floor
-size or twelve notes into a streak. A big goat should land heavier: more dust,
-a longer settle, and probably a screen-level cue past some streak. The
-`size` is already in hand at the point the juice is drawn, so this is tuning
-rather than plumbing.
+The actor is anchored a fixed 34px left of the line, and that number is from
+when it was half a lane row tall. It is now up to about 110px wide, so at a
+capped streak the body overhangs the line by roughly 21px at rest and 34px at
+the bottom of a heavy landing — about a fifth of a beat of read-ahead, sitting
+under the most attention-stealing object on screen. `actor-layer.ts` rule 1
+used to claim this could not happen.
+
+The fix is to anchor on the body's **right edge** rather than its centre, so
+the overhang is a constant margin at every size. That is a one-line change and
+a deliberate composition decision — the goat would then stand further left as
+the streak builds — so it is a question rather than a job. Dust is already
+clamped and does not cross.
+
+Two other things also cross: the impact ring, which is a 1–2px stroke and
+probably fine, and the streak sparks.
 
 ## Closed
 

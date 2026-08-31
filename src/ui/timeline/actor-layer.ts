@@ -5,11 +5,21 @@
  *
  * Three placement rules, all of them load-bearing:
  *
- *   1. **Just left of the strike line, never right of it.** The strike line is
- *      the instant of input, so an actor sitting after it reads as a
- *      consequence of the player's timing rather than a prediction of it. An
- *      actor at or right of the line would also occlude the read-ahead zone
- *      with the single most attention-stealing object on screen.
+ *   1. **Anchored just left of the strike line.** The strike line is the
+ *      instant of input, so an actor sitting after it reads as a consequence of
+ *      the player's timing rather than a prediction of it, and an actor centred
+ *      right of the line would occlude the read-ahead zone with the single most
+ *      attention-stealing object on screen.
+ *
+ *      Stated as "never right of it" for two passes, and that is no longer true
+ *      of the *body*: the anchor is a fixed 34px left of the line, but the goat
+ *      grew, and at a capped streak its sprite is about 110px wide — so it
+ *      overhangs the line by roughly 21px at rest and 34px at the bottom of a
+ *      heavy landing, which is about a fifth of a beat of read-ahead. Whether
+ *      to fix that by anchoring on the body's right edge instead of its centre
+ *      is a composition decision, not a bug fix, and it is parked in
+ *      `docs/IDEAS.md` rather than taken here. What is *not* allowed to cross
+ *      is dust — see `DUST_RIGHT_FRACTION`.
  *   2. **On top of its bar**, so a scale run is visibly a staircase being
  *      climbed rather than a character floating past some rectangles.
  *   3. **Fallen actors below the lane band**, small and dim. They are the
@@ -33,14 +43,21 @@ const ACTOR = {
   spark: "#ffd34d",
   dust: "#f0e6d0",
   ring: "#fff4cf",
-  shadow: "rgba(0,0,0,0.38)",
+  shadow: "#000",
 } as const;
 
 /** Where the actor sits relative to the strike line, in bar-widths. */
 const LEFT_OF_STRIKE_PX = 34;
 
-/** How long the landing hop takes, in beats. */
-const HOP_BEATS = 0.28;
+/**
+ * How long the landing hop takes, in beats.
+ *
+ * Exported because it is the offset between "beats since the actor landed" and
+ * "beats since the impact" — everything the impact drives starts at the *end*
+ * of the hop, and a test reasoning about dust or squash in transport time has
+ * to know that or it silently measures the wrong window.
+ */
+export const HOP_BEATS = 0.28;
 
 /**
  * How big the goat is, as a multiple of a lane row: floor, plus what the streak
@@ -58,26 +75,93 @@ const SIZE_FLOOR_ROWS = 0.95;
 const SIZE_STREAK_ROWS = 1.35;
 
 /**
- * The landing, as squash and stretch.
- *
- * `LAND_SQUASH` is how far it compresses on contact, `LAND_DECAY` how quickly
- * that dies away in beats, and `LAND_WOBBLE` the rate of the bounce underneath
- * the decay — about one full oscillation before it is gone, so it reads as a
- * body absorbing an impact rather than as a wobble effect. `STRETCH` is the
- * opposite, applied in the air: a thing moving fast vertically elongates.
- *
- * All of it is resolved from `beat - landedBeat`, never accumulated, so a
- * dropped frame moves nothing — the same rule the hop arc already followed.
+ * How much the actor elongates in the air. Constant: it is about how fast the
+ * body is moving, and the hop arc does not change with the streak.
  */
 const STRETCH = 0.16;
-const LAND_SQUASH = 0.22;
-const LAND_DECAY = 0.18;
-const LAND_WOBBLE = 22;
 
-/** How long the dust and the impact ring last, in beats. */
-const DUST_BEATS = 0.55;
+/** How long the impact ring lasts, in beats. */
 const RING_BEATS = 0.3;
-const DUST_MOTES = 7;
+
+/**
+ * Everything about a landing that changes with how big the actor has grown.
+ *
+ * The problem this solves: `size` used to feed exactly one thing, the actor's
+ * overall scale. So a twelve-note streak was a *bigger* goat playing a
+ * *smaller* goat's landing — and mass that does not change how a body moves
+ * reads as a zoom rather than as weight. Every field here is the same landing
+ * seen at a different weight.
+ *
+ * The ranges are what "heavier" means, stated once:
+ *
+ *   - it **deforms further** on contact, and **settles slower** — a longer
+ *     decay and a slower wobble, because a heavy body oscillates lazily;
+ *   - it **stops dead for a moment** at the bottom (`hold`). This is hitstop,
+ *     and it is the single strongest weight cue available: the pause *is* the
+ *     mass. Two frames at 90bpm at the top of the range, nothing at the bottom;
+ *   - it **displaces more ground**, further, for longer;
+ *   - it **presses harder into its own shadow**.
+ *
+ * Pure, so "does a heavy landing actually outlast a light one" is a unit test
+ * rather than something you have to catch on a screenshot.
+ */
+export type LandingWeight = {
+  /** Peak compression, as a fraction of body height. */
+  squash: number;
+  /** How quickly the spring dies away, in beats. */
+  decay: number;
+  /** Rate of the bounce under the decay, in radians per beat. */
+  wobble: number;
+  /** Hitstop: how long the pose is held at full compression, in beats. */
+  hold: number;
+  motes: number;
+  /** Multiplier on how far dust is thrown. */
+  dustReach: number;
+  /** How long the dust lasts, in beats. */
+  dustLife: number;
+  /** Multiplier on each mote's size. */
+  moteScale: number;
+  shadowAlpha: number;
+  /** Multiplier on how far the shadow spreads at full compression. */
+  shadowSpread: number;
+};
+
+const lerp = (from: number, to: number, t: number): number => from + (to - from) * t;
+
+export function landingWeightFor(size: number): LandingWeight {
+  // Clamped rather than trusted: `size` is documented as 0..1 and a landing is
+  // not the place to find out that something upstream disagreed.
+  const s = Math.min(1, Math.max(0, size));
+  return {
+    squash: lerp(0.16, 0.34, s),
+    decay: lerp(0.14, 0.28, s),
+    wobble: lerp(26, 16, s),
+    hold: lerp(0, 0.05, s),
+    motes: Math.round(lerp(5, 14, s)),
+    dustReach: lerp(0.8, 1.5, s),
+    dustLife: lerp(0.45, 0.75, s),
+    moteScale: lerp(0.9, 1.3, s),
+    shadowAlpha: lerp(0.3, 0.5, s),
+    shadowSpread: lerp(1.2, 1.9, s),
+  };
+}
+
+/**
+ * How far right of the actor dust may travel, as a fraction of the gap between
+ * it and the strike line — and the margin it must leave.
+ *
+ * The strike line is the read-ahead boundary, and dust is the one thing here
+ * that moves outward far enough to cross it: at full streak a mote already
+ * reached about 100px against a 34px gap, so the biggest landings were
+ * throwing debris over the notes the player is reading. Scaling the puff with
+ * size, which is the whole point of this pass, would have made that worse.
+ *
+ * Biasing the puff leftward rather than shrinking it is not a workaround: the
+ * world scrolls right to left, so dust trailing backwards is what a puff behind
+ * moving ground looks like. The clamp underneath it is the backstop.
+ */
+const DUST_RIGHT_FRACTION = 0.45;
+const DUST_RIGHT_MARGIN = 6;
 
 /**
  * The scenario's climber art: a pose cycle, one pose per successful note.
@@ -140,17 +224,23 @@ export function drawTimelineActor(
   // under the goat, so it reads as kicked up by the landing rather than as
   // something stuck to the sprite.
   const land = Math.max(0, sinceLanding - HOP_BEATS);
+  const weight = landingWeightFor(state.size);
   if (t >= 1) {
     drawLandingRing(ctx, x, toY, scale, land);
-    drawLandingDust(ctx, x, toY, scale, land, state.streak);
+    // Dust is clamped against the strike line rather than against its own
+    // reach: how far it may go is a fact about where the actor is standing, and
+    // only the caller knows that.
+    drawLandingDust(ctx, x, toY, scale, land, state.streak, weight, LEFT_OF_STRIKE_PX - DUST_RIGHT_MARGIN);
   }
 
   // One pose per landing, so consecutive steps do not look identical. Keyed off
   // the streak rather than a counter of its own: the streak is already the
   // number of steps this actor has taken.
   drawGoat(ctx, x, y, scale, -lean, poseFor(sprites, state.streak), state.decorations, {
-    squash: squashAt(t, land),
+    squash: squashAt(t, land, weight),
     grounded: t >= 1,
+    shadowAlpha: weight.shadowAlpha,
+    shadowSpread: weight.shadowSpread,
   });
 }
 
@@ -161,10 +251,17 @@ export function drawTimelineActor(
  * where it is moving fastest. On contact it compresses hard and springs back
  * through a damped oscillation, which is the part that actually reads as
  * weight — a landing without it is a sprite that stops.
+ *
+ * The compression is *held* at its peak for `weight.hold` before the spring is
+ * allowed to start. That hold is hitstop, and it is the difference between a
+ * heavy landing and a large light one: the body arrives, stops, and only then
+ * recovers. At the light end the hold is zero and this is exactly the spring it
+ * always was.
  */
-function squashAt(hop: number, land: number): number {
+export function squashAt(hop: number, land: number, weight: LandingWeight): number {
   if (hop < 1) return -STRETCH * Math.sin(hop * Math.PI);
-  return LAND_SQUASH * Math.exp(-land / LAND_DECAY) * Math.cos(land * LAND_WOBBLE);
+  const spring = Math.max(0, land - weight.hold);
+  return weight.squash * Math.exp(-spring / weight.decay) * Math.cos(spring * weight.wobble);
 }
 
 function poseFor(sprites: ActorSprites, step: number): HTMLImageElement | null {
@@ -172,6 +269,24 @@ function poseFor(sprites: ActorSprites, step: number): HTMLImageElement | null {
   if (poses.length === 0) return null;
   return poses[Math.abs(step) % poses.length] ?? null;
 }
+
+/**
+ * What a landing is doing to the body this frame.
+ *
+ * Bundled rather than passed as four arguments because they are one thing seen
+ * from four sides, and because {@link RESTING} then states what "no landing" is
+ * in one place — the fallen actors on the floor are not mid-impact and should
+ * not have to spell that out.
+ */
+type Juice = {
+  squash: number;
+  grounded: boolean;
+  shadowAlpha: number;
+  shadowSpread: number;
+};
+
+/** A body at rest: no compression, and the lightest shadow. */
+const RESTING: Juice = { squash: 0, grounded: true, shadowAlpha: 0.3, shadowSpread: 1.2 };
 
 /**
  * The goat, standing on the bar.
@@ -187,7 +302,7 @@ function drawGoat(
   lean: number,
   pose: HTMLImageElement | null,
   decorations: number,
-  juice: { squash: number; grounded: boolean } = { squash: 0, grounded: true }
+  juice: Juice = RESTING
 ): void {
   ctx.save();
   ctx.translate(x, baseY);
@@ -195,21 +310,34 @@ function drawGoat(
   // A contact shadow, and it widens exactly as the body squashes. Two jobs: it
   // plants the goat on the bar instead of letting it float a pixel above one,
   // and it is a second channel carrying the same impact the body is — which is
-  // what stops a landing from depending on catching one frame of squash.
+  // what stops a landing from depending on catching one frame of squash. A
+  // heavier actor sits in a darker one and drives it wider.
   if (juice.grounded) {
-    const spread = 1 + Math.max(0, juice.squash) * 1.4;
+    const spread = 1 + Math.max(0, juice.squash) * juice.shadowSpread;
+    ctx.save();
+    ctx.globalAlpha *= juice.shadowAlpha;
     ctx.fillStyle = ACTOR.shadow;
     ctx.beginPath();
     ctx.ellipse(0, 0, scale * 0.3 * spread, scale * 0.07, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
   }
 
   ctx.rotate(lean * 0.18);
-  // Volume-preserving: what it loses in height it gains in width, which is what
-  // separates squash from simply being scaled down for a moment. Clamped so a
-  // pathological beat delta cannot invert or collapse the sprite.
+
+  // The body only, inside its own squash. What it loses in height it gains in
+  // width — that is what separates squash from being briefly scaled down — but
+  // the width grows as the *square root*, not in proportion.
+  //
+  // Strict volume preservation is a 2D idea, and this is a drawing of a solid:
+  // a body flattening spreads into two horizontal directions and the view only
+  // shows one of them, so the visible width should grow by the square root of
+  // what the height lost. Taking the whole widening in one axis made a heavy
+  // landing flatten the goat to twice its own length — it stopped reading as an
+  // impact and started reading as a different animal lying down.
   const sy = Math.max(0.35, 1 - juice.squash);
-  ctx.scale(1 / sy, sy);
+  ctx.save();
+  ctx.scale(1 / Math.sqrt(sy), sy);
 
   if (pose && pose.width > 0) {
     const height = scale * 0.72;
@@ -221,9 +349,12 @@ function drawGoat(
     ctx.fillStyle = ACTOR.fallback;
     ctx.fillRect(-scale * 0.3, -scale * 0.55, scale * 0.6, scale * 0.55);
   }
+  ctx.restore();
 
   // Decorations: earned past the size cap, so a long streak still registers
-  // once growing has stopped.
+  // once growing has stopped. Outside the squash — they are sparks orbiting the
+  // actor rather than part of it, and a stretched star reads as a rendering
+  // fault rather than as a body under load.
   ctx.fillStyle = ACTOR.spark;
   for (let i = 0; i < decorations; i += 1) {
     const angle = -Math.PI * 0.75 + i * 0.42;
@@ -278,14 +409,16 @@ function drawLandingDust(
   y: number,
   scale: number,
   land: number,
-  streak: number
+  streak: number,
+  weight: LandingWeight,
+  maxRight: number
 ): void {
-  if (land >= DUST_BEATS) return;
-  const t = land / DUST_BEATS;
+  if (land >= weight.dustLife) return;
+  const t = land / weight.dustLife;
   ctx.save();
   ctx.globalAlpha = (1 - t) * (1 - t) * 0.8;
   ctx.fillStyle = ACTOR.dust;
-  for (let i = 0; i < DUST_MOTES; i += 1) {
+  for (let i = 0; i < weight.motes; i += 1) {
     // Spread across the two lower quadrants, alternating sides so the puff is
     // symmetrical about the feet however few motes there are.
     const side = i % 2 === 0 ? 1 : -1;
@@ -295,13 +428,21 @@ function drawLandingDust(
     // at a tenth of a body width and rose a fifth of one, which put half the
     // puff behind the goat — the motes that were meant to read as spray came
     // out on one side only, because the other side was inside the sprite.
-    const reach = scale * (0.22 + spin * 0.3) * (0.5 + t * 1.2);
-    // Sizes vary with the mote, because seven identical circles in a row read
-    // as gravel rather than as dust however they are coloured.
-    const mote = scale * 0.055 * (0.55 + spin * 0.9) * (1 - t * 0.5);
+    const reach = scale * (0.22 + spin * 0.3) * (0.5 + t * 1.2) * weight.dustReach;
+    // Sizes vary with the mote, because identical circles in a row read as
+    // gravel rather than as dust however they are coloured.
+    const mote = scale * 0.055 * (0.55 + spin * 0.9) * (1 - t * 0.5) * weight.moteScale;
+    // Short on the right and hard-stopped short of the strike line, so a heavy
+    // landing never throws debris over the notes the player is reading ahead
+    // on. The mote's own radius comes out of the budget, because what must not
+    // cross the line is the drawn circle, not its centre — and the radius
+    // scales with the actor, so a fixed pixel margin would be right at one size
+    // and wrong at every other. See `DUST_RIGHT_FRACTION`.
+    const drift = Math.sin(angle) * reach;
+    const dx = drift > 0 ? Math.min(drift * DUST_RIGHT_FRACTION, maxRight - mote) : drift;
     ctx.beginPath();
     ctx.arc(
-      x + Math.sin(angle) * reach,
+      x + dx,
       // Fanned rather than laid out along the ground: the motes thrown nearly
       // straight up carry most of their reach vertically, the ones thrown wide
       // carry almost none of it. Plus the whole puff rises and falls back,
