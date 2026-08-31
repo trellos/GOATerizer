@@ -87,42 +87,6 @@ distinction is doing real diagnostic work — one says "you overshot by a third"
 the other says "that was not in the key" — and it probably wants a colour
 difference in real art rather than a rotation.
 
-### An input level check, because the gain problem is not auto-gainable
-
-Playtest: "I have to turn up the gain on my audio interface for it to recognize
-notes. Can it auto calibrate its sound level?"
-
-Investigated, and the obvious answer is wrong. **A software gain stage cannot
-fix this.** Boosting after the converter raises the signal and the noise
-together, and every gate that matters here is a *ratio*, not an absolute:
-Tuninator's amplitude gate is `min(rmsGate, noiseFloor × 200)` — a cap, not a
-floor — so it already measures the rig's own noise floor and adapts *downward*
-on a quiet clean input. Turning the interface preamp up works because it happens
-*before* the ADC, which is the one place gain actually buys signal-to-noise.
-
-So what is missing is not calibration, it is a **readout**. Tuninator already
-reports everything needed and GOATerizer already carries it as far as the dev
-panel: frame RMS, per-channel RMS, and which channel was selected. None of it is
-visible in normal play, so a player whose level is too low sees "it doesn't
-recognise my notes" and nothing else.
-
-Worth building: a level check — most naturally on the existing timing-check
-screen, which already asks the player to play notes — showing signal against
-measured noise floor as a ratio, with a target to turn the interface up to.
-
-Two specific things it should catch:
-
-- **The 2-in interface case.** Tuninator's own docs flag it: an instrument in
-  input 2 lands entirely on channel 1, and `channels: "auto"` sums until real
-  signal is heard. If the summed level never crosses the gate, the right channel
-  may never get selected — a chicken-and-egg that looks exactly like "I have to
-  turn the gain up".
-- **Confidence, not amplitude.** A quiet signal has worse SNR, so YIN confidence
-  falls and frames are treated as unvoiced even when they clear the amplitude
-  gate. `confidenceGate` and `rmsGate` are real `EngineTuning` options that
-  GOATerizer currently does not pass at all, so both sit at defaults chosen
-  without knowing whether the input is a DI or a room mic.
-
 ---
 
 ## Open — untested in the real world
@@ -154,6 +118,23 @@ rung.
 
 ## Closed
 
-Nothing yet. Entries move here with a date and a one-line outcome when they are
-built, rejected or made moot, so a rejected idea does not come back round as a
-new one.
+### Auto-calibrating the input level — built, 2026-08-29 (DECISION-034)
+
+"I have to turn up the gain on my audio interface for it to recognize notes."
+My first answer was half wrong and is worth keeping as a correction: I said the
+problem was not auto-calibratable, because a software gain stage cannot improve
+signal-to-noise. The gain half of that is true. The conclusion was not — the
+thing to calibrate was never the *gain*, it was Tuninator's amplitude **gate**,
+which is a real `EngineTuning` option this repo simply never passed.
+
+The player's own argument settled it: their amp sim reads the same signal
+perfectly, because a sim only amplifies and has no gate to fail. Tuninator's gate
+is `min(rmsGate, noiseFloor × 200)` — a cap, not a floor — so on any rig whose
+noise floor is above about 4e-5 it binds at the flat 0.008 default, no matter how
+clean the signal underneath is.
+
+Still open from the same thread: the **2-in interface** case is *not* the cause
+here — Tuninator sums rather than averages its channels, explicitly to avoid the
+6 dB loss, so a guitar on input 2 arrives at full level. Per-channel RMS and the
+selected channel are now shown in pregame anyway, since that is the one failure
+that otherwise looks exactly like a dead detector.

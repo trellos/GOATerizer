@@ -56,6 +56,15 @@ export type TuninatorProviderOptions = {
   workletUrl: string;
   /** `input.channels`, exposed for the debug panel's channel controls. */
   channels?: "auto" | "sum" | number;
+  /**
+   * Amplitude below which Tuninator treats the input as silence.
+   *
+   * Left undefined the library uses its own default, which assumes a hotter
+   * input than a guitarist running an amp sim tends to. Measured per rig — see
+   * `game/input-gate.ts` — and passed here so a quiet, clean signal is heard
+   * without the player having to drive their interface into their amp sim.
+   */
+  rmsGate?: number;
 };
 
 /** Player-facing copy, per recognizer error code. Never euphemistic. */
@@ -136,6 +145,11 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
         autoGainControl: false,
         channels: this.#options.channels ?? "auto",
       },
+      // Only sent when the player has actually measured their rig; otherwise
+      // the object is omitted entirely and Tuninator's defaults stand.
+      ...(this.#options.rmsGate !== undefined
+        ? { engine: { rmsGate: this.#options.rmsGate } }
+        : {}),
       diagnostics: {
         // The tuner readout and the "is the guitar actually being heard" meter
         // both need the continuous stream.

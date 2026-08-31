@@ -27,6 +27,8 @@ import { BassPlayer } from "../audio/bass-player.js";
 import { BACKBEAT_PATTERN, drumPatternForAttempt } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { BackingDuck } from "../game/backing-duck.js";
+import { InputGateMeasurement, inputGateVerdict } from "../game/input-gate.js";
+import { readInputRmsGate, writeInputRmsGate } from "../persistence/input-gate.js";
 import { Transport } from "../audio/transport.js";
 import {
   planAutoPerformance,
@@ -191,6 +193,13 @@ export class GameApp {
    * every attempt rather than being rebuilt with each.
    */
   readonly #duck = new BackingDuck();
+  /**
+   * What the player's rig actually sounds like. Fed from every pitch frame,
+   * including the ones Tuninator gated — which is the whole point, because a
+   * player whose notes are all being rejected is exactly who needs this.
+   */
+  readonly #inputGate = new InputGateMeasurement();
+  #inputRmsGate: number | null = readInputRmsGate();
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
   /** Which beat the kit is currently playing. See `#refreshDrumBeat`. */
@@ -488,6 +497,13 @@ export class GameApp {
       this.#leaveCalibration()
     );
     must("pregame-reroll", HTMLButtonElement).addEventListener("click", () => this.#reroll());
+    must("pregame-input-apply", HTMLButtonElement).addEventListener("click", () => {
+      const recommended = this.#inputGate.state.recommended;
+      if (recommended !== null) this.#applyInputGate(recommended);
+    });
+    must("pregame-input-reset", HTMLButtonElement).addEventListener("click", () =>
+      this.#applyInputGate(null)
+    );
     must("pregame-calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
       this.#applyCalibration()
     );
@@ -775,6 +791,9 @@ export class GameApp {
         : new TuninatorGuitarInputProvider({
             audioContext: context as AudioContext,
             workletUrl: WORKLET_URL,
+            // Undefined unless the player has measured their rig, in which case
+            // Tuninator's own default stands.
+            ...(this.#inputRmsGate !== null ? { rmsGate: this.#inputRmsGate } : {}),
           });
 
     this.#unsubscribeInput.push(
@@ -800,6 +819,7 @@ export class GameApp {
 
   #onInputStatus(status: GuitarInputStatus): void {
     this.#inputStatus = status;
+    if (status.frame) this.#inputGate.observe(status.frame.rms);
     // `status.kind` cannot see the mocked mic -- as far as the provider is
     // concerned it opened a real one -- so the synthetic case is read from
     // `#micMocked`, tracked at the one place that actually knows. A real error
@@ -1613,6 +1633,7 @@ export class GameApp {
   }
 
   #updatePregameReadouts(): void {
+    this.#updateInputLevelReadouts();
     const frame = this.#inputStatus?.frame;
     const meter = document.querySelector<HTMLElement>("#pregame-level span");
     if (meter) {
@@ -1641,6 +1662,52 @@ export class GameApp {
    * part nothing reported — and it is the only one that can say "you are still
    * playing 40ms late after all of that".
    */
+  /**
+   * What the rig sounds like, and whether the detector is listening below it.
+   *
+   * Levels are shown as a *ratio* rather than as raw RMS, because the ratio is
+   * the thing that decides whether a note can be found and the raw number means
+   * nothing to a guitarist. The channel line only appears when there is more
+   * than one, and it is there because an instrument in input 2 lands entirely
+   * on channel 1 — a case that otherwise looks exactly like a dead detector.
+   */
+  #updateInputLevelReadouts(): void {
+    const state = this.#inputGate.state;
+    const level = document.getElementById("pregame-input-level");
+    if (level instanceof HTMLElement) {
+      const frame = this.#inputStatus?.frame;
+      const channels =
+        frame?.channelRms && frame.channelRms.length > 1
+          ? ` — channels ${frame.channelRms.map((v) => v.toFixed(3)).join(" / ")}` +
+            `, reading ${frame.selectedChannel === null || frame.selectedChannel === undefined ? "both" : frame.selectedChannel + 1}`
+          : "";
+      level.textContent =
+        state.playingLevel === null
+          ? `Listening… ${state.floorFrames} frames${channels}`
+          : state.headroom === null
+            ? `Well clear of a silent input${channels}`
+            : `${Math.round(state.headroom)}x your background noise${channels}`;
+    }
+
+    const verdict = document.getElementById("pregame-input-verdict");
+    if (verdict instanceof HTMLElement) verdict.textContent = inputGateVerdict(state);
+
+    const apply = document.getElementById("pregame-input-apply");
+    if (apply instanceof HTMLButtonElement) apply.disabled = !state.worthApplying;
+  }
+
+  /** Stores a measured gate and restarts the recognizer so it takes effect. */
+  #applyInputGate(gate: number | null): void {
+    this.#inputRmsGate = gate;
+    writeInputRmsGate(gate);
+    this.#inputGate.reset();
+    this.#updateInputLevelReadouts();
+    // The gate is a construction-time option, so the recognizer has to be
+    // rebuilt. Routed through the same switch the dev panel uses, which already
+    // knows how to tear one down and stand another up without stopping the beat.
+    this.#queueProviderSwitch(this.#providerKind);
+  }
+
   #updateCalibrationReadouts(): void {
     const reportedMs = Math.round(this.#audio.outputLatencySeconds * 1000);
     const latency = document.getElementById("pregame-latency");
@@ -1706,6 +1773,19 @@ export class GameApp {
       "input error": this.#inputStatus?.errorCode ?? "—",
       "detected Hz": this.#inputStatus?.frame?.frequencyHz?.toFixed(1) ?? "—",
       "detected conf": this.#inputStatus?.frame?.confidence.toFixed(2) ?? "—",
+      // The player's own rig, in the numbers that decide whether a note can be
+      // found at all: their noise, their notes, and where the gate sits.
+      "input floor/level": (() => {
+        const g = this.#inputGate.state;
+        return g.playingLevel === null
+          ? `${g.noiseFloor?.toFixed(5) ?? "—"} / —`
+          : `${g.noiseFloor!.toFixed(5)} / ${g.playingLevel.toFixed(5)} (${g.headroom === null ? "clean" : Math.round(g.headroom) + "x"})`;
+      })(),
+      "input gate": `${this.#inputRmsGate?.toFixed(5) ?? "default"}${
+        this.#inputGate.state.recommended !== null
+          ? ` → ${this.#inputGate.state.recommended.toFixed(5)}`
+          : ""
+      }`,
       "channel rms": this.#inputStatus?.frame?.channelRms?.map((v) => v.toFixed(3)).join(" ") ?? "—",
       "selected channel": String(this.#inputStatus?.frame?.selectedChannel ?? "—"),
       // Split, because "the browser says 180ms" and "you are 40ms late on top
