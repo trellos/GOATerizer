@@ -118,6 +118,24 @@ rung.
 
 ## Closed
 
+### The gate sets itself, as early as there is signal — built, 2026-08-31 (DECISION-035)
+
+"It does it during gameplay and not once it starts receiving a signal? I play a
+lot during the pregame screen." The measurement was already running from the
+first frame — 242ms after the click, on pregame — so the stated mechanism was
+not the problem. The report was still right about the feature: **Use my level**
+stored the gate and never gave it to the recognizer, because the provider switch
+early-returns when the source is already the one running. Measured, not read:
+across an apply the recognizer's state never left `listening`.
+
+Now forced, and now automatic — the gate sets itself in pregame once there is
+enough playing behind it, ~4.7s after the mic opens, and says so. Either button
+hands control back for the session.
+
+Still unvalidated against a real guitar, and now with more riding on it: the
+thresholds that decide to move a player's gate *without being asked* are
+reasoned, not measured on the rig that motivated any of this.
+
 ### Auto-calibrating the input level — built, 2026-08-29 (DECISION-034)
 
 "I have to turn up the gain on my audio interface for it to recognize notes."

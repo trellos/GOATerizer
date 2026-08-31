@@ -66,6 +66,42 @@ export const MIN_FLOOR_FRAMES = 40;
 export const MIN_PLAYING_FRAMES = 12;
 
 /**
+ * How many frames the measurement keeps.
+ *
+ * Bounded rather than everything-since-the-mic-opened, for two reasons that
+ * both showed up the moment this was left running for a whole session.
+ *
+ * The measurement has to describe the rig *now*. A player who turns their
+ * interface up mid-session — the exact thing this feature exists to stop them
+ * having to do, and therefore exactly what they will try — must not be averaged
+ * against ten minutes of the old level. A window forgets, which is the correct
+ * behaviour for a thing that answers "what is coming in".
+ *
+ * And the state is derived by sorting, once per read, on the render path. With
+ * an unbounded buffer that cost grows for as long as the player sits there; a
+ * window makes it a constant.
+ *
+ * Sized from a measured frame rate rather than a guessed one: Tuninator
+ * delivered about 20 diagnostic frames a second in a browser check, so this is
+ * roughly 25 seconds of audio — long enough to hold a phrase and the gaps
+ * between notes that reveal the floor, short enough to follow a knob being
+ * turned. An inference from hop size had put the rate four times higher, which
+ * would have made this window a minute and a half.
+ */
+export const MEASUREMENT_WINDOW_FRAMES = 512;
+
+/**
+ * Extra evidence demanded before the gate is moved *without being asked*.
+ *
+ * A player pressing the button has decided; automatic calibration has to decide
+ * for them, so it is deliberately stricter than what it would let them choose
+ * by hand — four times the playing frames, and separation comfortably past the
+ * point where the verdict would have warned them about their noise.
+ */
+export const AUTO_APPLY_MIN_PLAYING_FRAMES = MIN_PLAYING_FRAMES * 4;
+export const AUTO_APPLY_MIN_HEADROOM = 8;
+
+/**
  * How much louder than the noise floor a frame has to be to count as playing.
  *
  * Deliberately far below {@link GATE_NOISE_MULTIPLE}: the whole point is to
@@ -97,12 +133,30 @@ export type InputGateState = {
   headroom: number | null;
 };
 
-/** The `p`-quantile of `values`. Copies rather than sorting the caller's array. */
-function quantile(values: readonly number[], p: number): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * p)));
-  return sorted[index] ?? null;
+/** The `p`-quantile of an already-sorted slice `[from, to)`. */
+function quantileOfSorted(sorted: readonly number[], from: number, to: number, p: number): number | null {
+  const count = to - from;
+  if (count <= 0) return null;
+  const offset = Math.min(count - 1, Math.max(0, Math.round((count - 1) * p)));
+  return sorted[from + offset] ?? null;
+}
+
+/**
+ * The first index of `sorted` holding a value strictly above `threshold`.
+ *
+ * The playing frames are every frame above a multiple of the noise floor, and
+ * in a sorted array that set is a suffix — so it is found by bisection instead
+ * of by filtering into a second array and sorting that too.
+ */
+function firstAbove(sorted: readonly number[], threshold: number): number {
+  let low = 0;
+  let high = sorted.length;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (sorted[mid]! > threshold) high = mid;
+    else low = mid + 1;
+  }
+  return low;
 }
 
 /**
@@ -114,32 +168,58 @@ function quantile(values: readonly number[], p: number): number | null {
  * exactly the player who needs this, and their frames still report a level.
  */
 export class InputGateMeasurement {
-  #levels: number[] = [];
+  /** Ring buffer, unsorted, at most {@link MEASUREMENT_WINDOW_FRAMES} long. */
+  #window: number[] = [];
+  #next = 0;
+  /** Frames ever seen, which the window itself cannot report once it is full. */
+  #observed = 0;
+  /**
+   * The last derived state, dropped on every new frame.
+   *
+   * `state` is read several times per rendered frame — the readout wants it,
+   * and the dev panel wants it again for two more rows — and each read sorts
+   * the window. Memoising means the sort happens once per *audio* frame at
+   * worst rather than once per reader.
+   */
+  #cache: InputGateState | null = null;
 
   /** One frame's RMS. Order does not matter; quantiles are taken at the end. */
   observe(rms: number): void {
     if (!Number.isFinite(rms) || rms < 0) return;
-    this.#levels.push(rms);
+    if (this.#window.length < MEASUREMENT_WINDOW_FRAMES) this.#window.push(rms);
+    else this.#window[this.#next] = rms;
+    this.#next = (this.#next + 1) % MEASUREMENT_WINDOW_FRAMES;
+    this.#observed += 1;
+    this.#cache = null;
   }
 
   reset(): void {
-    this.#levels = [];
+    this.#window = [];
+    this.#next = 0;
+    this.#observed = 0;
+    this.#cache = null;
   }
 
+  /** Frames ever observed, across window turnovers. */
   get frames(): number {
-    return this.#levels.length;
+    return this.#observed;
   }
 
   get state(): InputGateState {
+    return (this.#cache ??= this.#derive());
+  }
+
+  #derive(): InputGateState {
+    const sorted = [...this.#window].sort((a, b) => a - b);
     // The noise floor is a low quantile rather than the minimum: a single
     // anomalously quiet frame between notes is not the rig's noise, and a
     // minimum would let one of them drag the gate down to nothing.
-    const noiseFloor = quantile(this.#levels, 0.1);
-    if (noiseFloor === null || this.#levels.length < MIN_FLOOR_FRAMES) {
+    const noiseFloor = quantileOfSorted(sorted, 0, sorted.length, 0.1);
+    if (noiseFloor === null || sorted.length < MIN_FLOOR_FRAMES) {
       return {
         noiseFloor,
         playingLevel: null,
-        floorFrames: this.#levels.length,
+        floorFrames: sorted.length,
         playingFrames: 0,
         recommended: null,
         worthApplying: false,
@@ -147,11 +227,15 @@ export class InputGateMeasurement {
       };
     }
 
-    const playing = this.#levels.filter((level) => level > noiseFloor * PLAYING_MULTIPLE);
+    const playingFrom = firstAbove(sorted, noiseFloor * PLAYING_MULTIPLE);
+    const playingFrames = sorted.length - playingFrom;
     // The median of the playing frames, not the peak: a gate set from the
     // loudest thing the player did would reject everything quieter, and the
     // note that matters is the ordinary one, not the hardest strum.
-    const playingLevel = playing.length >= MIN_PLAYING_FRAMES ? quantile(playing, 0.5) : null;
+    const playingLevel =
+      playingFrames >= MIN_PLAYING_FRAMES
+        ? quantileOfSorted(sorted, playingFrom, sorted.length, 0.5)
+        : null;
     // Guarded against a floor of exactly zero, which is not hypothetical: a
     // synthetic source is digitally silent between notes, and dividing by it
     // put `Infinityx` in front of the player.
@@ -187,17 +271,50 @@ export class InputGateMeasurement {
     return {
       noiseFloor,
       playingLevel,
-      floorFrames: this.#levels.length,
-      playingFrames: playing.length,
+      floorFrames: sorted.length,
+      playingFrames,
       recommended,
       // Only worth offering when it actually moves the gate down. A rig that is
       // already loud enough gets told it is fine rather than given a button
       // that changes nothing.
-      worthApplying:
-        recommended !== null && recommended < TUNINATOR_DEFAULT_RMS_GATE * 0.9,
+      worthApplying: gateChangesAnything(recommended, null),
       headroom,
     };
   }
+}
+
+/**
+ * Whether a recommendation is a real change from the gate actually in force.
+ *
+ * `inForce` is null when the player has never calibrated, in which case the
+ * gate in force is Tuninator's own default. This exists because the two
+ * questions are not the same one: `worthApplying` asks whether a measurement
+ * beats the *default*, and stays true forever once it does — so after applying
+ * a gate, the button that set it would re-enable and offer to set it again.
+ */
+export function gateChangesAnything(recommended: number | null, inForce: number | null): boolean {
+  if (recommended === null) return false;
+  return recommended < (inForce ?? TUNINATOR_DEFAULT_RMS_GATE) * 0.9;
+}
+
+/**
+ * Whether to move the gate on the player's behalf, without being asked.
+ *
+ * The original request was for the level to *auto* calibrate, so the button is
+ * the fallback rather than the mechanism. What makes it safe to do silently is
+ * that it only ever moves the gate down, only from a measurement with real
+ * separation behind it, and only when it is reversible — the player can put it
+ * back, and doing so also ends automatic calibration for the session, so Reset
+ * is never immediately undone.
+ *
+ * A null headroom is the *cleanest* case rather than a missing one: it means
+ * the measured noise floor was zero, so there is no noise for a lower gate to
+ * let through.
+ */
+export function shouldAutoApply(state: InputGateState): boolean {
+  if (!state.worthApplying || state.recommended === null) return false;
+  if (state.playingFrames < AUTO_APPLY_MIN_PLAYING_FRAMES) return false;
+  return state.headroom === null || state.headroom >= AUTO_APPLY_MIN_HEADROOM;
 }
 
 /**
@@ -207,8 +324,10 @@ export class InputGateMeasurement {
  * internals: nobody tuning a guitar wants to be told about an RMS gate.
  */
 export function inputGateVerdict(state: InputGateState): string {
-  if (state.floorFrames < MIN_FLOOR_FRAMES) return "Listening…";
-  if (state.playingLevel === null) return "Play a few notes at your normal strength.";
+  if (state.floorFrames < MIN_FLOOR_FRAMES) return "Listening to your input…";
+  if (state.playingLevel === null) {
+    return "Listening. Play a few notes at your normal strength and this sets itself.";
+  }
   if (state.headroom !== null && state.headroom < 4) {
     return "Your guitar is barely above the background noise. Turn the interface up a little.";
   }

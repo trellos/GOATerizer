@@ -943,10 +943,93 @@ try {
   await live.screenshot({ path: path.join(SHOTS, "12-live-input.png") });
 
   note(
-    "Chromium's fake capture device is silence, so no note is detected here. " +
-      "This asserts the live wiring reaches `listening` through Tuninator, not that a guitar was played."
+    "Chromium's fake capture device is a pulsing tone, not a guitar. It is enough " +
+      "signal to measure a level from, which is what the input-gate checks below use, " +
+      "but nothing here asserts that a guitar was played."
   );
   await live.close();
+
+  /* ==================================================================== */
+  /* Part 3b — the input gate measures early and actually takes effect     */
+  /* ==================================================================== */
+
+  // The same live recognizer as Part 3, with the dev panel available so the
+  // measurement can be read. The fake capture device supplies a real level.
+  const gatePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await gatePage.goto(`${BASE}/?dev=1`, { waitUntil: "networkidle" });
+  await gatePage.click("#start-play");
+
+  // Before anything is played *in a run*: the measurement has to be running on
+  // the pregame screen, because that is where a player warms up. The complaint
+  // this guards is "it should start as early as possible".
+  const firstFrames = await waitForDev(gatePage, "input frames", (v) => Number(v) > 0, 10000);
+  check(
+    "the level measurement runs in pregame, before any run starts",
+    Number(firstFrames) > 0 && (await dev(gatePage, "screen")) === "pregame",
+    `${firstFrames} frames on the ${await dev(gatePage, "screen")} screen`
+  );
+
+  // A gate is a construction-time option, so it takes effect only by standing a
+  // new recognizer up. The bug this guards stored the gate, displayed it, and
+  // left the old recognizer running until the next page load — the switch saw
+  // "already on tuninator, still listening" and returned.
+  //
+  // Counted builds rather than a glimpse of the `starting` state: on a rebuild
+  // the mic permission and the worklet are already cached, so the recognizer
+  // can be back in `listening` before the next frame renders.
+  const buildsBefore = Number(await dev(gatePage, "input builds"));
+  const autoGate = await waitForDev(
+    gatePage,
+    "input gate",
+    (value) => (value ?? "").includes("(auto)"),
+    20000
+  );
+  const buildsAfter = await waitForDev(
+    gatePage,
+    "input builds",
+    (value) => Number(value) > buildsBefore,
+    5000
+  );
+
+  check(
+    "the gate calibrates itself, without the player having to find a button",
+    (autoGate ?? "").includes("(auto)"),
+    autoGate ?? "never"
+  );
+  check(
+    "applying a gate rebuilds the recognizer, so it actually takes effect",
+    Number(buildsAfter) > buildsBefore,
+    `recognizers built: ${buildsBefore} → ${buildsAfter}`
+  );
+  check(
+    "the applied gate is stored for the next session",
+    Number(
+      await gatePage.evaluate(() => localStorage.getItem("goaterizer.inputRmsGate.v1"))
+    ) > 0
+  );
+  check(
+    "a gate already in force is not offered again",
+    await gatePage.evaluate(
+      () => document.getElementById("pregame-input-apply")?.disabled === true
+    )
+  );
+  check(
+    "the readout owns up to having set the gate itself",
+    (await gatePage.textContent("#pregame-input-verdict"))?.includes("automatically") ?? false
+  );
+
+  // Reset has to mean something: automatic calibration gets one go per session,
+  // so putting the gate back is not undone on the next frame.
+  await gatePage.evaluate(() => document.getElementById("pregame-input-reset")?.click());
+  await gatePage.waitForTimeout(3000);
+  check(
+    "Reset puts the default back and automatic calibration does not undo it",
+    (await gatePage.evaluate(() =>
+      localStorage.getItem("goaterizer.inputRmsGate.v1")
+    )) === null,
+    (await dev(gatePage, "input gate")) ?? ""
+  );
+  await gatePage.close();
 
   /* ==================================================================== */
   /* Part 4 — the synthetic mic actually drives real Tuninator detection   */

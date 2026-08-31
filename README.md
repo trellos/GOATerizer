@@ -112,6 +112,15 @@ tables at the top of that script.
    five-fret neck diagrams — that is where on the neck you want to practise this
    octave. Pregame and the run are the same layout, so the timeline you warm up
    on is the same rectangle you play on. None of it stops the beat.
+
+   Warming up here is also what sets your input level. The detector gates on
+   amplitude before it looks for a pitch, and its default assumes a hotter
+   signal than anyone running an amp sim keeps — so it measures your rig from
+   the moment the mic opens and, once it has heard enough playing, moves the
+   gate down under your quietest notes on its own. **Input level** says what it
+   found and what it did; **Reset** puts the default back and hands you the
+   wheel for the rest of the session. Nothing about this touches your interface
+   or adds gain — it changes what the detector considers silence.
 3. **Play** starts the run on the next measure boundary plus a lead-in. Targets
    slide in from the right, cross the strike line on their beat, and leave to
    the left. The goat stands on the bar you just hit and jumps to the next one,

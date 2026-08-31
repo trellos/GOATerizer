@@ -27,7 +27,12 @@ import { BassPlayer } from "../audio/bass-player.js";
 import { BACKBEAT_PATTERN, drumPatternForAttempt } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
 import { BackingDuck } from "../game/backing-duck.js";
-import { InputGateMeasurement, inputGateVerdict } from "../game/input-gate.js";
+import {
+  gateChangesAnything,
+  InputGateMeasurement,
+  inputGateVerdict,
+  shouldAutoApply,
+} from "../game/input-gate.js";
 import { readInputRmsGate, writeInputRmsGate } from "../persistence/input-gate.js";
 import { Transport } from "../audio/transport.js";
 import {
@@ -200,6 +205,15 @@ export class GameApp {
    */
   readonly #inputGate = new InputGateMeasurement();
   #inputRmsGate: number | null = readInputRmsGate();
+  /**
+   * Whether automatic calibration has had its go this session.
+   *
+   * Set by the automatic pass itself and by either button, so a player who
+   * takes the wheel keeps it. See `#maybeAutoCalibrateInput`.
+   */
+  #autoGateDone = false;
+  /** The gate this session set on its own, for the readout to own up to. */
+  #autoGateApplied: number | null = null;
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
   /** Which beat the kit is currently playing. See `#refreshDrumBeat`. */
@@ -233,6 +247,8 @@ export class GameApp {
    * pointing at a disposed recognizer, with `#micMocked` set by whichever lost.
    */
   #providerSwitch: Promise<void> = Promise.resolve();
+  /** How many recognizers this session has stood up. See `#switchProvider`. */
+  #providerBuilds = 0;
   #unsubscribeInput: (() => void)[] = [];
   #inputStatus: GuitarInputStatus | null = null;
   /**
@@ -497,13 +513,20 @@ export class GameApp {
       this.#leaveCalibration()
     );
     must("pregame-reroll", HTMLButtonElement).addEventListener("click", () => this.#reroll());
+    // Both handlers end automatic calibration for the session: once the player
+    // has said what they want, this stops having opinions.
     must("pregame-input-apply", HTMLButtonElement).addEventListener("click", () => {
       const recommended = this.#inputGate.state.recommended;
-      if (recommended !== null) this.#applyInputGate(recommended);
+      if (recommended === null) return;
+      this.#autoGateDone = true;
+      this.#autoGateApplied = null;
+      this.#applyInputGate(recommended);
     });
-    must("pregame-input-reset", HTMLButtonElement).addEventListener("click", () =>
-      this.#applyInputGate(null)
-    );
+    must("pregame-input-reset", HTMLButtonElement).addEventListener("click", () => {
+      this.#autoGateDone = true;
+      this.#autoGateApplied = null;
+      this.#applyInputGate(null);
+    });
     must("pregame-calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
       this.#applyCalibration()
     );
@@ -625,6 +648,15 @@ export class GameApp {
       return;
     }
 
+    // First thing after the unlock, because it is the only thing here the
+    // player is actually waiting on. Opening the mic means `getUserMedia` and
+    // then fetching a worklet, and nothing can be measured about their level
+    // until frames start arriving — so it is started now and awaited at the
+    // end, overlapping with building the backing rather than queueing behind
+    // it. This is the earliest a browser will let a microphone open at all:
+    // everything before it is the same user gesture.
+    const inputReady = this.#queueProviderSwitch(this.#initialInputKind);
+
     if (!this.#transport.running) this.#transport.start(tempoById(this.#setup.tempoId).bpm);
 
     const context = this.#audio.context;
@@ -653,7 +685,7 @@ export class GameApp {
     this.#applyGameViewMode();
     this.#updateKeyReadouts();
 
-    await this.#queueProviderSwitch(this.#initialInputKind);
+    await inputReady;
   }
 
   /** New key and new bass line. Deliberately does NOT touch the transport. */
@@ -737,12 +769,26 @@ export class GameApp {
    * directly: two overlapping switches can interleave a `dispose()` with a
    * `start()` and leave the app holding a disposed recognizer.
    */
-  #queueProviderSwitch(kind: "tuninator" | "test" | "synth"): Promise<void> {
-    this.#providerSwitch = this.#providerSwitch.then(() => this.#switchProvider(kind));
+  #queueProviderSwitch(
+    kind: "tuninator" | "test" | "synth",
+    options: { force?: boolean } = {}
+  ): Promise<void> {
+    this.#providerSwitch = this.#providerSwitch.then(() =>
+      this.#switchProvider(kind, options.force ?? false)
+    );
     return this.#providerSwitch;
   }
 
-  async #switchProvider(kind: "tuninator" | "test" | "synth"): Promise<void> {
+  /**
+   * `force` rebuilds a recognizer that is already the right kind and healthy.
+   *
+   * Only one caller needs it, and it is the reason this parameter exists: the
+   * amplitude gate is a *construction-time* option, so changing it means
+   * standing a new recognizer up. Without this the guard below saw "already on
+   * tuninator, still listening" and returned, and a measured gate was stored,
+   * displayed, and never handed to Tuninator until the next page load.
+   */
+  async #switchProvider(kind: "tuninator" | "test" | "synth", force = false): Promise<void> {
     if (kind !== "tuninator" && !this.#devMode) {
       // Belt and braces: neither dev source must be reachable in normal play,
       // whatever calls this.
@@ -752,12 +798,22 @@ export class GameApp {
 
     // Already on it and working: do not tear down a healthy recognizer just to
     // build the same one again. A provider that errored is retried.
-    if (kind === this.#sourceKind && this.#provider && this.#provider.getStatus().state !== "error") {
+    if (
+      !force &&
+      kind === this.#sourceKind &&
+      this.#provider &&
+      this.#provider.getStatus().state !== "error"
+    ) {
       return;
     }
 
     // Anything queued was timed against the provider that is about to go away.
     this.#cancelAutoplay();
+    // Levels measured through one source say nothing about another: a dev sine
+    // and a real guitar must never end up averaged into the same rig. A forced
+    // rebuild of the *same* source keeps its measurement, because it is still
+    // the same input — `#applyInputGate` clears it deliberately instead.
+    if (kind !== this.#sourceKind) this.#inputGate.reset();
 
     for (const off of this.#unsubscribeInput) off();
     this.#unsubscribeInput = [];
@@ -785,6 +841,13 @@ export class GameApp {
     // as TuninatorGuitarInputProvider or Tuninator can tell, "synth" and
     // "tuninator" are the same input.
     this.#providerKind = kind === "test" ? "test" : "tuninator";
+    // Counted because a rebuild is otherwise invisible: on a second open the
+    // mic permission and the worklet module are both already cached, so the
+    // recognizer can go from `starting` back to `listening` inside a single
+    // animation frame and no readout ever shows the transition. A gate only
+    // takes effect by construction, so "did it get built again" is the
+    // question, and a transient state is the wrong place to ask it.
+    this.#providerBuilds += 1;
     this.#provider =
       kind === "test"
         ? new TestGuitarInputProvider()
@@ -1633,6 +1696,8 @@ export class GameApp {
   }
 
   #updatePregameReadouts(): void {
+    // Before the readout, so the frame that decides also shows the decision.
+    this.#maybeAutoCalibrateInput();
     this.#updateInputLevelReadouts();
     const frame = this.#inputStatus?.frame;
     const meter = document.querySelector<HTMLElement>("#pregame-level span");
@@ -1673,6 +1738,11 @@ export class GameApp {
    */
   #updateInputLevelReadouts(): void {
     const state = this.#inputGate.state;
+    // Against the gate actually in force, not against Tuninator's default:
+    // after a gate has been applied, `worthApplying` stays true forever and
+    // would leave the button offering to set the value it already set.
+    const changes = gateChangesAnything(state.recommended, this.#inputRmsGate);
+
     const level = document.getElementById("pregame-input-level");
     if (level instanceof HTMLElement) {
       const frame = this.#inputStatus?.frame;
@@ -1683,29 +1753,67 @@ export class GameApp {
           : "";
       level.textContent =
         state.playingLevel === null
-          ? `Listening… ${state.floorFrames} frames${channels}`
+          ? `Listening — ${state.floorFrames} frames of your input so far${channels}`
           : state.headroom === null
             ? `Well clear of a silent input${channels}`
             : `${Math.round(state.headroom)}x your background noise${channels}`;
     }
 
     const verdict = document.getElementById("pregame-input-verdict");
-    if (verdict instanceof HTMLElement) verdict.textContent = inputGateVerdict(state);
+    if (verdict instanceof HTMLElement) {
+      // A gate that is in force and that this measurement does not want to move
+      // is a settled state, and saying what it is beats re-running the advice
+      // that produced it. Otherwise the measurement speaks for itself.
+      verdict.textContent =
+        this.#inputRmsGate !== null && !changes
+          ? this.#autoGateApplied !== null
+            ? `Set to your playing automatically — the detector now listens down to ${this.#inputRmsGate.toFixed(4)}. Reset puts it back.`
+            : `Using your measured level (${this.#inputRmsGate.toFixed(4)}).`
+          : inputGateVerdict(state);
+    }
 
     const apply = document.getElementById("pregame-input-apply");
-    if (apply instanceof HTMLButtonElement) apply.disabled = !state.worthApplying;
+    if (apply instanceof HTMLButtonElement) apply.disabled = !changes;
   }
 
   /** Stores a measured gate and restarts the recognizer so it takes effect. */
   #applyInputGate(gate: number | null): void {
     this.#inputRmsGate = gate;
     writeInputRmsGate(gate);
+    // The old numbers were measured through the old gate. They are still true
+    // about the rig, but the readout beside them is about to describe a
+    // different recognizer, so the honest thing is to measure again.
     this.#inputGate.reset();
     this.#updateInputLevelReadouts();
     // The gate is a construction-time option, so the recognizer has to be
     // rebuilt. Routed through the same switch the dev panel uses, which already
-    // knows how to tear one down and stand another up without stopping the beat.
-    this.#queueProviderSwitch(this.#providerKind);
+    // knows how to tear one down and stand another up without stopping the beat
+    // — forced, because it is the same source and the guard would otherwise
+    // keep the recognizer that still has the old gate. `#sourceKind`, not
+    // `#providerKind`: the latter reports "tuninator" for the synthetic mic and
+    // would silently swap a dev source for a real one.
+    this.#queueProviderSwitch(this.#sourceKind, { force: true });
+  }
+
+  /**
+   * Sets the gate from the player's own playing, without being asked once.
+   *
+   * The request was for the level to calibrate itself, so a button the player
+   * has to find is a fallback rather than the feature. This runs on the pregame
+   * frame — the only screen where rebuilding the recognizer costs nothing,
+   * because no attempt is in flight — and at most once per session.
+   *
+   * Any manual use of either button ends it for the session. That is what makes
+   * Reset mean something: without it, putting the gate back would be undone by
+   * this on the very next frame.
+   */
+  #maybeAutoCalibrateInput(): void {
+    if (this.#autoGateDone || this.#inputRmsGate !== null) return;
+    const state = this.#inputGate.state;
+    if (!shouldAutoApply(state) || state.recommended === null) return;
+    this.#autoGateDone = true;
+    this.#autoGateApplied = state.recommended;
+    this.#applyInputGate(state.recommended);
   }
 
   #updateCalibrationReadouts(): void {
@@ -1785,7 +1893,12 @@ export class GameApp {
         this.#inputGate.state.recommended !== null
           ? ` → ${this.#inputGate.state.recommended.toFixed(5)}`
           : ""
-      }`,
+      }${this.#autoGateApplied !== null ? " (auto)" : ""}`,
+      // Total frames, not the window's occupancy: this is the row that answers
+      // "has it been listening since the mic opened", which is a different
+      // question from "what is it measuring right now".
+      "input frames": String(this.#inputGate.frames),
+      "input builds": String(this.#providerBuilds),
       "channel rms": this.#inputStatus?.frame?.channelRms?.map((v) => v.toFixed(3)).join(" ") ?? "—",
       "selected channel": String(this.#inputStatus?.frame?.selectedChannel ?? "—"),
       // Split, because "the browser says 180ms" and "you are 40ms late on top
