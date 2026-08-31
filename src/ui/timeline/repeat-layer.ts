@@ -31,7 +31,15 @@
  * A missed note gets neither the lift nor the crush. Its can tips over and
  * rolls past his shins while the palm comes down on nothing.
  *
- * Primitives, not sprites, because the question is whether the mechanic reads.
+ * The performer is drawn from primitives, because his swing is a solved pose
+ * that no fixed sprite could hold. The **cans are sprites**, which reverses an
+ * earlier decision and is worth saying why: the argument for primitives was
+ * that the question was whether the mechanic read, not whether the art was
+ * good. That was right until the mechanic did read — at which point the cans
+ * were still nine-pixel slivers of grey with a red stripe, and the object the
+ * whole minigame is named after was the least legible thing on screen. The
+ * scenario has had `repeatTarget` and `targetCompletedState` bound all along;
+ * nothing here was using them.
  */
 
 import type {
@@ -68,6 +76,9 @@ const CRUSHER = {
  */
 const STANDS_BACK_BEATS = 1;
 
+/** A flattened can's height, as a fraction of an upright one's. */
+const CRUSHED_HEIGHT = 0.28;
+
 /**
  * The performer's height, as a multiple of a lane row.
  *
@@ -75,20 +86,82 @@ const STANDS_BACK_BEATS = 1;
  * object on screen that is always moving and never moves *anywhere*, so he is
  * where the eye rests between notes, and the swing has to be legible from
  * there.
+ *
+ * He grew with the cans rather than instead of them. The can is held against
+ * his brow, so the two sizes are one decision: a can big enough to read that is
+ * held against a head that did not grow stops being a can he is holding and
+ * becomes his head. The ratio below is what actually has to hold, and it is
+ * asserted rather than left to a comment.
  */
-const BODY_ROWS = 1.5;
+const BODY_ROWS = 2;
 
 /**
  * A can's height as a multiple of a row, and its width as a fraction of that —
  * upright, then splayed out once it has been flattened.
  *
- * The crushed width is not much more than double the upright one, because a can
- * that spreads to twice the width of his head stops reading as a can he is
- * holding and starts reading as a plank across his face.
+ * Roughly doubled, because at 0.45 of a row the can was about nine pixels wide
+ * and read as a coloured splinter riding a note bar. The aspect went with it:
+ * 0.42 was narrower than a real can, which is 66mm across and 122mm tall, and
+ * the extra width is most of what makes it look like something you could pick
+ * up. Sprites override both when they load; these stay as the fallback's
+ * proportions and as the size the sprite is drawn at.
  */
-const CAN_ROWS = 0.45;
-const CAN_ASPECT = 0.42;
-const CAN_CRUSHED_ASPECT = 0.75;
+const CAN_ROWS = 0.82;
+const CAN_ASPECT = 0.5;
+// Deliberately the crushed sprite's own aspect (24x12) multiplied by the height
+// it is drawn at, so the fallback occupies the same box the sprite does. Left at
+// a guessed 0.95 these disagreed by nearly two to one, which meant a missing
+// asset did not degrade to a plainer can — it degraded to a differently
+// proportioned object in a different place relative to his face.
+const CAN_CRUSHED_ASPECT = 2 * CRUSHED_HEIGHT;
+
+/**
+ * The can art: intact, and dealt with.
+ *
+ * Resolved by the caller from the scenario's `repeatTarget` and
+ * `targetCompletedState` bindings, exactly as the climbing actor's poses are —
+ * this module has no business knowing about asset ids. Either may be null, in
+ * which case the primitives below stand in; an asset that failed to load should
+ * degrade to a legible shape rather than to nothing.
+ */
+export type RepeatSprites = {
+  can: HTMLImageElement | null;
+  crushed: HTMLImageElement | null;
+};
+
+export const NO_REPEAT_SPRITES: RepeatSprites = { can: null, crushed: null };
+
+/**
+ * How big a can is drawn, in both poses, when there is no sprite.
+ *
+ * Exported so the geometry tests can find a can in a list of drawing ops by its
+ * size without restating these numbers — which they did, and which meant
+ * resizing the can silently turned six spatial assertions into assertions about
+ * nothing rather than into failures. The size is not what those tests are
+ * about; it is only how they tell a can from the crusher's headband.
+ */
+export function repeatCanMetrics(rowHeight: number): {
+  upright: { w: number; h: number };
+  crushed: { w: number; h: number };
+} {
+  const size = rowHeight * CAN_ROWS;
+  return {
+    upright: { w: size * CAN_ASPECT, h: size },
+    crushed: { w: size * CAN_CRUSHED_ASPECT, h: size * CRUSHED_HEIGHT },
+  };
+}
+
+/**
+ * How wide his head is drawn, for the one proportion that has to hold.
+ *
+ * The can is crushed against his brow, so a can as wide as his head, held over
+ * his face, stops reading as a can he is holding and starts reading as his
+ * head. That was a comment for two passes and the comment did not stop the can
+ * from being resized past it — so it is a number the tests can ask for.
+ */
+export function repeatHeadWidth(rowHeight: number): number {
+  return rowHeight * BODY_ROWS * FIGURE.headRX * 2;
+}
 
 /**
  * How high above its own lane a placed can rides, centre to bar, as a multiple
@@ -129,6 +202,31 @@ const CRUSH_SWINGS = 0.3;
 /** How long a flattened can takes to drop from his brow onto the pile. */
 const FALL_BEATS = 0.35;
 
+/**
+ * The crush, as everything that happens in the moment of contact.
+ *
+ * A flatten on its own is a sprite swap, and a sprite swap at this speed is
+ * something the eye can miss entirely — which is what the old single pale
+ * starburst amounted to. Four channels carry the impact instead, so no one
+ * frame has to do the work:
+ *
+ *   - `SHAKE` — the whole man jolts down and recoils. The character reacting is
+ *     the strongest signal available, and it is the one that survives being
+ *     seen out of the corner of an eye.
+ *   - `SQUASH` — the crushed can arrives over-flattened and springs back to its
+ *     resting shape, so the flatten reads as *happening* rather than as having
+ *     already happened.
+ *   - `RING` — a shock ring out from the point of contact, flat rather than
+ *     circular so it reads as travelling across the front of him.
+ *   - `SPRAY` — what was in the can, thrown up and out.
+ */
+const SHAKE_ROWS = 0.13;
+const SHAKE_BEATS = 0.3;
+const SQUASH_OVERSHOOT = 0.3;
+const RING_BEATS = 0.26;
+const SPRAY_BEATS = 0.5;
+const SPRAY_DROPS = 9;
+
 export type RepeatGeometry = ActorGeometry & {
   /** Timeline scroll speed. A can travels at exactly this speed. */
   pixelsPerBeat: number;
@@ -166,7 +264,8 @@ export function drawRepeatPerformer(
   state: RepeatVisualState,
   geometry: RepeatGeometry,
   beat: number,
-  pending: readonly PendingCan[] = []
+  pending: readonly PendingCan[] = [],
+  sprites: RepeatSprites = NO_REPEAT_SPRITES
 ): void {
   const travelPx = STANDS_BACK_BEATS * geometry.pixelsPerBeat;
   const homeX = geometry.strikeX - travelPx;
@@ -188,7 +287,13 @@ export function drawRepeatPerformer(
   // born on.
   const period = state.strikePeriodBeats;
   const swingPhase = state.complete ? 0.5 : (((beat % period) + period) % period) / period;
-  const crushBeats = Math.min(CRUSH_BEATS, period * CRUSH_SWINGS);
+  // Capped by the hold as well as by the swing. `CRUSH_SWINGS` alone is 0.3 of
+  // a period and the palm only rests for `HOLD`, which is 0.18 — so at a
+  // quarter-note pulse the flattened can outlived the hand on it by a
+  // twentieth of a beat and hung at his brow with the arm already climbing.
+  // That is exactly what this constant's own docstring warns about, and it was
+  // wrong anyway.
+  const crushBeats = Math.min(CRUSH_BEATS, period * Math.min(CRUSH_SWINGS, HOLD));
   const fallBeats = Math.min(FALL_BEATS, period * 1.4);
 
   const age = (can: FlyingCan) => Math.max(0, beat - can.bornBeat);
@@ -204,9 +309,40 @@ export function drawRepeatPerformer(
     return geometry.laneY(can.lane) - (canSize / 2) * (1 - rise) - lift * rise;
   };
 
+  const draw = (
+    x: number,
+    y: number,
+    pose: CanPose,
+    spin: number
+  ): void => drawCan(ctx, x, y, canSize, pose, spin, sprites);
+
   // Anything that has already dropped onto the heap. Cans still in the air on
   // their way down are drawn individually, so they are not counted twice.
   const crushed = state.cans.filter((can) => can.fate === "crushed");
+
+  /**
+   * How long ago the most recent can was hit, or null if none has been.
+   *
+   * The jolt belongs to *him*, not to the can, so it has to be found across all
+   * of them rather than inside the loop that draws one — and it is the most
+   * recent contact that matters, because in sixteenths a second can arrives
+   * before the recoil from the first has finished.
+   */
+  let sinceHit: number | null = null;
+  for (const can of crushed) {
+    const since = age(can) - STANDS_BACK_BEATS;
+    if (since >= 0 && (sinceHit === null || since < sinceHit)) sinceHit = since;
+  }
+  // Sine, not cosine, so the jolt starts at rest and is driven down over the
+  // first few hundredths of a beat before recoiling. A cosine put full
+  // displacement on the contact frame itself, which is a step rather than an
+  // impact — and it also meant the can was never actually *at* the crush point
+  // on the frame it was crushed, which is the one thing about this layer that
+  // is asserted as a hard equality.
+  const jolt =
+    sinceHit === null || sinceHit >= SHAKE_BEATS
+      ? 0
+      : (1 - sinceHit / SHAKE_BEATS) ** 2 * Math.sin(sinceHit * 26);
   const falling = crushed.filter((can) => {
     const since = age(can) - STANDS_BACK_BEATS;
     return since >= 0 && since < crushBeats + fallBeats;
@@ -214,7 +350,7 @@ export function drawRepeatPerformer(
   // The heap sits a can's width in front of him rather than under his boots,
   // which is where the crushed cans fall to and keeps it off his silhouette.
   const pileX = homeX + canSize * 1.4;
-  drawPile(ctx, Math.max(0, state.pile - falling), pileX, geometry);
+  drawPile(ctx, Math.max(0, state.pile - falling), pileX, geometry, sprites);
 
   // Everything he does not touch goes behind him, and the one can he does goes
   // in front. That ordering is itself part of the read: the can in front of the
@@ -222,26 +358,29 @@ export function drawRepeatPerformer(
   //
   // Cans still approaching the strike line sit in the bars they belong to —
   // the container premise, drawn: a note *is* a can coming at you.
-  for (const can of pending) drawCan(ctx, can.x, can.y - canSize / 2, canSize, "upright", 0);
+  for (const can of pending) draw(can.x, can.y - canSize / 2, "upright", 0);
 
   for (const can of state.cans) {
     if (can.fate === "missed") {
       // Never got up. It lies down in its bar and rolls past his boots, which
       // is what a can does when nobody picks it up.
-      drawCan(ctx, scrollX(can), geometry.laneY(can.lane), canSize, "rolling", age(can) * 2.6);
+      draw(scrollX(can), geometry.laneY(can.lane), "rolling", age(can) * 2.6);
     } else if (can.fate === "wrong") {
       // Right idea, wrong place. Nothing stops it, so it holds the height the
       // player gave it and keeps going — over his head or past his hip by
       // exactly the interval they missed by.
       const tilt = can.wobbly ? Math.sin(age(can) * 9 + can.id) * 0.4 : 0;
-      drawCan(ctx, scrollX(can), flyingY(can), canSize, "upright", tilt);
+      draw(scrollX(can), flyingY(can), "upright", tilt);
     }
   }
 
   drawCrusher(
     ctx,
     bodyX,
-    homeY,
+    // He takes the blow: driven down on contact and springing back. This is the
+    // channel that carries the crush when the player is not looking straight at
+    // the can, which is most of the time — they are reading the next note.
+    homeY + jolt * geometry.rowHeight * SHAKE_ROWS,
     geometry.rowHeight,
     { dx: homeX - bodyX, above: palmAbove },
     swingPhase,
@@ -252,15 +391,21 @@ export function drawRepeatPerformer(
   // next can is only a few pixels behind the one being crushed, and painting it
   // afterwards hides the single frame the whole mechanic is about.
   for (const can of crushed) {
-    if (age(can) < STANDS_BACK_BEATS) drawCan(ctx, scrollX(can), flyingY(can), canSize, "upright", 0);
+    if (age(can) < STANDS_BACK_BEATS) draw(scrollX(can), flyingY(can), "upright", 0);
   }
   for (const can of crushed) {
     const sinceContact = age(can) - STANDS_BACK_BEATS;
     if (sinceContact < 0) continue;
+    const brow = homeY - lift + jolt * geometry.rowHeight * SHAKE_ROWS;
     if (sinceContact < crushBeats) {
-      // The palm is down. Flat, against his brow, with the impact on it.
-      drawCan(ctx, homeX, homeY - lift, canSize, "crushed", 0);
-      drawSpark(ctx, homeX, homeY - lift, canSize * 0.9 * (1 - sinceContact / crushBeats));
+      // The palm is down. Flat, against his brow, with the impact on it — and
+      // over-flattened at the instant of contact, springing back to its resting
+      // shape over the rest of the window, so the flatten is an event rather
+      // than a swapped sprite.
+      const t = sinceContact / crushBeats;
+      drawCan(ctx, homeX, brow, canSize, "crushed", 0, sprites, 1 + SQUASH_OVERSHOOT * (1 - t));
+      drawRing(ctx, homeX, brow, canSize * (0.25 + t * 0.8), 1 - t);
+      drawSpray(ctx, homeX, brow, canSize, sinceContact / SPRAY_BEATS);
     } else if (sinceContact < crushBeats + fallBeats) {
       // ...and down it goes, onto the pile. Accelerating, because a can that
       // drifts down reads as floating rather than as something dropped.
@@ -268,14 +413,15 @@ export function drawRepeatPerformer(
       // instead of sliding down through his face and chest.
       const t = (sinceContact - crushBeats) / fallBeats;
       const from = homeY - lift;
-      drawCan(
-        ctx,
+      draw(
         homeX + (pileX - homeX) * t,
         from + (geometry.floorY - from) * (t * t),
-        canSize,
         "crushed",
-        0
+        // Tumbles as it falls. A flat object dropping without rotating reads as
+        // being lowered.
+        t * 1.1
       );
+      if (sinceContact < SPRAY_BEATS) drawSpray(ctx, homeX, homeY - lift, canSize, sinceContact / SPRAY_BEATS);
     }
     // After that it belongs to the pile, which is drawn from the count.
   }
@@ -311,7 +457,7 @@ const FIGURE = {
    * the working arm comes out from *behind* his head — a real head is a good
    * deal narrower than it is tall, and that is what leaves the shoulders room.
    */
-  headRX: 0.1,
+  headRX: 0.115,
   headRY: 0.125,
   shoulderHalf: 0.145,
   hipHalf: 0.105,
@@ -530,12 +676,20 @@ function drawCan(
   y: number,
   size: number,
   pose: CanPose,
-  spin: number
+  spin: number,
+  sprites: RepeatSprites = NO_REPEAT_SPRITES,
+  squash = 1
 ): void {
   const crushed = pose === "crushed";
-  const w = size * (crushed ? CAN_CRUSHED_ASPECT : CAN_ASPECT);
-  const h = crushed ? size * 0.3 : size;
-  const rim = Math.max(1, h * 0.14);
+  const sprite = crushed ? sprites.crushed : sprites.can;
+  const fallback = crushed
+    ? repeatCanMetrics(size / CAN_ROWS).crushed
+    : repeatCanMetrics(size / CAN_ROWS).upright;
+  // Height is what the layout is expressed in — the lift, the crush point and
+  // the palm are all vertical measurements — so the sprite's own aspect decides
+  // the width rather than the other way round.
+  const h = fallback.h;
+  const w = sprite && sprite.height > 0 ? h * (sprite.width / sprite.height) : fallback.w;
 
   ctx.save();
   // A rolling can turns about its own middle and rests that middle half its
@@ -543,14 +697,24 @@ function drawCan(
   ctx.translate(x, pose === "rolling" ? y - w / 2 : y);
   if (pose === "rolling") ctx.rotate(Math.PI / 2 + spin);
   else if (spin !== 0) ctx.rotate(spin);
+  // Volume-preserving, so an over-flattened can is wider rather than simply
+  // smaller. Only the crush uses this; everything else passes 1.
+  if (squash !== 1) ctx.scale(squash, 1 / squash);
 
+  if (sprite && sprite.width > 0) {
+    ctx.drawImage(sprite, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    return;
+  }
+
+  // The asset has not loaded. A blocked-in can keeps the mechanic legible
+  // rather than leaving a hole where the object the minigame is about should
+  // be; an outline first, because a can spends most of its flight over a bright
+  // note bar and a pale grey cylinder on a cyan rectangle has no edge.
   const top = -h / 2;
-
-  // An outline first: a can spends most of its flight over a bright note bar,
-  // and a pale grey cylinder on a cyan rectangle is not a can.
+  const rim = Math.max(1, h * 0.14);
   ctx.fillStyle = CRUSHER.outline;
   ctx.fillRect(-w / 2 - 1.5, top - 1.5, w + 3, h + 3);
-
   ctx.fillStyle = CRUSHER.can;
   ctx.fillRect(-w / 2, top, w, h);
   ctx.fillStyle = CRUSHER.canDark;
@@ -563,26 +727,66 @@ function drawCan(
 }
 
 /**
- * The impact, above the can only.
+ * The shock ring out from the point of contact.
  *
- * A full starburst around the can was a mistake: the lower spokes land on the
- * crusher's face and the ones pointing along the timeline read as an arrow, so
- * at thirty pixels the whole thing came out as a pale blob stuck to the can.
- * Four ticks in the upper hemisphere have nothing to collide with and say the
- * same thing.
+ * Flat rather than circular: it is meant to read as travelling across the front
+ * of him, and a circle at this size reads as a bubble drawn around his head.
  */
-function drawSpark(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  if (r <= 0) return;
+function drawRing(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  strength: number
+): void {
+  if (strength <= 0) return;
   ctx.save();
+  ctx.globalAlpha = strength * 0.8;
   ctx.strokeStyle = CRUSHER.spark;
-  ctx.lineWidth = Math.max(1, r * 0.12);
-  ctx.lineCap = "butt";
+  ctx.lineWidth = Math.max(1, r * 0.08 * strength);
   ctx.beginPath();
-  for (const angle of [-2.5, -1.9, -1.25, -0.65]) {
-    ctx.moveTo(x + Math.cos(angle) * r * 0.55, y + Math.sin(angle) * r * 0.55);
-    ctx.lineTo(x + Math.cos(angle) * r, y + Math.sin(angle) * r);
-  }
+  ctx.ellipse(x, y, r, r * 0.62, 0, 0, Math.PI * 2);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * What was in the can, thrown up and out.
+ *
+ * Placed from the drop's index rather than from a random seed, so the same
+ * moment of the same crush draws the same spray on every frame and after any
+ * dropped one — position stays a pure function of the beat, like everything
+ * else here. Biased upward: a can crushed against a forehead throws its
+ * contents over the top of him, not down through his chest.
+ */
+function drawSpray(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  t: number
+): void {
+  if (t <= 0 || t >= 1) return;
+  ctx.save();
+  ctx.globalAlpha = (1 - t) * (1 - t);
+  ctx.fillStyle = CRUSHER.spark;
+  for (let i = 0; i < SPRAY_DROPS; i += 1) {
+    const spread = (i / (SPRAY_DROPS - 1)) * 2 - 1;
+    const angle = -Math.PI / 2 + spread * 1.25;
+    const speed = size * (1.5 + Math.abs(spread) * 0.9);
+    // A ballistic arc rather than a straight line: out at a constant rate, and
+    // falling back under its own weight. Droplets that travel radially read as
+    // a firework.
+    ctx.beginPath();
+    ctx.arc(
+      x + Math.cos(angle) * speed * t,
+      y + Math.sin(angle) * speed * t + size * 2.6 * t * t,
+      Math.max(0.8, size * 0.13 * (1 - t * 0.6)),
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -598,21 +802,38 @@ function drawPile(
   ctx: CanvasRenderingContext2D,
   pile: number,
   homeX: number,
-  geometry: ActorGeometry
+  geometry: ActorGeometry,
+  sprites: RepeatSprites
 ): void {
   if (pile === 0) return;
-  const unit = geometry.rowHeight * 0.34;
+  const unit = geometry.rowHeight * 0.44;
   const perRow = 8;
 
   ctx.save();
-  ctx.fillStyle = CRUSHER.pile;
   for (let i = 0; i < pile; i += 1) {
     const row = Math.floor(i / perRow);
     const column = i % perRow;
     // Each row is inset, so a long attempt builds a heap rather than a wall.
     const x = homeX - unit * (perRow / 2) + column * unit + row * unit * 0.5;
     const y = geometry.floorY - row * unit * 0.55;
-    ctx.fillRect(x, y - unit * 0.34, unit * 0.9, unit * 0.34);
+    if (sprites.crushed) {
+      // The same sprite that was just dropped here, so the heap is visibly
+      // made of the cans the player watched fall into it rather than of
+      // anonymous grey tiles. Alternately flipped and nudged off the grid,
+      // because a heap of identical cans in rows is a wall.
+      const w = unit * 1.05;
+      const h = w * (sprites.crushed.height / sprites.crushed.width);
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.translate(x + unit / 2, y - h / 2);
+      ctx.rotate(((i % 3) - 1) * 0.16);
+      if (i % 2 === 0) ctx.scale(-1, 1);
+      ctx.drawImage(sprites.crushed, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = CRUSHER.pile;
+      ctx.fillRect(x, y - unit * 0.34, unit * 0.9, unit * 0.34);
+    }
   }
   ctx.restore();
 }

@@ -93,6 +93,7 @@ npm run typecheck         # tsc --noEmit
 npm run build             # typecheck + production build
 npm run validate:browser  # build, serve, drive real Chromium through a whole run
 npm run art               # regenerate the placeholder pixel art
+npm run shoot:actors      # close-ups and animation strips of the timeline actors
 ```
 
 `node scripts/author-rocky-scenarios.mjs` re-derives the authored musical
@@ -124,8 +125,10 @@ tables at the top of that script.
 3. **Play** starts the run on the next measure boundary plus a lead-in. Targets
    slide in from the right, cross the strike line on their beat, and leave to
    the left. The goat stands on the bar you just hit and jumps to the next one,
-   growing with the streak; a miss drops it to the floor and the next good note
-   spawns a new one. The scenario behind it all is a backdrop.
+   growing with the streak; it lands with a squash, a puff of dust and a ring
+   out from its feet, so an arrival is an event rather than a sprite stopping. A
+   miss drops it to the floor and the next good note spawns a new one. The
+   scenario behind it all is a backdrop.
    The kit changes with the minigame: the difficulty picks one of seven
    intensity rungs, from a half-time skeleton to the whole drum kit, and the
    feel of the authored notes picks the grid the bar subdivides on. The bass
@@ -211,7 +214,8 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
   degree is. GOATerizer implements no pitch detection of its own.
 - **A minigame class contains no scenario-specific asset names.** It is handed
   class asset *slots* and class parameters. Rocky Ascent decides its slots hold
-  goats; Can Crushing decides its `repeatTarget` is a beer can.
+  goats; Can Crushing decides its `repeatTarget` is a beer can. The layer that
+  draws the cans is handed images by the caller and never names an asset id.
 - **Authored pitch places terrain; played pitch places projectiles.** The goat
   lands on the lane of the note it was *asked* for, so one flub can never strand
   it somewhere the next note is unreachable from. A can appears at the lane you
@@ -276,9 +280,11 @@ presented as design.
   implemented. `ClimbMinigame`'s runtime was deleted when the actors moved onto
   the timeline — its scenarios still declare the class, and their route data is
   still authored and validated, but nothing reads it (DECISION-023).
-- **The actors are a draft.** They are drawn from the scenarios' own placeholder
-  art where it exists (the goat) and from canvas primitives where it does not
-  yet (the can crusher).
+- **The actors are a draft.** The goat and both cans are the scenarios' own
+  placeholder sprites; the can crusher is still canvas primitives, because his
+  swing is a two-bone solve rather than a pose cycle and no fixed sprite holds
+  it. That gap is now the most obvious rough edge in the frame — see
+  `docs/IDEAS.md`.
 - **Placeholder art is original CC0 work**, not the third-party packs the
   scenario file names — see `docs/assets/ASSET_SOURCES.md` for why and for how
   to swap them in.

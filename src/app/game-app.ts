@@ -91,6 +91,7 @@ import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import type { ActorSprites } from "../ui/timeline/actor-layer.js";
+import { NO_REPEAT_SPRITES, type RepeatSprites } from "../ui/timeline/repeat-layer.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import {
   OVERLAY_BAND_FRACTION,
@@ -302,6 +303,7 @@ export class GameApp {
    * that is no longer always Rocky Ascent.
    */
   #actorSpriteCache: { id: string; sprites: ActorSprites } | null = null;
+  #repeatSpriteCache: { id: string; sprites: RepeatSprites } | null = null;
   #devLevel: number | null = null;
   #devScenarioId: string | null = null;
   /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
@@ -1612,6 +1614,7 @@ export class GameApp {
         attempt ? attempt.toAttemptBeat(beat) : 0
       );
       this.#gameView?.setActorSprites(this.#actorSpritesFor(attempt?.scenario ?? null));
+      this.#gameView?.setRepeatSprites(this.#repeatSpritesFor(attempt?.scenario ?? null));
       // A repeat scenario puts its own performer on the bars instead.
       this.#gameView?.setRepeat(attempt?.repeat ? attempt.repeat.state : null);
       this.#gameView?.render(this.#timeline, beat);
@@ -1641,6 +1644,23 @@ export class GameApp {
         : [];
     const sprites: ActorSprites = { poses };
     this.#actorSpriteCache = { id: scenario.id, sprites };
+    return sprites;
+  }
+
+  /**
+   * The can art for a repeat scenario, resolved through the asset store.
+   *
+   * Cached on the scenario id for the same reason the climber art is: this runs
+   * every frame and the answer only changes when the scenario does.
+   */
+  #repeatSpritesFor(scenario: ScenarioDefinition | null): RepeatSprites {
+    if (!scenario || scenario.assetBindings.kind !== "repeat") return NO_REPEAT_SPRITES;
+    if (this.#repeatSpriteCache?.id === scenario.id) return this.#repeatSpriteCache.sprites;
+    const sprites: RepeatSprites = {
+      can: this.#assets.get(scenario.assetBindings.repeatTarget),
+      crushed: this.#assets.get(scenario.assetBindings.targetCompletedState),
+    };
+    this.#repeatSpriteCache = { id: scenario.id, sprites };
     return sprites;
   }
 

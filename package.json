@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:browser": "node scripts/browser-validate.mjs",
+    "shoot:actors": "node scripts/shoot-actors.mjs",
     "art": "node scripts/generate-placeholder-art.mjs"
   },
   "dependencies": {

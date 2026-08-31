@@ -81,11 +81,11 @@ building on that class.
 
 ### A wrong-lane can and an unplaceable can look alike
 
-At the size the crusher renders, a can played on the wrong lane and a can from
-an off-scale pitch are both pale cylinders; only a wobble separates them. The
-distinction is doing real diagnostic work — one says "you overshot by a third",
-the other says "that was not in the key" — and it probably wants a colour
-difference in real art rather than a rotation.
+A can played on the wrong lane and a can from an off-scale pitch are both the
+same sprite; only a wobble separates them. The distinction is doing real
+diagnostic work — one says "you overshot by a third", the other says "that was
+not in the key" — and now that the cans are sprites (DECISION-036) the obvious
+answer is a second one in a different colour rather than a rotation.
 
 ---
 
@@ -115,6 +115,24 @@ late `retune` promotes it from wrong to hit never reports a release, costing one
 rung.
 
 ---
+
+## Open — art that is now one pass in, not finished
+
+### The crusher is still primitives, and now he is the crude thing on screen
+
+The cans became sprites (DECISION-036) and he did not, because his swing is a
+solved pose no fixed sprite could hold. That was the right call and it has a
+cost: he is a stick figure standing next to a piece of real pixel art, and the
+gap got wider rather than narrower. The honest fix is a limb-segment sprite set
+driven by the same IK — arm, forearm, torso, head — rather than a pose cycle.
+
+### The goat has one landing, played at every size
+
+The squash, dust and ring are the same shape whether the goat is at its floor
+size or twelve notes into a streak. A big goat should land heavier: more dust,
+a longer settle, and probably a screen-level cue past some streak. The
+`size` is already in hand at the point the juice is drawn, so this is tuning
+rather than plumbing.
 
 ## Closed
 

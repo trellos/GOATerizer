@@ -24,7 +24,9 @@ import { describe, expect, it } from "vitest";
 import type { RepeatVisualState } from "../src/scenario/minigames/repeat-minigame.js";
 import {
   drawRepeatPerformer,
+  repeatCanMetrics,
   repeatCrushPoint,
+  repeatHeadWidth,
   type RepeatGeometry,
 } from "../src/ui/timeline/repeat-layer.js";
 
@@ -40,6 +42,17 @@ const GEOMETRY: RepeatGeometry = {
 };
 
 const PERFORMER_LANE = 3;
+
+/**
+ * The layer's own crush and fall windows, at the quarter-note pulse these
+ * fixtures use.
+ *
+ * Restated here rather than exported: they are timings, not geometry, and the
+ * tests that care only need to know where the windows are so they can sample
+ * inside them.
+ */
+const CRUSH_BEATS_AT_PULSE = Math.min(0.22, 1 * 0.18);
+const FALL_BEATS = 0.35;
 
 /**
  * One drawing op, resolved to the origin the layer had translated to.
@@ -74,7 +87,7 @@ function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[]; strokes: Point[
   const ops: Op[] = [];
   const strokes: Point[][] = [];
   let path: Point[] = [];
-  let state = { x: 0, y: 0, rotation: 0 };
+  let state = { x: 0, y: 0, rotation: 0, sx: 1, sy: 1 };
   const stack: (typeof state)[] = [];
   const at = (x: number, y: number) => ({ x: state.x + x, y: state.y + y });
   const ctx = {
@@ -88,8 +101,21 @@ function recorder(): { ctx: CanvasRenderingContext2D; ops: Op[]; strokes: Point[
     rotate: (angle: number) => {
       state = { ...state, rotation: state.rotation + angle };
     },
+    // Modelled rather than ignored: the crush squashes the flattened can with a
+    // real transform, and a recorder that silently dropped it would report a
+    // size the screen never showed.
+    scale: (sx: number, sy: number) => {
+      state = { ...state, sx: state.sx * sx, sy: state.sy * sy };
+    },
     fillRect: (_x: number, _y: number, w: number, h: number) => {
-      ops.push({ kind: "rect", x: state.x, y: state.y, rotation: state.rotation, w, h });
+      ops.push({
+        kind: "rect",
+        x: state.x,
+        y: state.y,
+        rotation: state.rotation,
+        w: w * state.sx,
+        h: h * state.sy,
+      });
     },
     arc: (x: number, y: number, r: number) => {
       ops.push({ kind: "arc", x: state.x + x, y: state.y + y, rotation: state.rotation, w: r, h: r });
@@ -127,17 +153,23 @@ function stateWith(overrides: Partial<RepeatVisualState> = {}): RepeatVisualStat
   };
 }
 
-const CAN = ROW * 0.45;
-const CAN_W = CAN * 0.42;
+const CAN = repeatCanMetrics(ROW);
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
 /**
- * Cans are picked out by their exact body size rather than by shape, because
- * the crusher's headband is also a wide flat rectangle and matching on
- * proportions quietly found that instead.
+ * Cans are picked out by their body **area** rather than by shape, because the
+ * crusher's headband is also a wide flat rectangle and matching on proportions
+ * quietly found that instead.
+ *
+ * Area, and not width and height separately, because the crush squashes the
+ * flattened can and springs it back — and that squash is volume-preserving by
+ * construction, so `w * h` is exactly the quantity it leaves alone. Matching on
+ * either dimension on its own would find the can on some frames of the crush
+ * and not others.
  */
-const isFlatCan = (op: Op) => op.kind === "rect" && near(op.w, CAN * 0.75) && near(op.h, CAN * 0.3);
-const isTallCan = (op: Op) => op.kind === "rect" && near(op.w, CAN_W) && near(op.h, CAN);
+const area = (size: { w: number; h: number }) => size.w * size.h;
+const isFlatCan = (op: Op) => op.kind === "rect" && near(op.w * op.h, area(CAN.crushed));
+const isTallCan = (op: Op) => op.kind === "rect" && near(op.w * op.h, area(CAN.upright));
 
 function flatCan(ops: readonly Op[]): Op | undefined {
   return ops.filter(isFlatCan).at(-1);
@@ -224,7 +256,14 @@ describe("a can the player placed correctly", () => {
 
   it("drops out of his hands and onto the floor", () => {
     const point = repeatCrushPoint(crushing, GEOMETRY);
-    const heights = [1.25, 1.4, 1.55].map((beat) => flatCan(draw(crushing, beat))!.y);
+    // Sampled as fractions of the fall rather than at fixed beats. The fall
+    // begins when the flatten ends, so shortening the crush slid this window
+    // earlier and the last fixed sample fell off the end of it — a tuning
+    // change turning into a failure that looked like a drawing bug.
+    const fallFrom = 1 + CRUSH_BEATS_AT_PULSE;
+    const heights = [0.15, 0.5, 0.9].map(
+      (through) => flatCan(draw(crushing, fallFrom + FALL_BEATS * through))!.y
+    );
     // Monotonically downward, and clear of where it was crushed.
     expect(heights[1]!).toBeGreaterThan(heights[0]!);
     expect(heights[2]!).toBeGreaterThan(heights[1]!);
@@ -330,7 +369,7 @@ describe("a can nobody played at", () => {
     const can = draw(missed, 1).filter((op) => isTallCan(op) && op.rotation !== 0).at(-1);
     expect(can).toBeDefined();
     // Resting on the bar it arrived in, nowhere near his hands.
-    expect(can!.y).toBeCloseTo(bar - CAN_W / 2, 5);
+    expect(can!.y).toBeCloseTo(bar - CAN.upright.w / 2, 5);
     expect(bar - point.y).toBeGreaterThan(ROW);
   });
 
@@ -344,5 +383,79 @@ describe("a can nobody played at", () => {
 
   it("is never flattened", () => {
     expect(flatCan(draw(missed, 1))).toBeUndefined();
+  });
+});
+
+describe("the can against the head", () => {
+  it("keeps his head wider than the can he holds against it", () => {
+    // The whole gesture is a can crushed on a forehead, so the two are drawn
+    // overlapping on purpose. What must not happen is the can matching or
+    // beating the head for width: at that point the silhouette stops reading
+    // as a man holding something and starts reading as a man with a tin head.
+    //
+    // Asserted rather than commented because it has now been broken twice by
+    // resizing one of the two without the other — most recently by doubling
+    // the can, which is what these numbers exist to allow safely.
+    for (const row of [24, 40, 64, 96]) {
+      expect(repeatHeadWidth(row)).toBeGreaterThan(repeatCanMetrics(row).upright.w);
+    }
+  });
+
+  it("keeps the flattened can from spanning his whole face", () => {
+    // A crushed can is wider than an upright one — that is what being crushed
+    // means — but it is still held at his brow, and past about one and a half
+    // heads it reads as a plank laid across him rather than as a flattened can.
+    for (const row of [24, 40, 64, 96]) {
+      expect(repeatCanMetrics(row).crushed.w).toBeLessThan(repeatHeadWidth(row) * 1.5);
+    }
+  });
+});
+
+describe("the crush and the hand that makes it", () => {
+  const crushing = stateWith({
+    crushed: 1,
+    pile: 1,
+    cans: [{ id: 1, lane: PERFORMER_LANE, fate: "crushed", wobbly: false, bornBeat: 0 }],
+  });
+
+  it("keeps the palm down for the whole time the can is flat", () => {
+    // The flattened can is only legible as *being crushed* while the thing
+    // crushing it is on it. Let the flatten outlast the hold and the last
+    // frames of it are a flat can hanging at his brow with the arm already
+    // climbing away — which is what happened, because the crush was capped at
+    // 0.3 of a period and the hold is 0.18 of one.
+    //
+    // Checked across the pulses the game actually uses: a quarter, an eighth,
+    // and a sixteenth. The bug only appeared at the slow end, where the cap in
+    // beats stopped binding and the fraction of the period took over.
+    for (const period of [1, 0.5, 0.25]) {
+      const state = { ...crushing, strikePeriodBeats: period };
+      const point = repeatCrushPoint(state, GEOMETRY);
+
+      // Found by scanning for the last beat a can is still drawn flat *at the
+      // crush point*, rather than computed from the constants this is meant to
+      // constrain. Asserting at the beat the window is supposed to end is
+      // circular: it passes whatever the window actually does, which is how the
+      // first version of this test sat green over the very bug it was written
+      // for.
+      // Held exactly on the crush point in x while it is being crushed, and
+      // carried forward toward the pile the instant it starts to fall — so x
+      // separates the two phases exactly. A radius around the crush point does
+      // not: the fall begins *at* that point, so the first frames of it look
+      // like the crush and drag the answer past the end of the window.
+      const flatAtBrow = (beat: number) => {
+        const can = flatCan(draw(state, beat));
+        return can !== undefined && Math.abs(can.x - point.x) < 1e-6;
+      };
+      let lastFlat = 1;
+      for (let beat = 1; beat < 1 + period; beat += 0.002) {
+        if (flatAtBrow(beat)) lastFlat = beat;
+      }
+      expect(lastFlat).toBeGreaterThan(1);
+
+      const hand = workingArm(state, lastFlat)[2];
+      expect(Math.abs(hand.x - point.x)).toBeLessThan(ROW * 0.35);
+      expect(point.y - hand.y).toBeLessThan(ROW * 0.5);
+    }
   });
 });

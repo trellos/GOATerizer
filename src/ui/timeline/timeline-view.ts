@@ -34,7 +34,7 @@ import { midiToName } from "../../music/pitch.js";
 import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
 import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
-import { drawRepeatPerformer } from "./repeat-layer.js";
+import { drawRepeatPerformer, NO_REPEAT_SPRITES, type RepeatSprites } from "./repeat-layer.js";
 import type {
   PlayedNote,
   TargetNote,
@@ -144,6 +144,7 @@ export class TimelineView {
   #actorSprites: ActorSprites = { poses: [] };
   /** PROTOTYPE: the repeat performer, when the scenario is a `RepeatMinigame`. */
   #repeat: RepeatVisualState | null = null;
+  #repeatSprites: RepeatSprites = NO_REPEAT_SPRITES;
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
@@ -201,6 +202,15 @@ export class TimelineView {
    */
   setRepeat(repeat: RepeatVisualState | null): void {
     this.#repeat = repeat;
+  }
+
+  /**
+   * The can art, resolved by the caller from the scenario's `repeatTarget` and
+   * `targetCompletedState` bindings. Separate from `setRepeat` because the
+   * state changes every frame and the art changes once a scenario.
+   */
+  setRepeatSprites(sprites: RepeatSprites): void {
+    this.#repeatSprites = sprites;
   }
 
   setKey(key: RunKey): void {
@@ -403,7 +413,8 @@ export class TimelineView {
         repeat,
         { ...geometry, pixelsPerBeat: this.#pixelsPerBeat },
         this.#actorBeat,
-        pending
+        pending,
+        this.#repeatSprites
       );
     } else if (actor) {
       drawTimelineActor(ctx, actor, geometry, this.#actorBeat, this.#actorSprites);
