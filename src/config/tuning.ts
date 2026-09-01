@@ -201,6 +201,41 @@ export const EXTRA_INPUT_LATENCY_MS = 0;
 /** Ignore detections below this confidence entirely. Tuninator gates at 0.35. */
 export const MIN_ATTACK_CONFIDENCE = 0.3;
 
+/**
+ * How soon after an announced attack a *new* Tuninator `Note` is folded into
+ * that attack instead of being announced as a second played note.
+ *
+ * Tuninator segments one played event into more than one `Note` a measurable
+ * fraction of the time — 97 of 459 events in its own corpus. Downstream a
+ * fragment is indistinguishable from a second pick: the first resolves the
+ * target and the second lands as a wrong note, so one cleanly played note
+ * scores as a hit *and* a mistake, and draws two bars on the timeline.
+ *
+ * Folding them is a translation decision, not a detection one. Tuninator still
+ * reports exactly what it reports and no pitch detection happens here, so
+ * `AGENTS.md` §4's boundary is intact: this is the adapter deciding what one
+ * *played note* means to the game.
+ *
+ * The value is bracketed from both sides rather than chosen. The floor is what
+ * the fragments actually are: Tuninator absorbs a stub into the articulation
+ * that shed it only while that stub is younger than its `transient
+ * .articulationMs`, 80ms — so the splits that escape absorption and reach the
+ * game are the ones that just missed that bound, and a window under 80ms would
+ * miss them too. The ceiling is musical: the window must stay below the
+ * shortest gap between two notes the player can legitimately be asked for,
+ * which is a sixteenth at the fastest tempo, 60000 / (140 * 4) = 107ms. 90ms is
+ * the only round number comfortably inside 80..107.
+ *
+ * Measured from the announced attack rather than from the previous fragment's
+ * end, deliberately: `releaseGraceMs` means a legato eighth ends only as the
+ * next one begins, so a contiguity rule would swallow real playing.
+ *
+ * Provisional, and in milliseconds rather than beats because it describes the
+ * recognizer's behaviour and the physics of a pick, neither of which knows what
+ * tempo the game is at.
+ */
+export const FRAGMENT_COALESCE_MS = 90;
+
 /* -------------------------------------------------------------------------- */
 /* Timeline                                                                    */
 /* -------------------------------------------------------------------------- */

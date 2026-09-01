@@ -114,6 +114,17 @@ a session player's), but nothing in the *run* ever suggests visiting it. A
 "your notes are landing 180ms late — the timing check can fix that" nudge after
 an attempt that scored badly on timing alone would close the loop.
 
+**There is already a written answer for half of this**, on the deleted branch
+`claude/tuninator-experimental-recognition-lcrsuv` and recoverable from
+`055d4f4`: `nearestPitchDelta`, which records how far a played note fell from
+the nearest target *of its pitch* while ignoring every window. Samples taken
+from resolved notes are truncated at the Good window by construction, so on a
+rig sitting further out than that window the timing log stays empty and the
+median it does report is biased toward zero — the instrument built to find a
+large offset is blindest to exactly that. Deliberately not ported alongside
+DECISION-040, because it is a second mechanism and a branch cleanup is not the
+place to land one.
+
 ### The frame loop costs about 16% more than it did
 
 Measured interleaved on one machine, pre-session `main` against this branch:

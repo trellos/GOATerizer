@@ -40,7 +40,7 @@ import type {
   RecognizerState,
 } from "tuninator";
 
-import { MIN_ATTACK_CONFIDENCE } from "../config/tuning.js";
+import { FRAGMENT_COALESCE_MS, MIN_ATTACK_CONFIDENCE } from "../config/tuning.js";
 import {
   Emitter,
   type GuitarInputEvent,
@@ -92,10 +92,22 @@ const STATE_COPY: Readonly<Record<RecognizerState, string>> = {
 
 /** What the adapter remembers about one in-flight Note. */
 type TrackedNote = {
+  /**
+   * The played note this Tuninator `Note` belongs to.
+   *
+   * Usually the Note's own id, but not always: a fragment is folded into the
+   * attack it belongs to and then travels under *that* id for the rest of its
+   * life, so one played note stays one played note downstream however many
+   * `Note`s the recognizer split it into. See {@link FRAGMENT_COALESCE_MS}.
+   */
+  attackId: string;
   /** Null until an attack has actually been emitted for this note. */
   emittedMidi: number | null;
   contextTime: number;
 };
+
+/** The last attack announced to the game, and what it currently claims. */
+type LastAttack = { attackId: string; midi: number; contextTime: number };
 
 export class TuninatorGuitarInputProvider implements GuitarInputProvider {
   readonly kind = "tuninator" as const;
@@ -104,6 +116,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
   readonly #events = new Emitter<GuitarInputEvent>();
   readonly #statusChanges = new Emitter<GuitarInputStatus>();
   readonly #tracked = new Map<string, TrackedNote>();
+  #lastAttack: LastAttack | null = null;
   #unsubscribes: Unsubscribe[] = [];
   #recognizer: Recognizer | null = null;
   #status: GuitarInputStatus = {
@@ -180,6 +193,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     if (!recognizer) return;
     await recognizer.stop();
     this.#tracked.clear();
+    this.#lastAttack = null;
   }
 
   async dispose(): Promise<void> {
@@ -188,6 +202,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     for (const off of this.#unsubscribes) off();
     this.#unsubscribes = [];
     this.#tracked.clear();
+    this.#lastAttack = null;
     if (recognizer) {
       try {
         await recognizer.dispose();
@@ -268,6 +283,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
       // eventual attack is stamped with it rather than with delivery time.
       if (!tracked) {
         this.#tracked.set(note.id, {
+          attackId: note.id,
           emittedMidi: null,
           contextTime: this.#toContextTime(note.startTime),
         });
@@ -280,13 +296,22 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     const contextTime = tracked?.contextTime ?? this.#toContextTime(note.startTime);
     const rounded = Math.round(midi);
 
+    const frequencyHz = pitch?.frequencyHz ?? note.pitch.currentFrequencyHz ?? 0;
+
     if (!tracked || tracked.emittedMidi === null) {
-      this.#tracked.set(note.id, { emittedMidi: rounded, contextTime });
+      // One pick can reach us as several `Note`s. If this one starts on top of
+      // an attack we have already announced, it is a fragment of that attack
+      // rather than a second played note, and announcing it would score one
+      // clean note as a hit and a mistake at once.
+      if (this.#foldIntoLastAttack(note, rounded, frequencyHz, contextTime)) return;
+
+      this.#tracked.set(note.id, { attackId: note.id, emittedMidi: rounded, contextTime });
+      this.#lastAttack = { attackId: note.id, midi: rounded, contextTime };
       this.#events.emit({
         type: "attack",
         id: note.id,
         midi: rounded,
-        frequencyHz: pitch?.frequencyHz ?? note.pitch.currentFrequencyHz ?? 0,
+        frequencyHz,
         confidence: note.confidence,
         contextTime,
       });
@@ -296,13 +321,14 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     if (tracked.emittedMidi !== rounded) {
       // The recognizer revised the answer. Same played note, better label.
       tracked.emittedMidi = rounded;
+      this.#noteRetuned(tracked.attackId, rounded);
       this.#events.emit({
         type: "retune",
-        id: note.id,
+        id: tracked.attackId,
         midi: rounded,
-        frequencyHz: pitch?.frequencyHz ?? note.pitch.currentFrequencyHz ?? 0,
+        frequencyHz,
         confidence: note.confidence,
-        contextTime,
+        contextTime: tracked.contextTime,
       });
       return;
     }
@@ -313,7 +339,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     if (bendCents !== 0 || change?.type === "pitchMovement" || change?.type === "bendUpdate") {
       this.#events.emit({
         type: "sustain",
-        id: note.id,
+        id: tracked.attackId,
         midi: rounded,
         frequencyHz: pitch?.frequencyHz ?? note.pitch.currentFrequencyHz ?? 0,
         bendCents,
@@ -328,11 +354,67 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
     const tracked = this.#tracked.get(note.id);
     this.#tracked.delete(note.id);
     if (!tracked || tracked.emittedMidi === null) return;
+
+    // A played note is released once, when the *last* Note carrying its attack
+    // stops sounding. Releasing on the first would end the timeline bar while
+    // the string is still ringing under a fragment.
+    for (const other of this.#tracked.values()) {
+      if (other.attackId === tracked.attackId) return;
+    }
+
     this.#events.emit({
       type: "release",
-      id: note.id,
+      id: tracked.attackId,
       contextTime: this.#toContextTime(note.endTime ?? note.startTime),
     });
+  }
+
+  /**
+   * Folds a `Note` that began on top of an announced attack into that attack.
+   *
+   * Returns true when the Note was folded and must not be announced. The
+   * comparison is absolute so a fragment stamped fractionally *before* the
+   * attack it belongs to — the boundary moves when a stub is absorbed — is
+   * still recognised as one.
+   */
+  #foldIntoLastAttack(
+    note: Note,
+    rounded: number,
+    frequencyHz: number,
+    contextTime: number
+  ): boolean {
+    const last = this.#lastAttack;
+    if (!last) return false;
+    if (Math.abs(contextTime - last.contextTime) >= FRAGMENT_COALESCE_MS / 1000) return false;
+
+    // Every event about this Note from here on travels under the original
+    // attack's id, including its release.
+    this.#tracked.set(note.id, {
+      attackId: last.attackId,
+      emittedMidi: last.midi,
+      contextTime: last.contextTime,
+    });
+
+    if (rounded !== last.midi) {
+      // The fragment disagrees about the pitch. That is the same information a
+      // `pitchCorrection` carries, so it travels the same way: judgment gets to
+      // re-read an unresolved outcome, and nothing is scored twice.
+      last.midi = rounded;
+      this.#events.emit({
+        type: "retune",
+        id: last.attackId,
+        midi: rounded,
+        frequencyHz,
+        confidence: note.confidence,
+        contextTime: last.contextTime,
+      });
+    }
+    return true;
+  }
+
+  /** Keeps `#lastAttack` current so a later fragment compares against the truth. */
+  #noteRetuned(attackId: string, midi: number): void {
+    if (this.#lastAttack?.attackId === attackId) this.#lastAttack.midi = midi;
   }
 
   #setStatus(patch: Partial<GuitarInputStatus>): void {
