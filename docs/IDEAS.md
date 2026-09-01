@@ -114,6 +114,27 @@ a session player's), but nothing in the *run* ever suggests visiting it. A
 "your notes are landing 180ms late — the timing check can fix that" nudge after
 an attempt that scored badly on timing alone would close the loop.
 
+### The frame loop costs about 16% more than it did
+
+Measured interleaved on one machine, pre-session `main` against this branch:
+98–103 fps versus 84–86. That is the art work of this session, and most of it
+is one deliberate decision — the goat is 2.4x bigger, which is 6x the pixels
+blitted every frame. Our own JavaScript is not the problem: frame work p95 is
+1.3ms against an 11ms frame.
+
+It matters because the browser suite's `not capped at 60fps` check has a
+threshold of 90, chosen when the container ran at 198. It now fails at ~85
+while `main` passes at ~100 — so on this hardware the check has quietly become
+a relative-performance detector rather than the vsync-cap assertion it says it
+is. Two honest options, and they are not the same: re-aim the check at what it
+claims (comfortably above 60, with the separate 4ms frame-work budget doing the
+real work), or spend the frame back. The pile of crushed cans is the obvious
+first place to look — up to 24 sprites, each with its own save/rotate/scale,
+drawn every frame for a whole attempt.
+
+Deliberately not fixed by lowering the threshold in the same change that caused
+the regression.
+
 ## Open — untested in the real world
 
 ### No physical guitar has been played against this build

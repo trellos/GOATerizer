@@ -81,6 +81,49 @@ export function keyId(key: RunKey): string {
   return `${SHARP_NAMES[key.tonic]}-${key.mode}`;
 }
 
+/**
+ * Reads a written key name into a {@link RunKey}, or null if it is not one.
+ *
+ * Deliberately generous about spelling, because the thing typing it is a human
+ * writing a link: `Eb`, `eb`, `D#`, `Eb minor`, `Ebm`, `eb-min`, `EbMajor` all
+ * arrive here. Enharmonics are accepted as written and stored as the pitch
+ * class they are — ask for `D#` and the readouts will say `Eb`, because the
+ * spelling of a key on screen follows {@link usesFlats}, not the request.
+ *
+ * Mode defaults to major when unwritten, as it does on any chord chart.
+ */
+export function parseKeyName(text: string): RunKey | null {
+  const cleaned = text.trim().toLowerCase().replace(/[\s_-]+/g, "");
+  const match = /^([a-g])(b|#|♭|♯)?(.*)$/.exec(cleaned);
+  if (!match) return null;
+
+  const [, letter = "", accidental = "", rest = ""] = match;
+  const mode = parseMode(rest);
+  if (mode === null) return null;
+
+  const base = NATURAL_PITCH_CLASSES[letter];
+  if (base === undefined) return null;
+  const shift = accidental === "b" || accidental === "♭" ? -1 : accidental === "" ? 0 : 1;
+  return { tonic: mod(base + shift, 12) as PitchClassIndex, mode };
+}
+
+const NATURAL_PITCH_CLASSES: Readonly<Record<string, number>> = {
+  c: 0,
+  d: 2,
+  e: 4,
+  f: 5,
+  g: 7,
+  a: 9,
+  b: 11,
+};
+
+/** The mode suffix of a written key name. `""` is major; anything odd is null. */
+function parseMode(suffix: string): Mode | null {
+  if (suffix === "" || suffix === "maj" || suffix === "major") return "major";
+  if (suffix === "m" || suffix === "min" || suffix === "minor") return "minor";
+  return null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Register                                                                    */
 /* -------------------------------------------------------------------------- */

@@ -44,7 +44,13 @@ import {
 } from "../dev/auto-performance.js";
 import { SyntheticGuitarSource } from "../dev/synthetic-guitar.js";
 import { pickWeightedKey } from "../config/key-weighting.js";
-import { DEFAULT_TEMPO_ID, TEMPOS, tempoById, type TempoId } from "../config/tempos.js";
+import {
+  DEFAULT_TEMPO_ID,
+  parseTempo,
+  TEMPOS,
+  tempoById,
+  type TempoId,
+} from "../config/tempos.js";
 import {
   ATTEMPT_BEATS,
   AUTOPLAY_DEFAULT_SEED,
@@ -73,7 +79,7 @@ import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from ".
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
 import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingering.js";
-import { keyDisplayName, keyShortName, type RunKey } from "../music/keys.js";
+import { keyDisplayName, keyShortName, parseKeyName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
 import {
@@ -339,10 +345,11 @@ export class GameApp {
   async start(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.#devMode = params.get("dev") === "1";
-    // EXPERIMENT (see `styles.css`): the timeline drawn over the scenario
-    // rather than beside it. On by default on this branch; `?overlay=0` gives
-    // the two-pane layout back for an A/B in the same build.
+    // The timeline is drawn over the scenario rather than beside it.
+    // `?overlay=0` gives the two-pane layout back, which is what the A/B was
+    // run on before the overlay became the default.
     this.#overlayTimeline = params.get("overlay") !== "0";
+    this.#applySetupParams(params);
 
     this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
     this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
@@ -563,6 +570,45 @@ export class GameApp {
           other.dataset["selected"] = String(other.dataset["view"] === mode);
         }
       });
+    }
+  }
+
+  /**
+   * `?key=` and `?tempo=`: start the run set up a particular way.
+   *
+   * Not dev-only, unlike the flags below. Both name choices the player already
+   * makes by hand — the reroll button and the tempo chips — so a link that
+   * arrives pre-set is a shortcut into normal play, not a way around it. What
+   * it buys is practice: "send me the Eb one again" is otherwise a matter of
+   * rerolling until Eb comes up, and Eb major is a weight-3 key.
+   *
+   * The pregame still owns both: Reroll rolls a fresh random key as it always
+   * has, and the tempo chips still switch tempo. The URL sets the starting
+   * point, it does not pin it.
+   *
+   * An unreadable value is ignored, with a warning, and the run starts as it
+   * would have — a typo in a link should not refuse to start the game.
+   */
+  #applySetupParams(params: URLSearchParams): void {
+    const requestedKey = params.get("key");
+    if (requestedKey !== null) {
+      const key = parseKeyName(requestedKey);
+      if (key) {
+        this.#setup.key = key;
+        this.#timeline.setKey(key);
+      } else {
+        console.warn(`[goaterizer] ignoring unreadable ?key=${requestedKey}`);
+      }
+    }
+
+    const requestedTempo = params.get("tempo");
+    if (requestedTempo !== null) {
+      const tempoId = parseTempo(requestedTempo);
+      if (tempoId) {
+        this.#setup.tempoId = tempoId;
+      } else {
+        console.warn(`[goaterizer] ignoring unreadable ?tempo=${requestedTempo}`);
+      }
     }
   }
 
