@@ -43,6 +43,36 @@ export type SubdivisionWindows = {
   good: number;
 };
 
+/**
+ * The narrowest a Good window is ever allowed to get, whatever the subdivision
+ * and whatever the neighbour clamp says.
+ *
+ * Half a beat — an eighth note either side, at any tempo. This exists because
+ * of what the clamp did to a player with a *systematic* offset, which is the
+ * common case on a real rig and not something they can feel or fix by playing
+ * better.
+ *
+ * Measured against the real judge on authored material: with the clamp alone,
+ * eighth-note material breaks at 0.25 beats of lateness — 167ms at 90bpm — and
+ * it breaks as a **cliff**, not a slope. Every note past that point arrives
+ * after its own target has expired and is offered to the next one, which is a
+ * different pitch, so a single uncompensated latency turns nearly every note
+ * into a miss *and* a wrong note at once. Sixty targets, a hundred and twelve
+ * failures. That is what "the goat appears briefly then disappears" looks like
+ * from the inside.
+ *
+ * With this floor the same material stays clean to ±0.4 beats (±267ms), on
+ * one-pitch material as well as scale material, in both directions.
+ *
+ * Overlapping windows are safe here, and were always safer than the clamp
+ * assumed: `TargetJudge` filters candidates by **pitch** before it picks the
+ * nearest in time, and a resolved target is never offered again — so a played
+ * note finds the nearest target *that it could actually be*, and one note can
+ * never resolve two. The clamp was protecting an invariant the resolver already
+ * enforces, and charging a real player for it.
+ */
+export const GOOD_WINDOW_FLOOR_BEATS = 0.5;
+
 export const TIMING_WINDOWS_BEATS: {
   whole: SubdivisionWindows;
   half: SubdivisionWindows;

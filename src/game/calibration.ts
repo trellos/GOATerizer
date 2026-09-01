@@ -79,9 +79,20 @@ export const MIN_SAMPLES = 8;
  *
  * Above this the notes are not clustered tightly enough for their middle to
  * mean anything, and the honest response is "play more evenly", not a number.
- * A steady player lands around 10-25ms; 45ms is scruffy but still usable.
+ *
+ * This is a **median absolute deviation**, not a range: 70ms means half the
+ * notes landed within 70ms of the middle of them. It was 45ms, which is a
+ * session player's consistency and turned the check into an accusation for
+ * everyone else — and it refused a trim to exactly the players who most needed
+ * one, since a loose player with 200ms of uncompensated latency is told to play
+ * more evenly rather than given the number that would fix their rig.
+ *
+ * The median stays worth trusting at this spread. Its own error falls as
+ * 1/sqrt(n), so across a full check the middle is still located to a couple of
+ * tens of milliseconds — coarse, and far better than nothing when the
+ * alternative is being told to try harder.
  */
-export const MAX_USABLE_SPREAD_MS = 45;
+export const MAX_USABLE_SPREAD_MS = 70;
 
 /**
  * Below this, the rig is already accurate and applying the result would be

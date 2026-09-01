@@ -667,6 +667,68 @@ try {
   }
 
   /* ==================================================================== */
+  /* Part 1b2 — a player whose whole rig is late is still playing the game */
+  /* ==================================================================== */
+
+  // The bug this guards, reported from an actual guitar: "I only see the goat
+  // appear briefly then disappear. It's saying my timing is bad... but it
+  // isn't." A rig with uncompensated latency is off by the *same* amount on
+  // every note, and past a quarter of a beat on eighth material the old window
+  // clamp turned each one into a miss AND a wrong note at once — the note
+  // arrived after its own target expired and was offered to the next one,
+  // which is a different pitch. The actor falls on either, so it never
+  // survived two notes.
+  //
+  // Nothing in the suite could produce that input: every existing check plays
+  // on time and fumbles a share of notes, which is a different failure. Hence
+  // `?playOffsetMs=`.
+  {
+    const late = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    // 200ms. The default tempo is 90bpm, so that is 0.3 of a beat: past the
+    // 0.25 where the old clamp broke on eighth material, and well inside the
+    // 0.4 the floor now covers. An earlier version of this used 150ms, which is
+    // 0.225 of a beat — *short* of the cliff — and so passed happily with the
+    // bug reintroduced. A regression test that does not fail on the regression
+    // is worse than none, because it is credited as coverage.
+    await late.goto(`${BASE}/?dev=1&input=test&level=4&scenario=rocky_ascent&playOffsetMs=200`, {
+      waitUntil: "networkidle",
+    });
+    await late.click("#start-play");
+    await late.waitForTimeout(1200);
+    await late.click("#pregame-play");
+    await late.waitForTimeout(300);
+    await late.click("#dev-autoplay-perfect");
+
+    const judged = await waitForDev(
+      late,
+      "perfect/good/miss",
+      (value) => Number((value ?? "0/0/0").split("/")[1]) >= 6,
+      20000
+    );
+    const [, good, miss] = (judged ?? "0/0/0").split("/").map(Number);
+    check(
+      "a consistently late player is still judged as playing the notes",
+      good >= 6 && miss <= good / 4,
+      `perfect/good/miss ${judged}`
+    );
+
+    // The symptom as the player described it. The actor falls on any miss or
+    // wrong note, so a surviving streak is the end-to-end proof.
+    const streak = await waitForDev(
+      late,
+      "actor lane/streak",
+      (value) => Number((value ?? "—/0").split("/")[1]) >= 5,
+      15000
+    );
+    check(
+      "and the goat stays on the bars instead of appearing and vanishing",
+      Number((streak ?? "—/0").split("/")[1]) >= 5,
+      `lane/streak ${streak}`
+    );
+    await late.close();
+  }
+
+  /* ==================================================================== */
   /* Part 1c — the timing check measures what it claims to                */
   /* ==================================================================== */
 

@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { JUDGMENT_POINTS, SCORE_VALUES, TIMING_WINDOWS_BEATS } from "../src/config/tuning.js";
+import {
+  GOOD_WINDOW_FLOOR_BEATS,
+  JUDGMENT_POINTS,
+  SCORE_VALUES,
+  TIMING_WINDOWS_BEATS,
+} from "../src/config/tuning.js";
 import { computeWindows, TargetJudge, type JudgmentEvent } from "../src/game/judgment.js";
 import { AttemptScore } from "../src/game/scoring.js";
 import { StarMeter } from "../src/game/stars.js";
@@ -42,33 +47,55 @@ describe("timing windows", () => {
     expect(windows[5]).toEqual(TIMING_WINDOWS_BEATS.quarter);
   });
 
-  it("tightens for eighths so adjacent targets stay distinguishable", () => {
+  it("never lets dense material be judged tighter than an eighth note", () => {
+    // The floor, and why it exists. Eighth material used to be clamped to a
+    // quarter of a beat either side, and at 90bpm that is 167ms — inside the
+    // uncompensated latency of an ordinary rig. See `GOOD_WINDOW_FLOOR_BEATS`.
     const windows = computeWindows(levelTargets(4));
-    expect(windows[3]?.good).toBe(TIMING_WINDOWS_BEATS.eighth.good);
-    expect(windows[3]?.good).toBeLessThan(TIMING_WINDOWS_BEATS.quarter.good);
-    expect(windows[3]?.perfect).toBeLessThan(TIMING_WINDOWS_BEATS.quarter.perfect);
+    for (const window of windows) {
+      expect(window.good).toBeGreaterThanOrEqual(GOOD_WINDOW_FLOOR_BEATS);
+    }
   });
 
-  it("never lets two targets claim the same played note", () => {
+  it("keeps Perfect tight even where Good is floored", () => {
+    // Forgiveness is about what counts as a hit. Widening what counts as
+    // *flawless* would make three stars mean less, so the floor deliberately
+    // does not reach Perfect.
+    const windows = computeWindows(levelTargets(4));
+    expect(windows[3]?.perfect).toBe(TIMING_WINDOWS_BEATS.eighth.perfect);
+    expect(windows[3]?.perfect).toBeLessThan(windows[3]!.good);
+  });
+
+  it("never resolves two targets from one played note", () => {
+    // The invariant the old half-the-gap clamp was written to protect. It is
+    // worth keeping now that windows overlap — but it is a fact about the
+    // *resolver*, not about the arithmetic that sizes windows, so it is
+    // asserted by playing notes rather than by adding two numbers together.
     for (const difficulty of [1, 2, 3, 4]) {
       const targets = levelTargets(difficulty);
-      const windows = computeWindows(targets);
-      for (let i = 1; i < targets.length; i += 1) {
-        const gap = targets[i]!.startBeat - targets[i - 1]!.startBeat;
-        expect(windows[i - 1]!.good + windows[i]!.good).toBeLessThanOrEqual(gap + 1e-9);
+      for (const target of targets.slice(0, 12)) {
+        const harness = makeJudge(targets);
+        harness.play(target.midi, target.startBeat);
+        const resolved = harness.events.filter(
+          (event) => event.type === "PerfectNote" || event.type === "GoodNote"
+        );
+        expect(resolved.length).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  it("clamps a long note's window when a short one follows closely", () => {
-    // A quarter on beat 0 followed by an eighth on beat 0.5: the quarter's
-    // authored +-0.5 would swallow the eighth, so it is halved.
+  it("still clamps a long note toward a close neighbour, under the floor", () => {
+    // A quarter on beat 0 followed by an eighth on beat 0.5. The clamp still
+    // runs and still halves the quarter's authored window — the floor then
+    // lifts the result back to half a beat, which is what the player is judged
+    // on. Both are asserted so a change to either is visible.
     const targets: ResolvedTarget[] = [
       { opportunityIndex: 0, promptIndex: 0, pass: 0, startBeat: 0, durationBeats: 1, duration: "quarter", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
       { opportunityIndex: 1, promptIndex: 1, pass: 0, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
     ];
     const windows = computeWindows(targets);
-    expect(windows[0]?.good).toBe(0.25);
+    expect(windows[0]?.good).toBe(GOOD_WINDOW_FLOOR_BEATS);
+    // Perfect is still cut by the neighbour, because it is not floored.
     expect(windows[0]?.perfect).toBeLessThanOrEqual(0.25);
   });
 });
@@ -378,12 +405,41 @@ describe("dense subdivisions stay unambiguous", () => {
     expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(6);
   });
 
-  it("does not let an eighth-note attack reach a target 0.5 beats away", () => {
+  it("lets an eighth-note attack reach a target half a beat away", () => {
+    // This reverses deliberately. Playing target 7's pitch at target 6's time
+    // used to be a wrong note; it is now a Good one, because half a beat is
+    // exactly the tolerance the floor buys (`GOOD_WINDOW_FLOOR_BEATS`).
+    //
+    // The case that made this necessary is not a player fumbling one note — it
+    // is a player whose whole performance is shifted by their rig's latency,
+    // for whom *every* note landed on the neighbouring target's time and was
+    // called a wrong note. Target 6 is still there to be hit, so this is
+    // forgiveness rather than a free pass.
     const targets = levelTargets(4);
     const harness = makeJudge(targets);
-    // Play target 7's pitch at target 6's time. Too far for target 7's window.
     harness.play(targets[7]!.midi, targets[6]!.startBeat);
-    expect(harness.types()).toEqual(["WrongNote"]);
+
+    const good = harness.events.find((e) => e.type === "GoodNote");
+    expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(7);
+  });
+
+  it("still refuses a note further out than the floor", () => {
+    // The floor is a floor, not the removal of a limit: half a beat is what it
+    // buys, and beyond that a note is still wrong.
+    //
+    // Asserted against a two-target fixture rather than authored material,
+    // because scale material reuses pitches — the first attempt at this hunted
+    // for a "far" target by index and found one whose pitch a *near* target
+    // also had, so the note was correctly matched to the near one and the test
+    // failed for a reason that had nothing to do with distance.
+    const targets: ResolvedTarget[] = [
+      { opportunityIndex: 0, promptIndex: 0, pass: 0, startBeat: 0, durationBeats: 0.5, duration: "eighth", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
+      { opportunityIndex: 1, promptIndex: 1, pass: 0, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
+    ];
+    const harness = makeJudge(targets);
+    // Target 1's pitch, a beat and a half before it: well past the floor.
+    harness.play(45, -1);
+    expect(harness.types()).toContain("WrongNote");
   });
 
   it("reports the target the player should be aiming at", () => {

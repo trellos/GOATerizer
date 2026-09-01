@@ -153,7 +153,7 @@ function calibrationVerdict(state: CalibrationState): string {
     return `Only ${state.samples} notes came through. Play one on every click — and check the guitar is actually being heard.`;
   }
   if (!state.usable) {
-    return `Your notes were spread ±${Math.round(state.spreadMs ?? 0)} ms, which is too loose for the middle of them to mean anything. Try again and worry about being even rather than being right.`;
+    return `Your notes were spread ±${Math.round(state.spreadMs ?? 0)} ms, which is too loose for the middle of them to mean anything yet. Nothing is wrong with your playing — this needs an even run to measure against, so try once more and aim for steady rather than right.`;
   }
   if (!state.worthApplying) {
     return "You are already inside 10 ms of the beat. Nothing to change — if the game still feels off, it is not this.";
@@ -308,6 +308,17 @@ export class GameApp {
   #devScenarioId: string | null = null;
   /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
   #devCalibrateOffsetMs: number | null = null;
+  /**
+   * `?dev=1&playOffsetMs=N`: autoplay plays the whole run N ms out of time.
+   *
+   * A player whose rig is uncompensated is off by the *same* amount on every
+   * note, and to them they are dead on the beat. That is a completely different
+   * input from the autoplay tiers, which model a player who is on time and
+   * fumbles a share of their notes — and it is the input nothing in this
+   * repository could produce, which is why judgment collapsing under a
+   * systematic offset (DECISION-038) shipped without a single test going red.
+   */
+  #devPlayOffsetMs = 0;
   #autoplay: AutoplayMode = "off";
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
@@ -589,6 +600,13 @@ export class GameApp {
     const calibrateOffset = Number(params.get("calibrateOffsetMs"));
     if (this.#devMode && params.has("calibrateOffsetMs") && Number.isFinite(calibrateOffset)) {
       this.#devCalibrateOffsetMs = calibrateOffset;
+    }
+
+    // `?playOffsetMs=N` shifts every autoplayed note by N ms, so a rig with
+    // uncompensated latency can be played back without a rig. Positive is late.
+    const playOffset = Number(params.get("playOffsetMs"));
+    if (this.#devMode && params.has("playOffsetMs") && Number.isFinite(playOffset)) {
+      this.#devPlayOffsetMs = playOffset;
     }
 
     // `?scenario=<id>` pins every slot that scenario authors to it. Dev-only,
@@ -2118,7 +2136,9 @@ export class GameApp {
 
     performance.gestures.forEach((gesture: AutoGesture, index: number) => {
       const attackTime =
-        this.#transport.contextTimeAt(attempt.runtime.startBeat + gesture.beat) + latency;
+        this.#transport.contextTimeAt(attempt.runtime.startBeat + gesture.beat) +
+        latency +
+        this.#devPlayOffsetMs / 1000;
       // Already past: `osc.start()` would clamp to now and compress the
       // envelope, and the test provider's queue would fire it out of order.
       if (attackTime <= earliest) return;

@@ -204,6 +204,34 @@ export function pickWrongMidi(args: {
 /* -------------------------------------------------------------------------- */
 
 /** Everything the fake guitarist does in one attempt. */
+/**
+ * How far a hit may be jittered, in beats.
+ *
+ * Bounded by the gap to the neighbouring target, not by the Good window. Those
+ * used to be the same number and are not any more: the Good window now has a
+ * floor of half a beat so a player with a systematic offset is still judged
+ * fairly (`GOOD_WINDOW_FLOOR_BEATS`), which means it can be wider than the
+ * space between two notes.
+ *
+ * A synthetic guitarist jittered by that much would schedule its next pluck
+ * before the current one had finished — one pair of hands playing two notes at
+ * once, which is not a performance any player could give and would quietly
+ * invalidate every autoplay-driven check in the browser suite.
+ */
+function jitterBudget(
+  targets: readonly ResolvedTarget[],
+  index: number,
+  window: TargetWindows
+): number {
+  const target = targets[index]!;
+  const previous = targets[index - 1];
+  const next = targets[index + 1];
+  let gap = Number.POSITIVE_INFINITY;
+  if (previous) gap = Math.min(gap, target.startBeat - previous.startBeat);
+  if (next) gap = Math.min(gap, next.startBeat - target.startBeat);
+  return Number.isFinite(gap) ? Math.min(window.good, gap / 2) : window.good;
+}
+
 export function planAutoPerformance(options: PlanOptions): AutoPerformance {
   const { targets, mode, seed, attemptIndex } = options;
   const windows = options.windows ?? computeWindows(targets);
@@ -243,7 +271,9 @@ export function planAutoPerformance(options: PlanOptions): AutoPerformance {
     if (hit) quota -= 1;
 
     const jitter =
-      mode === "perfect" ? 0 : (random() * 2 - 1) * window.good * AUTOPLAY_HIT_JITTER_FRACTION;
+      mode === "perfect"
+        ? 0
+        : (random() * 2 - 1) * jitterBudget(targets, index, window) * AUTOPLAY_HIT_JITTER_FRACTION;
     const beat = target.startBeat + jitter;
 
     if (hit) {

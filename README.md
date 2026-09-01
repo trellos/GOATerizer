@@ -143,6 +143,14 @@ tables at the top of that script.
    minigame puts a trophy on the shelf in the top bar — bare at one star, horns
    at two, a crown at three.
 
+Judging is deliberately forgiving about *when*: a note counts as played if it
+lands within an eighth note either side of its target, at any tempo and whatever
+the written subdivision. That is not generosity for its own sake — a rig with
+uncompensated latency puts every note out by the same amount, which a player
+cannot feel or fix by playing better, and a window tighter than that turns an
+ordinary interface into an unplayable game (DECISION-038). Hitting the middle
+still pays: Perfect stays tight, and three stars still needs it.
+
 **Timing check** (from the start screen) measures how far your notes land from
 the beat, so "the game feels late" can be told apart from "I am playing late".
 It reports two numbers: your offset, which is your rig and your feel together,
@@ -163,6 +171,7 @@ Dev tooling is gated behind `?dev=1` and never reachable from normal play.
 | `?dev=1&seed=N` | Picks a different seeded autoplay performance. The same `N` fumbles the same notes in the same places every time, so a screenshot or a bug report reproduces |
 | `?dev=1&level=N` | Force every slot to difficulty *N*, for tuning one level without grinding up to it. Which scenario fills it is still whatever the registry's difficulty pool picks — no longer always Rocky Ascent now that companion scenarios share levels with it |
 | `?dev=1&scenario=<id>` | Pin every slot that scenario authors to it, so one scenario can be looked at without rerolling the run. Slots it does not author fall back to normal random selection. Unknown ids are refused with a console warning rather than silently ignored |
+| `?dev=1&playOffsetMs=N` | Autoplay plays the whole run *N* ms out of time (positive is late), simulating a rig with uncompensated latency. Distinct from the tiers, which model a player who is *on time* and fumbles a share of notes — and it is the input nothing else here could produce, which is why judgment collapsing under a constant offset shipped green (DECISION-038) |
 | `?dev=1&calibrateOffsetMs=N` | On the timing check only: fake a player whose notes land *N* ms from the click, which is how that screen is testable without a guitar. Deliberately not one of the autoplay tiers — those describe what share of the *targets* a fake guitarist takes, and the check has no targets |
 
 ---

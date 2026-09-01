@@ -20,6 +20,7 @@
  */
 
 import {
+  GOOD_WINDOW_FLOOR_BEATS,
   OCTAVE_EQUIVALENT_MATCH,
   TIMING_WINDOWS_BEATS,
   WRONG_NOTE_DEBOUNCE_BEATS,
@@ -97,11 +98,21 @@ export type TargetWindows = SubdivisionWindows;
 /**
  * Timing windows for a whole level.
  *
- * Each target starts from its subdivision's authored window, then has its Good
- * window clamped to half the distance to its nearest neighbouring target. The
- * subdivision table already encodes that for uniform material; the clamp makes
- * it hold for *any* authored rhythm — a quarter note followed by an eighth
- * cannot claim a played note that belongs to the eighth.
+ * Each target starts from its subdivision's authored window and has its Good
+ * window clamped to half the distance to its nearest neighbouring target, so
+ * that dense material does not hand one played note to a target it obviously
+ * does not belong to.
+ *
+ * Then {@link GOOD_WINDOW_FLOOR_BEATS} puts a floor under the result, and the
+ * floor wins. The clamp on its own made eighth-note material break as a cliff
+ * under any systematic offset past 0.25 beats — see that constant for the
+ * measurement — and its stated purpose, stopping two targets claiming one note,
+ * is something `#findMatch` already guarantees structurally: candidates are
+ * filtered by pitch, the nearest survivor wins, and a resolved target is never
+ * offered again.
+ *
+ * Perfect is *not* floored. Widening what counts as a hit is forgiveness;
+ * widening what counts as flawless would make three stars mean less.
  */
 export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindows[] {
   return targets.map((target, index) => {
@@ -112,6 +123,7 @@ export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindow
     let good = base.good;
     if (previous) good = Math.min(good, (target.startBeat - previous.startBeat) / 2);
     if (next) good = Math.min(good, (next.startBeat - target.startBeat) / 2);
+    good = Math.max(good, GOOD_WINDOW_FLOOR_BEATS);
 
     return { perfect: Math.min(base.perfect, good), good };
   });

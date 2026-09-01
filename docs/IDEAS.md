@@ -89,6 +89,31 @@ answer is a second one in a different colour rather than a rotation.
 
 ---
 
+## Open — from the first real-guitar playtest
+
+### One-pitch material still slides under a shifted performance
+
+The Good-window floor (DECISION-038) fixed judging for a player whose rig is
+late, on every material where the *pitch* moves — pitch is what stops a shifted
+note being handed to its neighbour. Can Crushing is a single pitch for a whole
+attempt, so it has nothing to disambiguate with, and attribution slides by one
+note. Measured at 0.3 beats of lateness: four failures in forty-eight, both at
+seams where the rhythm changes, against forty-eight before the floor.
+
+Not obviously worth fixing — two dropped streaks an attempt is a long way from
+unplayable — but if it is, the lever is the resolver preferring a target the
+note is *late* for over one it is early for, since players run late far more
+often than early. That is a real tuning decision and wants its own playtest.
+
+### The player has no way to see they are playing late
+
+The whole failure above is invisible from inside: to a player with 200ms of
+uncompensated latency, they are dead on the beat. The timing check exists for
+exactly this and now offers a trim to far more people (its spread threshold was
+a session player's), but nothing in the *run* ever suggests visiting it. A
+"your notes are landing 180ms late — the timing check can fix that" nudge after
+an attempt that scored badly on timing alone would close the loop.
+
 ## Open — untested in the real world
 
 ### No physical guitar has been played against this build
