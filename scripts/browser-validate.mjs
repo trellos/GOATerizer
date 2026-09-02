@@ -364,23 +364,19 @@ try {
   // moment the notes start counting.
   const pregameTimelineBox = await canvasBox(page, "pregame-canvas");
 
-  await page.click('#pregame-views button[data-view="tab"]');
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(SHOTS, "03-pregame-tab.png") });
-  check("tablature view draws", (await canvasHasInk(page, "pregame-canvas")) > 20);
+  // Key View is the only timeline presentation (DECISION-021). The gutter is
+  // what makes it readable -- `b3 (Bb)` per lane, or `b3 E7` once a fingering is
+  // picked -- so an empty gutter is a broken timeline, not a cosmetic problem.
   check(
-    "tablature shows the selected shape as a physical reference",
+    "the gutter labels the pitch lanes",
     await page.evaluate(() => {
       const canvas = document.getElementById("pregame-canvas");
       const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
       if (!ctx || !(canvas instanceof HTMLCanvasElement)) return false;
-      // The gutter carries `E 2 4 5`-style rows; look for ink in it.
       const { data } = ctx.getImageData(0, 0, 96 * 2, canvas.height);
       return data.some((value, i) => i % 4 === 0 && value > 90);
     })
   );
-  await page.click('#pregame-views button[data-view="key"]');
-  await page.waitForTimeout(200);
 
   /* --- the run ------------------------------------------------------- */
 

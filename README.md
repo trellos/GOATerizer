@@ -101,9 +101,8 @@ tables at the top of that script.
    the microphone; nothing before it touches a protected API.
 2. **Pregame** is a live sandbox. The bass is already looping, Tuninator is
    already listening, and the timeline shows what you play. Reroll the key,
-   pick a tempo, pick Key View or Tablature View, and pick a fingering from the
-   five-fret neck diagrams — that is where on the neck you want to practise this
-   octave. Pregame and the run are the same layout, so the timeline you warm up
+   pick a tempo, and pick a fingering from the five-fret neck diagrams — that
+   is where on the neck you want to practise this octave. Pregame and the run are the same layout, so the timeline you warm up
    on is the same rectangle you play on. None of it stops the beat.
 3. **Play** starts the run on the next measure boundary plus a lead-in. Targets
    slide in from the right, cross the strike line on their beat, and leave to
@@ -161,7 +160,7 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
                      ┌────────────────────────┼────────────────────────┐
                      ▼                        ▼                        ▼
               TimelineModel              EnergyLayer            ScenarioStripView
-              (Key + Tab views)
+                (Key View)
 ```
 
 | Path | What lives there |
@@ -171,7 +170,7 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
 | `src/input/` | The `GuitarInputProvider` boundary, the Tuninator adapter, the deterministic test provider |
 | `src/game/` | Target resolution, judgment, score, stars, the attempt, the 16-slot run, ranks |
 | `src/scenario/` | Scenario schema and loader, the registry, `ClimbMinigame` |
-| `src/ui/` | Timeline model and views, scenario strip, energy streaks, dev panel |
+| `src/ui/` | Timeline model and view, scenario strip, energy streaks, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
 | `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
 
@@ -185,8 +184,10 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
 - **`ClimbMinigame` contains no scenario-specific asset names.** It is handed a
   route, class asset *slots* and class parameters. Rocky Ascent decides those
   slots hold goats and boulders.
-- **The timeline has one model and two views.** Key View and Tablature View
-  render the same `TimelineModel`; there is no second scoring engine.
+- **The timeline has one model and one presentation.** Key View renders
+  `TimelineModel`; there is no second scoring engine. Tablature View was removed
+  (`DECISION_LOG.md`, DECISION-021) — the vertical axis is harmonic role, and
+  neck position is a pregame choice shown as a diagram.
 - **The pitch space is one octave, root to root.** Eight lanes, authored as
   `1..7` plus `b1`. Two octaves was more than a player can hold in their head
   and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).

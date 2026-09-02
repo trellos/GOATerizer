@@ -69,7 +69,7 @@ import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import { TimelineView, type TimelineViewMode } from "../ui/timeline/timeline-view.js";
+import { TimelineView } from "../ui/timeline/timeline-view.js";
 
 
 type Screen = "start" | "pregame" | "game" | "results";
@@ -77,7 +77,6 @@ type Screen = "start" | "pregame" | "game" | "results";
 type Setup = {
   key: RunKey;
   tempoId: TempoId;
-  viewMode: TimelineViewMode;
   fingeringId: string;
 };
 
@@ -146,7 +145,6 @@ export class GameApp {
   #setup: Setup = {
     key: pickWeightedKey(),
     tempoId: DEFAULT_TEMPO_ID,
-    viewMode: "key",
     fingeringId: "",
   };
   #fingerings: Fingering[] = [];
@@ -348,18 +346,6 @@ export class GameApp {
       this.#reroll();
       this.#showScreen("pregame");
     });
-
-    for (const button of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-      button.addEventListener("click", () => {
-        const mode = button.dataset["view"] === "tab" ? "tab" : "key";
-        this.#setup.viewMode = mode;
-        this.#pregameView?.setMode(mode);
-        this.#gameView?.setMode(mode);
-        for (const other of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-          other.dataset["selected"] = String(other.dataset["view"] === mode);
-        }
-      });
-    }
   }
 
   /**
@@ -499,8 +485,6 @@ export class GameApp {
 
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
-    this.#pregameView?.setMode(this.#setup.viewMode);
-    this.#gameView?.setMode(this.#setup.viewMode);
     this.#updateKeyReadouts();
 
     await this.#queueProviderSwitch(this.#initialInputKind);

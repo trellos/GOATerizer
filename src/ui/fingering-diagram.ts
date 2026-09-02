@@ -36,7 +36,7 @@ function el<K extends keyof SVGElementTagNameMap>(
   return node;
 }
 
-/** Low E at the bottom, as on the timeline and in tablature. */
+/** Low E at the bottom, as tablature has always written it. */
 function stringY(stringIndex: number): number {
   return TOP + (STRING_COUNT - 1 - stringIndex) * ROW_H;
 }

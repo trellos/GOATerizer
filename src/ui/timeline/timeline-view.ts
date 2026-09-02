@@ -1,11 +1,10 @@
 /**
- * The timeline canvas — Key View and Tablature View.
+ * The timeline canvas — Key View.
  *
- * Both modes render the same {@link TimelineModel}. Only the vertical axis
- * differs: Key View has eight diatonic pitch lanes — one octave, root to root —
- * and Tablature View has six string rows. Time, duration, the strike line,
- * judgment colouring and the played-note overlay are shared, so the two views
- * cannot disagree about what happened.
+ * Renders {@link TimelineModel} onto eight diatonic pitch lanes: one octave,
+ * root to root. The vertical axis is harmonic role, which is what the game is
+ * teaching; the physical neck position is a pregame choice shown as a fingering
+ * diagram, not a second way to read the same notes.
  *
  * Type size is derived from the row height rather than fixed, because the
  * labels are gameplay information read at a glance while both hands are busy
@@ -27,13 +26,10 @@ import {
   BEATS_PER_MEASURE,
 } from "../../config/tuning.js";
 import type { Fingering } from "../../music/fingering.js";
-import { formatFretPosition, OPEN_STRING_MIDI, STRING_NAMES } from "../../music/fingering.js";
+import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
-import { midiToName } from "../../music/pitch.js";
 import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js";
-
-export type TimelineViewMode = "key" | "tab";
 
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
@@ -72,7 +68,6 @@ const THEME = {
 export class TimelineView {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
-  #mode: TimelineViewMode = "key";
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
@@ -85,14 +80,6 @@ export class TimelineView {
     this.#canvas = canvas;
     this.#ctx = ctx;
     this.#key = key;
-  }
-
-  get mode(): TimelineViewMode {
-    return this.#mode;
-  }
-
-  setMode(mode: TimelineViewMode): void {
-    this.#mode = mode;
   }
 
   setKey(key: RunKey): void {
@@ -129,16 +116,6 @@ export class TimelineView {
   }
 
   /**
-   * Fret-number type size in Tablature View.
-   *
-   * Larger than a Key View label: in tablature the number *is* the note, so it
-   * carries the same weight a coloured bar does in Key View.
-   */
-  get #tabFontPx(): number {
-    return Math.round(Math.max(14, Math.min(28, this.#rowHeight * 0.48)));
-  }
-
-  /**
    * A note bar's thickness: the full row, less a hairline.
    *
    * Adjacent rows are exactly `rowHeight` apart, so a bar this tall stops two
@@ -155,11 +132,9 @@ export class TimelineView {
   }
 
   get #gutterWidth(): number {
-    // Sized from the widest label each mode actually draws: `b3 (Bb)` in Key
-    // View, and in Tablature the string name plus the whole selected shape
-    // (`A  5  7  9`), which is what gives the player a physical reference
-    // before the run starts.
-    const columns = this.#mode === "key" ? 9 : 12;
+    // Sized from the widest label actually drawn: `b3 (Bb)` in a run, or the
+    // slightly wider `b3 E7` form the pregame uses to show the fingering.
+    const columns = 9;
     return Math.min(Math.round(columns * this.#labelCharPx) + 12, Math.round(this.#width * 0.3));
   }
 
@@ -184,7 +159,7 @@ export class TimelineView {
   }
 
   get #rowCount(): number {
-    return this.#mode === "key" ? LANE_COUNT : STRING_NAMES.length;
+    return LANE_COUNT;
   }
 
   get #rowHeight(): number {
@@ -201,14 +176,7 @@ export class TimelineView {
    * the note the player actually saw.
    */
   pointFor(lane: number, beat: number, nowBeat: number): { x: number; y: number } {
-    return { x: this.#x(beat, nowBeat), y: this.#rowY(this.#rowForLane(lane)) };
-  }
-
-  /** Pitch lane -> the row it is drawn on, in whichever mode is active. */
-  #rowForLane(lane: number): number {
-    if (this.#mode === "key") return lane;
-    const index = Math.max(0, Math.min(LANE_COUNT - 1, Math.round(lane)));
-    return this.#fingering?.positions[index]?.stringIndex ?? Math.min(5, Math.floor(index / 3));
+    return { x: this.#x(beat, nowBeat), y: this.#rowY(lane) };
   }
 
   /* ------------------------------------------------------------------ */
@@ -271,7 +239,6 @@ export class TimelineView {
    * lookup, unlike the label text next to it.
    */
   #rowAccent(row: number): "root" | "fifth" | null {
-    if (this.#mode !== "key") return null;
     const degreeIndex = row % 7;
     if (degreeIndex === 0) return "root";
     if (degreeIndex === 4) return "fifth";
@@ -313,7 +280,7 @@ export class TimelineView {
       // Centred on the row line, where the notes are, rather than floating in
       // the space above it.
       const y = this.#rowY(row);
-      if (this.#mode === "key") {
+      {
         const accent = this.#rowAccent(row);
         const label = laneLabel(row, this.#key);
         const fingering = this.#fingering?.positions[row];
@@ -330,21 +297,6 @@ export class TimelineView {
             ? `${label.degree.padEnd(2)} ${formatFretPosition(fingering)}`
             : `${label.degree.padEnd(2)} (${label.note})`;
         ctx.fillText(text, 8, y);
-      } else {
-        // String name, then every fret of the selected shape on that string —
-        // the one-octave scale laid out the way a hand would find it.
-        const frets = (this.#fingering?.positions ?? [])
-          .filter((position) => position.stringIndex === row)
-          .map((position) => String(position.fret));
-        ctx.textAlign = "left";
-        ctx.fillStyle = frets.length > 0 ? THEME.laneTextRoot : THEME.laneText;
-        ctx.font = `700 ${font}px ${MONO}`;
-        ctx.fillText(STRING_NAMES[row] ?? "", 8, y);
-        // Dimmed, never hidden: a string the shape does not use still has to
-        // read as a string, so the six rows stay countable.
-        ctx.fillStyle = THEME.laneText;
-        ctx.font = `600 ${font}px ${MONO}`;
-        ctx.fillText(frets.join(" ") || "·", 8 + this.#labelCharPx * 2.4, y);
       }
     }
   }
@@ -396,7 +348,7 @@ export class TimelineView {
     const ctx = this.#ctx;
     const x = this.#x(note.startBeat, nowBeat);
     const width = Math.max(3, note.durationBeats * this.#pixelsPerBeat - 3);
-    const y = this.#rowY(this.#rowForLane(note.lane));
+    const y = this.#rowY(note.lane);
     const height = Math.max(3, this.#rowHeight * 0.16);
 
     if (x + width < this.#playLeft) return;
@@ -412,7 +364,7 @@ export class TimelineView {
   }
 
   /**
-   * A target: one bar, the same shape in both views.
+   * A target: one bar.
    *
    * It fills its row from halfway to the row above to halfway to the row below,
    * so a step from one note to the next reads as two blocks whose corners meet
@@ -420,16 +372,13 @@ export class TimelineView {
    * label. Only a hairline separates adjacent rows, and the corner radius is
    * small for the same reason: rounded ends would open a visible gap exactly
    * where the eye is tracking the line.
-   *
-   * Tablature draws its fret number on top of that bar rather than instead of
-   * it, so the two views differ only in what the vertical axis means.
    */
   #drawTarget(note: TargetNote, nowBeat: number): void {
     const ctx = this.#ctx;
     const x = this.#x(note.startBeat, nowBeat);
     const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
     const height = this.#noteHeight;
-    const y = this.#rowY(this.#rowForLane(note.lane));
+    const y = this.#rowY(note.lane);
     const colour = this.#outcomeColour(note);
 
     ctx.save();
@@ -445,41 +394,7 @@ export class TimelineView {
     this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
     ctx.stroke();
 
-    if (this.#mode === "tab") {
-      this.#drawTabFret(note, x, width, y, colour);
-    }
-
     ctx.restore();
-  }
-
-  /**
-   * The fret number, on the target's own bar.
-   *
-   * Dark ink on the bright bar while it fits; a short note whose bar is
-   * narrower than its digits gets them alongside in the note's own colour
-   * instead. Never abbreviated and never dropped — in tablature the number *is*
-   * the note.
-   */
-  #drawTabFret(note: TargetNote, x: number, width: number, y: number, colour: string): void {
-    const ctx = this.#ctx;
-    const position = this.#fingering?.positions[note.lane];
-    const text = position ? String(position.fret) : "?";
-    const size = this.#tabFontPx;
-
-    ctx.font = `800 ${size}px ${MONO}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.globalAlpha = note.outcome === "miss" ? 0.55 : 1;
-
-    const textWidth = ctx.measureText(text).width;
-    if (textWidth + 8 <= width) {
-      ctx.fillStyle = THEME.ground;
-      ctx.fillText(text, x + 4, y);
-    } else {
-      ctx.fillStyle = colour;
-      ctx.fillText(text, x + width + 3, y);
-    }
-    ctx.globalAlpha = 1;
   }
 
   #drawPlayed(note: PlayedNote, nowBeat: number): void {
@@ -492,7 +407,7 @@ export class TimelineView {
     ctx.save();
     this.#clipPlayfield();
 
-    if (this.#mode === "key" && note.lanePosition !== null) {
+    if (note.lanePosition !== null) {
       const y = this.#rowY(note.lanePosition);
       const height = this.#playedHeight;
       if (note.diatonic) {
@@ -516,8 +431,6 @@ export class TimelineView {
         ctx.fillRect(x, y - 1, width, 2);
         ctx.globalAlpha = 1;
       }
-    } else if (this.#mode === "tab") {
-      this.#drawPlayedTab(note, x, width, colour);
     } else {
       // Off the octave entirely: pinned to the edge it left through,
       // in a colour that says "out of range" rather than vanishing.
@@ -527,66 +440,6 @@ export class TimelineView {
     }
 
     ctx.restore();
-  }
-
-  /**
-   * The player's own note in tablature: an inset bar on the string they
-   * actually sounded, matching Key View's treatment exactly.
-   *
-   * No fret number on a note that hit its target — the target's own number
-   * already says which fret, and two numbers in one row is noise. A *wrong*
-   * note gets one, because that is precisely the case where "what did I just
-   * play?" is the question and there is no target underneath answering it.
-   */
-  #drawPlayedTab(note: PlayedNote, x: number, width: number, colour: string): void {
-    const ctx = this.#ctx;
-    const size = Math.round(this.#tabFontPx * 0.72);
-    const mapped = this.#tabPositionFor(note.midi);
-    ctx.font = `700 ${size}px ${MONO}`;
-    ctx.textAlign = "left";
-
-    if (mapped) {
-      const y = this.#rowY(mapped.stringIndex);
-      const height = this.#playedHeight;
-      ctx.fillStyle = colour;
-      ctx.fillRect(x, y - height / 2, width, height);
-      // A dark hairline, so a white bar inside a coloured target still reads as
-      // two separate things at a glance.
-      ctx.strokeStyle = "rgba(8,10,14,0.85)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y - height / 2 + 0.5, Math.max(1, width - 1), height - 1);
-
-      if (note.wrong) {
-        ctx.fillStyle = colour;
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(mapped.fret), x + width + 3, y);
-      }
-      return;
-    }
-    // A pitch the chosen shape cannot express still has to appear. It is drawn
-    // above the stave with its note name, rather than silently dropped.
-    ctx.fillStyle = THEME.wrong;
-    ctx.textBaseline = "top";
-    ctx.fillText(midiToName(note.midi), x, 3);
-    ctx.fillRect(x, 3 + size * 1.15, Math.max(4, width), 2);
-  }
-
-  /**
-   * Nearest playable string/fret for an arbitrary played pitch, preferring the
-   * region the chosen fingering sits in.
-   */
-  #tabPositionFor(midi: number): { stringIndex: number; fret: number } | null {
-    const anchor = this.#fingering?.lowestFret ?? 0;
-    let best: { stringIndex: number; fret: number; distance: number } | null = null;
-    for (let stringIndex = 0; stringIndex < OPEN_STRING_MIDI.length; stringIndex += 1) {
-      const open = OPEN_STRING_MIDI[stringIndex];
-      if (open === undefined) continue;
-      const fret = midi - open;
-      if (fret < 0 || fret > 20) continue;
-      const distance = Math.abs(fret - anchor);
-      if (!best || distance < best.distance) best = { stringIndex, fret, distance };
-    }
-    return best ? { stringIndex: best.stringIndex, fret: best.fret } : null;
   }
 
   #edgeYFor(midi: number): number {

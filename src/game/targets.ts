@@ -2,8 +2,8 @@
  * Authored prompt -> concrete target opportunities in the run key.
  *
  * This is the one place a scale degree becomes a MIDI note. The judgment
- * engine, the timeline and the tablature view all consume the result, so there
- * is exactly one transposition in the game and every view agrees with it.
+ * engine and the timeline both consume the result, so there is exactly one
+ * transposition in the game and everything that draws a note agrees with it.
  */
 
 import { laneIndexOf, type ScaleDegreeRef } from "../music/degrees.js";

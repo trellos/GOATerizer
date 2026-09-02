@@ -4,6 +4,28 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-022: Constants mirroring a Tuninator internal carry a `MIRRORS` marker
+* **Date:** 2026-09-02
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted)
+* **Context:** `src/config/tuning.ts` declares itself "every provisional tuning number in one file", and `AGENTS.md` §17 is why: where the design leaves a gap, make it config and label it provisional. But a handful of values in that file are not free choices at all — `MIN_ATTACK_CONFIDENCE` sits deliberately just under Tuninator's own 0.35 confidence gate, and the synthetic-pluck envelope is set against `tracking.releaseGraceMs: 90` and `tracking.minStableMs: 55`. They were thoroughly documented in prose, but indistinguishable at a glance from the numbers around them that we are free to retune. If the library changes a threshold, these degrade silently and nothing points at why.
+* **Decision:** A value that mirrors an upstream Tuninator internal carries a `MIRRORS Tuninator <path> = <value>` line in its doc comment, and the file header explains the convention. `grep -rn "MIRRORS Tuninator"` lists everything to re-check when the library moves. The constants stay in `tuning.ts`; only their labelling changes.
+* **Alternatives Considered:** (a) Moving them to a `src/input/tuninator-constants.ts` beside the adapter. Rejected: it would split the "every provisional number in one file" contract into two conventions, and the autoplay envelope values are read by `src/dev/`, not by the adapter. (b) Leaving the prose as-is. Rejected: the information was present but not greppable, which is the difference between documentation and a checklist. (c) Asserting the values against the library at runtime. Rejected: they are not exported as a public API, and reaching into `tuninator/src/**` to read them is exactly what `AGENTS.md` §4 forbids.
+* **Consequences:** Positive — a Tuninator version bump now has a mechanical audit step, and the distinction between "we chose this" and "the library chose this" is visible at the call site. Negative — the marker is a convention with nothing enforcing it, so a future mirrored constant added without one is invisible again; and it records the upstream value at a moment in time, which is itself a thing that can go stale without anyone noticing.
+
+---
+
+#### DECISION-021: Tablature View is removed; Key View is the only timeline presentation
+* **Date:** 2026-09-02
+* **Status:** Accepted (supersedes `GOATerizer_Game_Design.md` §14)
+* **Owner:** Trevor (agent-assisted)
+* **Context:** GDD §14 specified a second timeline presentation — six string rows, fret numbers on the note bars, a tab bass rendering, and an explicitly unresolved wrong-note presentation for pitches the chosen fingering cannot express. It was implemented and switchable in pregame. In play it earned its keep less than Key View: the vertical axis the game is actually teaching is harmonic role, and the neck position it offered instead is already answered by the pregame fingering diagram. Separately, the minigame API now being designed gives each minigame a visual skin over the target notes, and a skin built for eight diatonic lanes is nonsense on six string rows — so keeping both views would have meant either per-view skins or a fallback path for every minigame.
+* **Decision:** Tablature View is removed at explicit user request (`AGENTS.md` §18, §20.1). `TimelineViewMode` and the mode branching go from `ui/timeline/timeline-view.ts` (`#drawTabFret`, `#drawPlayedTab`, `#tabPositionFor`, `#tabFontPx`, and the branches in `#rowCount`, `#gutterWidth`, `#rowAccent`, `#drawGutter`, `#drawTarget`, `#drawPlayed`); `#rowForLane` collapses to identity and is deleted. The pregame view picker goes from `index.html` and `game-app.ts`. GDD §14 becomes "Fingering Selection", keeping its §14.3 content.
+* **Alternatives Considered:** (a) Keeping Tab View and giving skins a per-view fallback. Rejected: it doubles the art surface for every one of six minigame families to preserve a view the player was not choosing. (b) Keeping it unskinned while Key View is skinnable. Rejected: two views that diverge in polish is worse than one, and it leaves the mode branching in the exact file the skin seam is about to be cut into. (c) Deleting `music/fingering.ts` along with it. Rejected and specifically guarded against — fingering still drives the pregame neck diagrams (DECISION-014) and the Key View gutter labels; only its *timeline-placement* role goes.
+* **Consequences:** Positive — `timeline-view.ts` drops ~27% (22.7 kB → 16.5 kB) before the timeline-skin seam is cut into it, one row model means a skin needs no per-view variant, and the vertical axis now means exactly one thing everywhere. No test changed: nothing under `tests/` rendered a timeline, so the 234 existing tests passed untouched — which is also the evidence that Tab View had no direct test coverage to lose. Negative — a real design feature is gone, and players who read tablature more fluently than scale degrees lose the presentation that suited them; GDD §14.2's bend-notation thinking is withdrawn with it and would need redoing if a fretboard view ever returns.
+
+---
+
 #### DECISION-020: `?key=` and `?tempo=` are setup links, not developer flags
 * **Date:** 2026-08-28
 * **Status:** Accepted
