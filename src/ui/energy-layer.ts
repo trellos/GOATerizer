@@ -3,7 +3,7 @@
  *
  * A short streak leaves the judged note on the timeline and flies up into the
  * scenario. On arrival it triggers the scenario's reaction, so the player reads
- * *I played that note correctly, and that made the goat climb* rather than
+ * *I played that note correctly, and that made the scenario react* rather than
  * seeing two things happen near each other.
  *
  * Flight time is measured in **beats**, not milliseconds, so it stays

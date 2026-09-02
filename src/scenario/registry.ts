@@ -1,15 +1,19 @@
 /**
  * The scenario library.
  *
- * Adding another `ClimbMinigame` scenario means: author a JSON file, drop its
- * art in `public/assets/scenarios/<id>/`, and add one entry here. No gameplay
- * code changes — which is the property the run shell and `ClimbMinigame` exist
- * to preserve.
+ * Adding a scenario means: author a JSON file naming a registered minigame,
+ * drop its art in `public/assets/scenarios/<id>/`, and add one entry here. No
+ * gameplay code changes — which is the property the minigame API exists to
+ * preserve. Adding a whole new *kind* of scenario means one more
+ * `registerMinigame` line below and a module implementing `MinigameModule`;
+ * nothing in `game/`, `ui/` or the loader learns its name.
  *
  * The vertical slice ships one scenario. The run shell below still models all
  * 16 slots and the real difficulty sequence.
  */
 
+import { registerMinigame } from "../minigame/registry.js";
+import { CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
 import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
@@ -26,39 +30,29 @@ const BASE_URL: string = import.meta.env?.BASE_URL ?? "/";
 /**
  * Placeholder art lives in the project's own asset tree, never hotlinked.
  * Provenance for every file is recorded in `docs/assets/ASSET_SOURCES.md`.
+ *
+ * *Which* ids a scenario needs is the minigame's answer, not this file's — the
+ * loader asks the scenario's own module and resolves whatever it names. All
+ * this supplies is where a given id lives on disk.
  */
-function assetUrls(scenarioDir: string, ids: readonly string[]): Record<string, string> {
-  return Object.fromEntries(
-    ids.map((id) => [id, `${BASE_URL}assets/scenarios/${scenarioDir}/${id}.png`])
-  );
+function urlsIn(scenarioDir: string): (assetId: string) => string {
+  return (assetId) => `${BASE_URL}assets/scenarios/${scenarioDir}/${assetId}.png`;
 }
 
-/**
- * The ten `ClimbMinigame` asset ids every Rocky-family scenario binds, derived
- * from the scenario id rather than retyped per scenario: background, four
- * advance poses, a finish pose, a foothold, a destination, and two effects.
- * Every Rocky scenario's `assetBindings` follows this exact naming convention,
- * so generating it once removes a per-scenario chance to typo an id that
- * `loadScenario` would otherwise only catch at runtime.
+/*
+ * The composition root for minigames.
+ *
+ * Registration lives here, with the content, rather than inside
+ * `minigame/registry.ts`: the registry must not import a minigame, or the
+ * generic half of the game would name a specific one again. This module already
+ * knows which scenarios this build ships, so it is the honest place to say
+ * which minigames it ships too.
  */
-function climbAssetIds(scenarioId: string): readonly string[] {
-  return [
-    `bg_${scenarioId}`,
-    `goat_${scenarioId}_advance_01`,
-    `goat_${scenarioId}_advance_02`,
-    `goat_${scenarioId}_advance_03`,
-    `goat_${scenarioId}_advance_04`,
-    `goat_${scenarioId}_finish`,
-    `prop_${scenarioId}_step`,
-    `prop_${scenarioId}_goal`,
-    `fx_${scenarioId}_dust`,
-    `fx_${scenarioId}_tick`,
-  ];
-}
+registerMinigame(CLIMB_MINIGAME);
 
 export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
   rockyAscentJson,
-  assetUrls("rocky-ascent", climbAssetIds("rocky_ascent"))
+  urlsIn("rocky-ascent")
 );
 
 /**
@@ -68,19 +62,19 @@ export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
  */
 export const ROCKY_ASCENT_HIGH: ScenarioDefinition = loadScenario(
   rockyAscentHighJson,
-  assetUrls("rocky-ascent-high", climbAssetIds("rocky_ascent_high"))
+  urlsIn("rocky-ascent-high")
 );
 
 /** The same class, descending: every scale fragment falls from b1 toward 1. */
 export const ROCKY_DESCENT: ScenarioDefinition = loadScenario(
   rockyDescentJson,
-  assetUrls("rocky-descent", climbAssetIds("rocky_descent"))
+  urlsIn("rocky-descent")
 );
 
 /** Rocky Descent's higher-register companion, at L3-6. */
 export const ROCKY_DESCENT_HIGH: ScenarioDefinition = loadScenario(
   rockyDescentHighJson,
-  assetUrls("rocky-descent-high", climbAssetIds("rocky_descent_high"))
+  urlsIn("rocky-descent-high")
 );
 
 export const SCENARIOS: readonly ScenarioDefinition[] = [

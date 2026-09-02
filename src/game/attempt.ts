@@ -16,8 +16,8 @@
 import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
 import type { RunKey } from "../music/keys.js";
-import type { Judged } from "../minigame/api.js";
-import { ClimbMinigame } from "../scenario/minigames/climb-minigame.js";
+import type { Judged, Minigame, MinigameModule, Opportunity } from "../minigame/api.js";
+import { requireMinigame } from "../minigame/registry.js";
 import type { ScenarioDefinition, ScenarioLevelData } from "../scenario/types.js";
 import { TargetJudge, type JudgmentEvent } from "./judgment.js";
 import { AttemptScore, type ScoreSnapshot } from "./scoring.js";
@@ -81,8 +81,9 @@ export class AttemptRuntime {
   readonly judge: TargetJudge;
   readonly score: AttemptScore;
   readonly starMeter: StarMeter;
-  readonly minigame: ClimbMinigame;
+  readonly minigame: Minigame;
 
+  readonly #module: MinigameModule;
   readonly #toBeat: (contextTime: number) => number;
   readonly #listeners: ((event: AttemptEvent) => void)[] = [];
   #nextEnergyId = 1;
@@ -112,10 +113,30 @@ export class AttemptRuntime {
     this.judge = new TargetJudge({ targets: this.targets, key: options.key });
     this.score = new AttemptScore({ streakBonusEligible: level.scoring.streakBonusEligible });
     this.starMeter = new StarMeter(level.stars);
-    this.minigame = new ClimbMinigame({
-      route: level.route,
-      bindings: options.scenario.assetBindings,
-      parameters: options.scenario.classParameters,
+    const module = requireMinigame(
+      options.scenario.minigameId,
+      `scenario ${options.scenario.id}`
+    );
+    this.#module = module;
+    this.minigame = module.create({
+      config: options.scenario.config,
+      data: level.data,
+      assets: Object.keys(options.scenario.assetUrls),
+      plan: {
+        measures: level.measurePlan.attemptMeasures,
+        beatsPerMeasure: level.measurePlan.beatsPerMeasure,
+        totalBeats: level.measurePlan.attemptMeasures * level.measurePlan.beatsPerMeasure,
+      },
+      opportunities: this.targets.map(
+        (target): Opportunity => ({
+          index: target.opportunityIndex,
+          startBeat: target.startBeat,
+          durationBeats: target.durationBeats,
+          duration: target.duration,
+          lane: target.lane,
+          midi: target.midi,
+        })
+      ),
     });
 
     this.judge.onEvent((judgment) => this.#onJudgment(judgment));
@@ -139,6 +160,16 @@ export class AttemptRuntime {
 
   get endBeat(): number {
     return this.startBeat + ATTEMPT_BEATS;
+  }
+
+  /**
+   * Developer-panel rows this scenario's minigame wants to show.
+   *
+   * Routed through the module rather than read off the instance, so the app
+   * shell never needs to know what kind of minigame it is looking at.
+   */
+  get debugRows(): Readonly<Record<string, string>> {
+    return this.#module.debug?.(this.minigame) ?? {};
   }
 
   /** Attempt-relative beat, from an absolute transport beat. */

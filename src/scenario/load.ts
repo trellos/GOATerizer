@@ -5,64 +5,28 @@
  * repair it, infer missing content, or generate exercises. It throws, loudly,
  * on anything it cannot map, so a bad edit fails a test rather than transposing
  * a note in a run.
+ *
+ * It validates only what the *host* owns: identity, the prompt, the measure
+ * length, star thresholds and scoring flags. Everything that varies by minigame
+ * — asset slots, class parameters, routes, rows, arenas — is handed to that
+ * minigame's own parsers, because only it knows the shape. That dispatch is
+ * what lets a scenario define whatever data its minigame wants while keeping
+ * this file free of any minigame's vocabulary.
  */
 
+import { requireMinigame } from "../minigame/registry.js";
 import { parseDegreeToken } from "../music/degrees.js";
+import { arr, bool, num, obj, ScenarioDataError, str } from "./parse.js";
 import type {
-  ClimbAssetBindings,
-  ClimbClassParameters,
   MeasurePlan,
-  MinigameClassId,
-  NoteDuration,
   PromptEvent,
-  RouteData,
   ScenarioDefinition,
   ScenarioLevelData,
   StarThresholds,
 } from "./types.js";
-import { DURATION_BEATS } from "./types.js";
+import { DURATION_BEATS, type NoteDuration } from "./types.js";
 
-export class ScenarioDataError extends Error {
-  constructor(where: string, reason: string) {
-    super(`Invalid scenario data at ${where}: ${reason}`);
-    this.name = "ScenarioDataError";
-  }
-}
-
-type Json = Record<string, unknown>;
-
-function obj(value: unknown, where: string): Json {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new ScenarioDataError(where, "expected an object");
-  }
-  return value as Json;
-}
-
-function arr(value: unknown, where: string): unknown[] {
-  if (!Array.isArray(value)) throw new ScenarioDataError(where, "expected an array");
-  return value;
-}
-
-function str(value: unknown, where: string): string {
-  if (typeof value !== "string") throw new ScenarioDataError(where, "expected a string");
-  return value;
-}
-
-function num(value: unknown, where: string): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new ScenarioDataError(where, "expected a finite number");
-  }
-  return value;
-}
-
-function bool(value: unknown, where: string): boolean {
-  if (typeof value !== "boolean") throw new ScenarioDataError(where, "expected a boolean");
-  return value;
-}
-
-function strings(value: unknown, where: string): string[] {
-  return arr(value, where).map((entry, i) => str(entry, `${where}[${i}]`));
-}
+export { ScenarioDataError } from "./parse.js";
 
 function duration(value: unknown, where: string): NoteDuration {
   const name = str(value, where);
@@ -138,8 +102,6 @@ function parseMeasurePlan(raw: unknown, where: string): MeasurePlan {
   return {
     attemptMeasures: num(plan["attemptMeasures"], `${where}.attemptMeasures`),
     beatsPerMeasure: num(plan["beatsPerMeasure"], `${where}.beatsPerMeasure`),
-    visualSpanMeasures: num(plan["visualSpanMeasures"], `${where}.visualSpanMeasures`),
-    resetBetweenMeasures: bool(plan["resetBetweenMeasures"], `${where}.resetBetweenMeasures`),
   };
 }
 
@@ -160,40 +122,11 @@ function parseStars(raw: unknown, where: string): StarThresholds {
   };
 }
 
-function parseRoute(raw: unknown, where: string, expectedWaypoints: number): RouteData {
-  const route = obj(raw, where);
-  const point = (value: unknown, at: string) => {
-    const p = obj(value, at);
-    return { x: num(p["x"], `${at}.x`), y: num(p["y"], `${at}.y`) };
-  };
-
-  const waypoints = arr(route["waypoints"], `${where}.waypoints`).map((entry, i) => {
-    const at = `${where}.waypoints[${i}]`;
-    const wp = obj(entry, at);
-    return {
-      ...point(wp, at),
-      scale: num(wp["scale"], `${at}.scale`),
-      rotationDeg: num(wp["rotationDeg"], `${at}.rotationDeg`),
-    };
-  });
-
-  if (waypoints.length !== expectedWaypoints) {
-    throw new ScenarioDataError(
-      `${where}.waypoints`,
-      `${waypoints.length} waypoints for ${expectedWaypoints} note opportunities — ` +
-        "one successful note must advance exactly one waypoint"
-    );
-  }
-
-  return {
-    character: str(route["character"], `${where}.character`),
-    startPosition: point(route["startPosition"], `${where}.startPosition`),
-    destination: point(route["destination"], `${where}.destination`),
-    waypoints,
-  };
-}
-
-function parseLevel(raw: unknown, where: string): ScenarioLevelData {
+function parseLevel(
+  raw: unknown,
+  where: string,
+  parseMinigameData: (visual: unknown, shape: { noteOpportunityCount: number; measures: number }) => unknown
+): ScenarioLevelData {
   const level = obj(raw, where);
   const measurePlan = parseMeasurePlan(level["measurePlan"], `${where}.measurePlan`);
   const prompt = parsePrompt(level["prompt"], `${where}.prompt`, measurePlan);
@@ -207,7 +140,6 @@ function parseLevel(raw: unknown, where: string): ScenarioLevelData {
     );
   }
 
-  const visual = obj(level["visual"], `${where}.visual`);
   const scoring = obj(level["scoring"], `${where}.scoring`);
 
   return {
@@ -218,81 +150,36 @@ function parseLevel(raw: unknown, where: string): ScenarioLevelData {
     measurePlan,
     stars: parseStars(level["stars"], `${where}.stars`),
     scoring: { streakBonusEligible: bool(scoring["streakBonusEligible"], `${where}.scoring.streakBonusEligible`) },
-    route: parseRoute(visual["route"], `${where}.visual.route`, noteCount),
-    visual,
-  };
-}
-
-function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
-  const bindings = obj(raw, where);
-  const one = (slot: string): string => {
-    const values = strings(bindings[slot], `${where}.${slot}`);
-    const first = values[0];
-    if (values.length !== 1 || first === undefined) {
-      throw new ScenarioDataError(`${where}.${slot}`, "expected exactly one asset id");
-    }
-    return first;
-  };
-  const many = (slot: string, min: number): string[] => {
-    const values = strings(bindings[slot], `${where}.${slot}`);
-    if (values.length < min) {
-      throw new ScenarioDataError(`${where}.${slot}`, `expected at least ${min} asset ids`);
-    }
-    return values;
-  };
-
-  return {
-    background: one("background"),
-    climberPoses: many("climberPoses", 1),
-    finishPose: one("finishPose"),
-    waypointVisuals: many("waypointVisuals", 1),
-    destinationVisual: one("destinationVisual"),
-    stepEffects: many("stepEffects", 2),
-  };
-}
-
-function parseClimbParameters(raw: unknown, where: string, plan: MeasurePlan): ClimbClassParameters {
-  const params = obj(raw, where);
-  const policy = str(params["badNotePolicy"], `${where}.badNotePolicy`);
-  if (policy !== "Wobble" && policy !== "Stall") {
-    throw new ScenarioDataError(`${where}.badNotePolicy`, 'expected "Wobble" or "Stall"');
-  }
-  return {
-    visualSpanMeasures: num(params["visualSpanMeasures"], `${where}.visualSpanMeasures`),
-    resetBetweenMeasures: plan.resetBetweenMeasures,
-    badNotePolicy: policy,
-    showDestinationFromStart: bool(
-      params["showDestinationFromStart"],
-      `${where}.showDestinationFromStart`
-    ),
+    data: parseMinigameData(level["visual"], {
+      noteOpportunityCount: noteCount,
+      measures: measurePlan.attemptMeasures,
+    }),
   };
 }
 
 /* -------------------------------------------------------------------------- */
 
-const KNOWN_CLASSES: ReadonlySet<string> = new Set<MinigameClassId>([
-  "ClimbMinigame",
-  "PerformMinigame",
-  "TraverseMinigame",
-  "ThreeStepMinigame",
-  "RepeatMinigame",
-  "BattleMinigame",
-]);
-
 /**
- * @param assetUrls asset id -> resolvable URL. Supplied by the caller so the
- * scenario file stays free of build-tool paths and never hotlinks anything.
+ * @param urlFor asset id -> resolvable URL. Supplied by the caller so the
+ * scenario file stays free of build-tool paths and never hotlinks anything, and
+ * so the *minigame* decides which ids exist rather than the host guessing them
+ * from a naming convention.
  */
 export function loadScenario(
   raw: unknown,
-  assetUrls: Readonly<Record<string, string>>
+  urlFor: (assetId: string) => string
 ): ScenarioDefinition {
   const root = obj(raw, "scenario");
   const id = str(root["id"], "scenario.id");
-  const minigameClass = str(root["minigameClass"], "scenario.minigameClass");
-  if (!KNOWN_CLASSES.has(minigameClass)) {
-    throw new ScenarioDataError("scenario.minigameClass", `unknown class ${minigameClass}`);
-  }
+  const minigameId = str(root["minigameClass"], "scenario.minigameClass");
+  const minigame = requireMinigame(minigameId, `scenario ${id}`);
+
+  // The minigame validates its own half. A scenario is free to carry whatever
+  // shape its minigame asks for; this loader never looks inside either blob.
+  const config = minigame.parseConfig({
+    classParameters: root["classParameters"],
+    assetBindings: root["assetBindings"],
+  });
 
   const supportedLevels = arr(root["supportedLevels"], "scenario.supportedLevels").map((entry, i) =>
     num(entry, `scenario.supportedLevels[${i}]`)
@@ -305,48 +192,32 @@ export function loadScenario(
     if (entry === undefined) {
       throw new ScenarioDataError("scenario.levels", `level ${level} is supported but absent`);
     }
-    const parsed = parseLevel(entry, `scenario.levels.${level}`);
+    const parsed = parseLevel(entry, `scenario.levels.${level}`, (visual, shape) =>
+      minigame.parseLevel(visual, shape)
+    );
     if (parsed.difficulty !== level) {
-      throw new ScenarioDataError(
-        `scenario.levels.${level}.difficulty`,
-        `is ${parsed.difficulty}`
-      );
+      throw new ScenarioDataError(`scenario.levels.${level}.difficulty`, `is ${parsed.difficulty}`);
     }
     levels.set(level, parsed);
   }
 
-  const firstLevel = levels.values().next().value;
-  if (!firstLevel) throw new ScenarioDataError("scenario.levels", "no supported levels");
+  if (levels.size === 0) throw new ScenarioDataError("scenario.levels", "no supported levels");
 
-  const bindings = parseClimbBindings(root["assetBindings"], "scenario.assetBindings");
-  for (const assetId of [
-    bindings.background,
-    ...bindings.climberPoses,
-    bindings.finishPose,
-    ...bindings.waypointVisuals,
-    bindings.destinationVisual,
-    ...bindings.stepEffects,
-  ]) {
-    if (assetUrls[assetId] === undefined) {
-      throw new ScenarioDataError("scenario.assetBindings", `no URL supplied for ${assetId}`);
-    }
+  const assetUrls: Record<string, string> = {};
+  for (const assetId of minigame.assetIds(config, [...levels.values()].map((l) => l.data))) {
+    assetUrls[assetId] = urlFor(assetId);
   }
 
   return {
     id,
     displayName: str(root["displayName"], "scenario.displayName"),
     theme: str(root["theme"], "scenario.theme"),
-    minigameClass: minigameClass as MinigameClassId,
+    minigameId,
     family: str(root["family"], "scenario.family"),
     visualVerb: str(root["visualVerb"], "scenario.visualVerb"),
     supportedLevels,
     premise: str(root["scenarioPremise"], "scenario.scenarioPremise"),
-    classParameters: parseClimbParameters(
-      root["classParameters"],
-      "scenario.classParameters",
-      firstLevel.measurePlan
-    ),
-    assetBindings: bindings,
+    config,
     assetUrls,
     levels,
   };

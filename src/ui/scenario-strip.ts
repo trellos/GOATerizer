@@ -193,8 +193,8 @@ export class ScenarioStripView {
       ctx.globalAlpha = Math.max(0, Math.min(1, sprite.opacity ?? 1));
       ctx.translate(cx, cy);
       if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
-      // The anchor is also the pivot: a climber tilts about its feet, a
-      // foothold about its middle.
+      // The anchor is also the pivot: a bottom-anchored actor turns about the
+      // ground it stands on, a centred prop about its middle.
       ctx.drawImage(image, -w / 2, sprite.anchor === "bottom" ? -h : -h / 2, w, h);
       ctx.restore();
     }

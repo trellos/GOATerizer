@@ -10,7 +10,7 @@
  *                                   └── TuninatorGuitarInputProvider
  *                                            │ normalised guitar events
  *                                            ▼
- *                                   AttemptRuntime (judge, score, stars, climb)
+ *                                   AttemptRuntime (judge, score, stars, minigame)
  *                                            │ judgment + energy
  *                        ┌───────────────────┼───────────────────┐
  *                        ▼                   ▼                   ▼
@@ -1186,9 +1186,11 @@ export class GameApp {
       "attempt score": score ? String(score.score) : "—",
       "judgment points": score ? String(score.judgmentPoints) : "—",
       stars: attempt ? String(attempt.starMeter.stars) : "—",
-      waypoint: attempt
-        ? `${attempt.minigame.progress.waypointIndex + 1}/${attempt.minigame.progress.waypointCount}`
-        : "—",
+      // Whatever this scenario's minigame wants shown. The shell does not know
+      // what kind of minigame it is looking at, so it does not know these rows'
+      // names either -- CLIMB contributes a waypoint counter, REPEAT would
+      // contribute something else entirely.
+      ...(attempt?.debugRows ?? {}),
       "energy in flight": String(this.#energy?.activeCount ?? 0),
       autoplay: this.#autoplay === "off" ? "off" : `${this.#autoplay} seed ${this.#autoplaySeed}`,
       // What the fake guitarist *intended*. On the synthetic path the

@@ -1,26 +1,22 @@
 /**
  * The scenario content model.
  *
- * A **minigame class** is a reusable behaviour family (`ClimbMinigame`). A
- * **scenario** is an authored content instance belonging to exactly one class
- * (Rocky Ascent). **Scenario level data** is the hand-authored content for one
- * supported difficulty. Nothing here is inferred from a difficulty number.
+ * A **minigame** is a reusable behaviour family. A **scenario** is an authored
+ * content instance belonging to exactly one of them (Rocky Ascent). **Scenario
+ * level data** is the hand-authored content for one supported difficulty.
+ * Nothing here is inferred from a difficulty number.
+ *
+ * Nothing in this file names a minigame or knows the shape of one's content.
+ * The parts that vary by minigame are `config` and `data`, both `unknown`: the
+ * minigame validates them, the host only carries them.
  *
  * These types describe the *runtime* shape. The authored shape lives in
  * `docs/scenarios/<id>/<id>.scenario.json` and is validated into these by
  * `load.ts`.
  */
 
-import type { NoteDuration } from "../minigame/api.js";
+import type { MinigameId, NoteDuration } from "../minigame/api.js";
 import type { ScaleDegreeRef } from "../music/degrees.js";
-
-export type MinigameClassId =
-  | "ClimbMinigame"
-  | "PerformMinigame"
-  | "TraverseMinigame"
-  | "ThreeStepMinigame"
-  | "RepeatMinigame"
-  | "BattleMinigame";
 
 /**
  * Re-exported: a note's written duration is part of the minigame contract, not
@@ -57,12 +53,17 @@ export type PromptEvent = {
   degree: ScaleDegreeRef | null;
 };
 
-/** How a scenario uses the four measures of an attempt. */
+/**
+ * The musical length of an attempt.
+ *
+ * Only the two facts the host needs. *How* a scenario uses those measures —
+ * whether a visual cycle spans one, two or all four, and what a boundary resets
+ * — belongs to the minigame and lives in its own level data: a BATTLE scenario
+ * varies it by difficulty level, which no host-owned flag could express.
+ */
 export type MeasurePlan = {
   attemptMeasures: number;
   beatsPerMeasure: number;
-  visualSpanMeasures: number;
-  resetBetweenMeasures: boolean;
 };
 
 /** Cumulative judgment-point thresholds. Stars lock once earned. */
@@ -74,25 +75,6 @@ export type StarThresholds = {
   note: string;
 };
 
-export type RoutePoint = { x: number; y: number };
-
-export type RouteWaypoint = RoutePoint & {
-  /** Transform-only variety on one reused sprite. */
-  scale: number;
-  rotationDeg: number;
-};
-
-/**
- * `ClimbMinigame` route data, in normalised scenario space: x rightwards 0..1,
- * y downwards 0..1 with 0 at the top of the frame.
- */
-export type RouteData = {
-  character: string;
-  startPosition: RoutePoint;
-  destination: RoutePoint;
-  waypoints: readonly RouteWaypoint[];
-};
-
 export type ScenarioLevelData = {
   difficulty: number;
   prompt: readonly PromptEvent[];
@@ -102,42 +84,28 @@ export type ScenarioLevelData = {
   measurePlan: MeasurePlan;
   stars: StarThresholds;
   scoring: { streakBonusEligible: boolean };
-  route: RouteData;
-  /** Free-form per-level visual character, passed to the class as parameters. */
-  visual: Readonly<Record<string, unknown>>;
-};
-
-/**
- * Asset slots are named by the *class*, never by the scenario. `ClimbMinigame`
- * asks for `climberPoses`; Rocky Ascent decides those are goats.
- */
-export type ClimbAssetBindings = {
-  background: string;
-  climberPoses: readonly string[];
-  finishPose: string;
-  waypointVisuals: readonly string[];
-  destinationVisual: string;
-  stepEffects: readonly string[];
-};
-
-export type ClimbClassParameters = {
-  visualSpanMeasures: number;
-  resetBetweenMeasures: boolean;
-  badNotePolicy: "Wobble" | "Stall";
-  showDestinationFromStart: boolean;
+  /**
+   * Whatever this scenario's minigame returned from `parseLevel`. Opaque: the
+   * host stores and forwards it and never looks inside.
+   */
+  data: unknown;
 };
 
 export type ScenarioDefinition = {
   id: string;
   displayName: string;
   theme: string;
-  minigameClass: MinigameClassId;
+  /** Which minigame plays this scenario. Resolved through `minigame/registry`. */
+  minigameId: MinigameId;
   family: string;
   visualVerb: string;
   supportedLevels: readonly number[];
   premise: string;
-  classParameters: ClimbClassParameters;
-  assetBindings: ClimbAssetBindings;
+  /**
+   * Whatever this scenario's minigame returned from `parseConfig`. Opaque, for
+   * the same reason as {@link ScenarioLevelData.data}.
+   */
+  config: unknown;
   /** Asset id -> URL, resolved against the app's base path at load time. */
   assetUrls: Readonly<Record<string, string>>;
   levels: ReadonlyMap<number, ScenarioLevelData>;

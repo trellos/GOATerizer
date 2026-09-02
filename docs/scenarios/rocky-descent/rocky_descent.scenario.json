@@ -213,7 +213,7 @@
   "designerReview": {
     "blockingIssues": [],
     "nonBlockingTBD": [
-      "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
+      "Star thresholds are authored but PROVISIONAL \u2014 see each level's `stars.note`.",
       "Phrases and (for Rocky Ascent) waypoint coordinates are regenerable via scripts/author-rocky-scenarios.mjs."
     ]
   },
@@ -223,9 +223,7 @@
       "supported": true,
       "measurePlan": {
         "attemptMeasures": 4,
-        "beatsPerMeasure": 4,
-        "visualSpanMeasures": 4,
-        "resetBetweenMeasures": false
+        "beatsPerMeasure": 4
       },
       "prompt": [
         {
@@ -392,6 +390,8 @@
       "noteOpportunityCount": 16,
       "authoredBeatCount": 16,
       "visual": {
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false,
         "routeCharacter": "broad, calm downhill boulder staircase",
         "routeDirection": "descending",
         "steepness": 0.25,
@@ -524,7 +524,7 @@
         "star2Threshold": 128,
         "star3Threshold": 160,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (160); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (160); three stars is the maximum itself, so \u2605\u2605\u2605 requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -532,7 +532,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+        "note": "Scale material is not streak-eligible content (GDD \u00a79.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "2": {
@@ -540,9 +540,7 @@
       "supported": true,
       "measurePlan": {
         "attemptMeasures": 4,
-        "beatsPerMeasure": 4,
-        "visualSpanMeasures": 4,
-        "resetBetweenMeasures": false
+        "beatsPerMeasure": 4
       },
       "prompt": [
         {
@@ -789,6 +787,8 @@
       "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false,
         "routeCharacter": "longer and more obviously descending rocky route",
         "routeDirection": "descending",
         "steepness": 0.45,
@@ -969,7 +969,7 @@
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so \u2605\u2605\u2605 requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -977,7 +977,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+        "note": "Scale material is not streak-eligible content (GDD \u00a79.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "3": {
@@ -985,9 +985,7 @@
       "supported": true,
       "measurePlan": {
         "attemptMeasures": 4,
-        "beatsPerMeasure": 4,
-        "visualSpanMeasures": 4,
-        "resetBetweenMeasures": false
+        "beatsPerMeasure": 4
       },
       "prompt": [
         {
@@ -1234,6 +1232,8 @@
       "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false,
         "routeCharacter": "steep exposed descent with tighter boulders and faster lower sections",
         "routeDirection": "descending",
         "steepness": 0.7,
@@ -1414,7 +1414,7 @@
         "star2Threshold": 192,
         "star3Threshold": 240,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (240); three stars is the maximum itself, so \u2605\u2605\u2605 requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1422,7 +1422,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+        "note": "Scale material is not streak-eligible content (GDD \u00a79.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
     "4": {
@@ -1430,9 +1430,7 @@
       "supported": true,
       "measurePlan": {
         "attemptMeasures": 4,
-        "beatsPerMeasure": 4,
-        "visualSpanMeasures": 4,
-        "resetBetweenMeasures": false
+        "beatsPerMeasure": 4
       },
       "prompt": [
         {
@@ -1759,6 +1757,8 @@
       "noteOpportunityCount": 32,
       "authoredBeatCount": 16,
       "visual": {
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false,
         "routeCharacter": "absurd near-vertical goat descent on tiny footholds",
         "routeDirection": "descending",
         "steepness": 0.95,
@@ -1987,7 +1987,7 @@
         "star2Threshold": 256,
         "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (320); three stars is the maximum itself, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. Pass is 45% and two stars 80% of the all-Perfect maximum (320); three stars is the maximum itself, so \u2605\u2605\u2605 requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1995,7 +1995,7 @@
       },
       "scoring": {
         "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+        "note": "Scale material is not streak-eligible content (GDD \u00a79.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     }
   }

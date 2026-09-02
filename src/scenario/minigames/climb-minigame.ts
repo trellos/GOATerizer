@@ -19,13 +19,66 @@
  * poses or wobble, and this class knows nothing about canvases or pixels.
  */
 
-import { decay, type Judged, type Minigame, type Scene, type Sprite } from "../../minigame/api.js";
-import type {
-  ClimbAssetBindings,
-  ClimbClassParameters,
-  RouteData,
-  RoutePoint,
-} from "../types.js";
+import {
+  decay,
+  MINIGAME_API_VERSION,
+  type AttemptContext,
+  type Judged,
+  type Minigame,
+  type MinigameModule,
+  type Scene,
+  type Sprite,
+} from "../../minigame/api.js";
+import { bool, num, obj, ScenarioDataError, str, strings } from "../parse.js";
+
+/* -------------------------------------------------------------------------- */
+/* Content shape — owned by this class, opaque to the host                     */
+/* -------------------------------------------------------------------------- */
+
+export type RoutePoint = { x: number; y: number };
+
+export type RouteWaypoint = RoutePoint & {
+  /** Transform-only variety on one reused sprite. */
+  scale: number;
+  rotationDeg: number;
+};
+
+/**
+ * The climb route, in normalised scenario space: x rightwards 0..1, y downwards
+ * 0..1 with 0 at the top of the frame.
+ */
+export type RouteData = {
+  character: string;
+  startPosition: RoutePoint;
+  destination: RoutePoint;
+  waypoints: readonly RouteWaypoint[];
+};
+
+/**
+ * Asset slots are named by the *class*, never by the scenario. `ClimbMinigame`
+ * asks for `climberPoses`; Rocky Ascent decides those are goats.
+ */
+export type ClimbAssetBindings = {
+  background: string;
+  climberPoses: readonly string[];
+  finishPose: string;
+  waypointVisuals: readonly string[];
+  destinationVisual: string;
+  stepEffects: readonly string[];
+};
+
+export type ClimbConfig = {
+  bindings: ClimbAssetBindings;
+  badNotePolicy: "Wobble" | "Stall";
+  showDestinationFromStart: boolean;
+};
+
+export type ClimbLevelData = {
+  route: RouteData;
+  /** How many measures one visual arc spans. Rocky spans all four. */
+  visualSpanMeasures: number;
+  resetBetweenMeasures: boolean;
+};
 
 export type ClimbEffectKind = "contact" | "accent";
 
@@ -43,7 +96,8 @@ type ClimbEffect = {
 export type ClimbOptions = {
   route: RouteData;
   bindings: ClimbAssetBindings;
-  parameters: ClimbClassParameters;
+  parameters: { badNotePolicy: "Wobble" | "Stall"; showDestinationFromStart: boolean };
+  resetBetweenMeasures: boolean;
 };
 
 /** How long a contact/accent effect stays up, in beats. */
@@ -77,7 +131,8 @@ const WOBBLE_TILT = 9;
 export class ClimbMinigame implements Minigame {
   readonly #route: RouteData;
   readonly #bindings: ClimbAssetBindings;
-  readonly #parameters: ClimbClassParameters;
+  readonly #parameters: ClimbOptions["parameters"];
+  readonly #resetBetweenMeasures: boolean;
 
   #successfulNotes = 0;
   #waypointIndex = -1;
@@ -93,6 +148,7 @@ export class ClimbMinigame implements Minigame {
     this.#route = options.route;
     this.#bindings = options.bindings;
     this.#parameters = options.parameters;
+    this.#resetBetweenMeasures = options.resetBetweenMeasures;
   }
 
   /**
@@ -174,7 +230,7 @@ export class ClimbMinigame implements Minigame {
    * attempt-global progress.
    */
   onMeasure(_measureIndex: number, beat: number): void {
-    if (!this.#parameters.resetBetweenMeasures) return;
+    if (!this.#resetBetweenMeasures) return;
     this.#waypointIndex = -1;
     this.#effects = [];
     this.#wobbleStartedAtBeat = null;
@@ -330,3 +386,176 @@ export class ClimbMinigame implements Minigame {
     return decay(this.#wobbleStartedAtBeat, WOBBLE_DECAY_BEATS, beat);
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* The package                                                                 */
+/* -------------------------------------------------------------------------- */
+
+function parseBindings(raw: unknown, where: string): ClimbAssetBindings {
+  const bindings = obj(raw, where);
+  const one = (slot: string): string => {
+    const values = strings(bindings[slot], `${where}.${slot}`);
+    const first = values[0];
+    if (values.length !== 1 || first === undefined) {
+      throw new ScenarioDataError(`${where}.${slot}`, "expected exactly one asset id");
+    }
+    return first;
+  };
+  const many = (slot: string, min: number): string[] => {
+    const values = strings(bindings[slot], `${where}.${slot}`);
+    if (values.length < min) {
+      throw new ScenarioDataError(`${where}.${slot}`, `expected at least ${min} asset ids`);
+    }
+    return values;
+  };
+
+  return {
+    background: one("background"),
+    climberPoses: many("climberPoses", 1),
+    finishPose: one("finishPose"),
+    waypointVisuals: many("waypointVisuals", 1),
+    destinationVisual: one("destinationVisual"),
+    // Slot ordering is part of the class contract: [0] is the contact effect
+    // where the climber lands, [1] the clean-progress accent.
+    stepEffects: many("stepEffects", 2),
+  };
+}
+
+function parseRoute(raw: unknown, where: string, expectedWaypoints: number): RouteData {
+  const route = obj(raw, where);
+  const point = (value: unknown, at: string): RoutePoint => {
+    const p = obj(value, at);
+    return { x: num(p["x"], `${at}.x`), y: num(p["y"], `${at}.y`) };
+  };
+
+  const waypoints = arrayOf(route["waypoints"], `${where}.waypoints`).map((entry, i) => {
+    const at = `${where}.waypoints[${i}]`;
+    const wp = obj(entry, at);
+    return {
+      ...point(wp, at),
+      scale: num(wp["scale"], `${at}.scale`),
+      rotationDeg: num(wp["rotationDeg"], `${at}.rotationDeg`),
+    };
+  });
+
+  if (waypoints.length !== expectedWaypoints) {
+    throw new ScenarioDataError(
+      `${where}.waypoints`,
+      `${waypoints.length} waypoints for ${expectedWaypoints} note opportunities — ` +
+        "one successful note must advance exactly one waypoint"
+    );
+  }
+
+  return {
+    character: str(route["character"], `${where}.character`),
+    startPosition: point(route["startPosition"], `${where}.startPosition`),
+    destination: point(route["destination"], `${where}.destination`),
+    waypoints,
+  };
+}
+
+function arrayOf(value: unknown, where: string): unknown[] {
+  if (!Array.isArray(value)) throw new ScenarioDataError(where, "expected an array");
+  return value;
+}
+
+/** Narrows a scenario's opaque config. Throws if it did not come from here. */
+export function climbConfig(config: unknown): ClimbConfig {
+  const value = config as Partial<ClimbConfig> | null;
+  if (!value || typeof value !== "object" || !value.bindings) {
+    throw new Error("not a ClimbMinigame config");
+  }
+  return value as ClimbConfig;
+}
+
+/** Narrows a level's opaque data. Throws if it did not come from here. */
+export function climbLevelData(data: unknown): ClimbLevelData {
+  const value = data as Partial<ClimbLevelData> | null;
+  if (!value || typeof value !== "object" || !value.route) {
+    throw new Error("not ClimbMinigame level data");
+  }
+  return value as ClimbLevelData;
+}
+
+/**
+ * `ClimbMinigame` as the host sees it.
+ *
+ * The two parsers are why this class can define whatever content shape it
+ * likes: only it knows what a route or a foothold is, so only it can say
+ * whether a scenario file is valid. The host stores what they return without
+ * ever looking inside.
+ */
+export const CLIMB_MINIGAME: MinigameModule = {
+  id: "ClimbMinigame",
+  displayName: "Climb",
+  apiVersion: MINIGAME_API_VERSION,
+
+  parseConfig(raw: unknown): ClimbConfig {
+    const root = obj(raw, "climb config");
+    const params = obj(root["classParameters"], "scenario.classParameters");
+    const policy = str(params["badNotePolicy"], "scenario.classParameters.badNotePolicy");
+    if (policy !== "Wobble" && policy !== "Stall") {
+      throw new ScenarioDataError(
+        "scenario.classParameters.badNotePolicy",
+        'expected "Wobble" or "Stall"'
+      );
+    }
+    return {
+      bindings: parseBindings(root["assetBindings"], "scenario.assetBindings"),
+      badNotePolicy: policy,
+      showDestinationFromStart: bool(
+        params["showDestinationFromStart"],
+        "scenario.classParameters.showDestinationFromStart"
+      ),
+    };
+  },
+
+  parseLevel(raw: unknown, shape): ClimbLevelData {
+    const visual = obj(raw, "level.visual");
+    return {
+      // One waypoint per note opportunity is the class's own invariant, checked
+      // here rather than by the generic loader -- a REPEAT scenario's row holds
+      // `noteOpportunityCount / measures` targets, and neither rule is the
+      // host's to enforce.
+      route: parseRoute(visual["route"], "level.visual.route", shape.noteOpportunityCount),
+      visualSpanMeasures: num(visual["visualSpanMeasures"], "level.visual.visualSpanMeasures"),
+      resetBetweenMeasures: bool(
+        visual["resetBetweenMeasures"],
+        "level.visual.resetBetweenMeasures"
+      ),
+    };
+  },
+
+  assetIds(config: unknown): readonly string[] {
+    const { bindings } = climbConfig(config);
+    return [
+      bindings.background,
+      ...bindings.climberPoses,
+      bindings.finishPose,
+      ...bindings.waypointVisuals,
+      bindings.destinationVisual,
+      ...bindings.stepEffects,
+    ];
+  },
+
+  create(context: AttemptContext): ClimbMinigame {
+    const config = climbConfig(context.config);
+    const level = climbLevelData(context.data);
+    return new ClimbMinigame({
+      route: level.route,
+      bindings: config.bindings,
+      parameters: {
+        badNotePolicy: config.badNotePolicy,
+        showDestinationFromStart: config.showDestinationFromStart,
+      },
+      resetBetweenMeasures: level.resetBetweenMeasures,
+    });
+  },
+
+  debug(instance: Minigame): Readonly<Record<string, string>> {
+    if (!(instance instanceof ClimbMinigame)) return {};
+    const { waypointIndex, waypointCount } = instance.progress;
+    return { waypoint: `${waypointIndex + 1}/${waypointCount}` };
+  },
+};

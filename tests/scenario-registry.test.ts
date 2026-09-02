@@ -17,7 +17,14 @@
 
 import { describe, expect, it } from "vitest";
 
+import { MINIGAME_API_VERSION } from "../src/minigame/api.js";
+import {
+  minigameById,
+  registeredMinigameIds,
+  registerMinigame,
+} from "../src/minigame/registry.js";
 import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
+import { loadScenario } from "../src/scenario/load.js";
 import {
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
@@ -32,7 +39,7 @@ describe("scenario registry", () => {
   it("holds all four Rocky-family scenarios, each a ClimbMinigame in the Scale family", () => {
     expect(SCENARIOS).toHaveLength(4);
     for (const scenario of SCENARIOS) {
-      expect(scenario.minigameClass).toBe("ClimbMinigame");
+      expect(scenario.minigameId).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
@@ -113,3 +120,73 @@ describe("scenario registry", () => {
     }
   });
 });
+
+/**
+ * The minigame library.
+ *
+ * These are the guarantees that make a minigame something the game can be
+ * *given* rather than something it has to know about: an unregistered id is a
+ * loud content error instead of "whatever runs first", and a package built
+ * against a different revision of the contract is refused at registration
+ * rather than halfway through a render call.
+ */
+describe("minigame registry", () => {
+  it("registers the climb minigame by importing the scenario library", () => {
+    expect(registeredMinigameIds()).toContain("ClimbMinigame");
+    expect(minigameById("ClimbMinigame")?.apiVersion).toBe(MINIGAME_API_VERSION);
+  });
+
+  it("refuses a scenario whose minigame nobody registered, and says which exist", () => {
+    const orphan = { ...structuredClone(RAW_SCENARIO_SHAPE), minigameClass: "BattleMinigame" };
+    expect(() => loadScenario(orphan, (id) => `/${id}.png`)).toThrow(
+      /no minigame registered for "BattleMinigame".*ClimbMinigame/s
+    );
+  });
+
+  it("refuses a package built against a different API revision", () => {
+    expect(() =>
+      registerMinigame({
+        id: "FromTheFuture",
+        displayName: "From the future",
+        apiVersion: MINIGAME_API_VERSION + 1,
+        parseConfig: () => ({}),
+        parseLevel: () => ({}),
+        assetIds: () => [],
+        create: () => {
+          throw new Error("unreachable");
+        },
+      })
+    ).toThrow(/targets API v/);
+    expect(registeredMinigameIds()).not.toContain("FromTheFuture");
+  });
+
+  it("refuses a second, different package claiming an id already taken", () => {
+    const climb = minigameById("ClimbMinigame")!;
+    // The same module registering twice is fine; a different one is not.
+    expect(() => registerMinigame(climb)).not.toThrow();
+    expect(() => registerMinigame({ ...climb, displayName: "Impostor" })).toThrow(
+      /already registered/
+    );
+  });
+});
+
+/**
+ * The smallest scenario the *host* half of the loader accepts.
+ *
+ * Deliberately not a real file: the point is to reach the minigame lookup, so
+ * everything beyond identity is minimal. A real scenario's own validation lives
+ * with its minigame and is covered by `scenario-data.test.ts`.
+ */
+const RAW_SCENARIO_SHAPE = {
+  id: "orphan",
+  displayName: "Orphan",
+  theme: "none",
+  minigameClass: "ClimbMinigame",
+  family: "Scale",
+  visualVerb: "CLIMB",
+  scenarioPremise: "a scenario whose minigame is not registered",
+  supportedLevels: [1],
+  classParameters: {},
+  assetBindings: {},
+  levels: {},
+};

@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
+import { climbConfig, climbLevelData } from "../src/scenario/minigames/climb-minigame.js";
 import { formatDegreeToken } from "../src/music/degrees.js";
 import type { ScenarioLevelData } from "../src/scenario/types.js";
 
@@ -27,19 +28,35 @@ function level(difficulty: number): ScenarioLevelData {
   return data;
 }
 
+/**
+ * Rocky Ascent's climb halves, narrowed once.
+ *
+ * `config` and `data` are `unknown` on the scenario model: the host carries
+ * them and only `ClimbMinigame` knows their shape. A test asserting on a route
+ * or an asset slot is a climb test and has to say so.
+ */
+const ASCENT = climbConfig(ROCKY_ASCENT.config);
+const climbLevel = (difficulty: number) =>
+  climbLevelData(ROCKY_ASCENT.levels.get(difficulty)!.data);
+
 describe("Rocky Ascent scenario", () => {
   it("is a ClimbMinigame supporting exactly L1-L4", () => {
     expect(ROCKY_ASCENT.id).toBe("rocky_ascent");
-    expect(ROCKY_ASCENT.minigameClass).toBe("ClimbMinigame");
+    expect(ROCKY_ASCENT.minigameId).toBe("ClimbMinigame");
     expect(ROCKY_ASCENT.family).toBe("Scale");
     expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...ROCKY_ASCENT.levels.keys()]).toEqual([1, 2, 3, 4]);
   });
 
   it("runs one continuous four-measure visual arc with no measure reset", () => {
-    expect(ROCKY_ASCENT.classParameters.visualSpanMeasures).toBe(4);
-    expect(ROCKY_ASCENT.classParameters.resetBetweenMeasures).toBe(false);
-    expect(ROCKY_ASCENT.classParameters.badNotePolicy).toBe("Wobble");
+    // Span and reset are per level now: a scenario whose visual cycle changes
+    // with difficulty is exactly what BATTLE needs, and a scenario-wide flag
+    // could not express it.
+    for (const difficulty of LEVELS) {
+      expect(climbLevel(difficulty).visualSpanMeasures).toBe(4);
+      expect(climbLevel(difficulty).resetBetweenMeasures).toBe(false);
+    }
+    expect(ASCENT.badNotePolicy).toBe("Wobble");
   });
 
   it.each(LEVELS)("L%i totals exactly 16 beats", (difficulty) => {
@@ -117,11 +134,11 @@ describe("Rocky Ascent scenario", () => {
 
   it.each(LEVELS)("L%i authors one waypoint per note opportunity", (difficulty) => {
     const data = level(difficulty);
-    expect(data.route.waypoints).toHaveLength(data.noteOpportunityCount);
+    expect(climbLevel(difficulty).route.waypoints).toHaveLength(data.noteOpportunityCount);
   });
 
   it.each(LEVELS)("L%i waypoints stay inside normalised scenario space", (difficulty) => {
-    for (const wp of level(difficulty).route.waypoints) {
+    for (const wp of climbLevel(difficulty).route.waypoints) {
       expect(wp.x).toBeGreaterThanOrEqual(0);
       expect(wp.x).toBeLessThanOrEqual(1);
       expect(wp.y).toBeGreaterThanOrEqual(0);
@@ -130,17 +147,17 @@ describe("Rocky Ascent scenario", () => {
   });
 
   it.each(LEVELS)("L%i climbs: every waypoint is above the previous one", (difficulty) => {
-    const waypoints = level(difficulty).route.waypoints;
+    const waypoints = climbLevel(difficulty).route.waypoints;
     for (let i = 1; i < waypoints.length; i += 1) {
       // y is downwards, so "higher up the mountain" is a smaller y.
       expect(waypoints[i]!.y).toBeLessThan(waypoints[i - 1]!.y);
     }
-    expect(waypoints[0]!.y).toBeLessThan(level(difficulty).route.startPosition.y);
+    expect(waypoints[0]!.y).toBeLessThan(climbLevel(difficulty).route.startPosition.y);
   });
 
   it("escalates visually with difficulty", () => {
     const rise = (difficulty: number) => {
-      const route = level(difficulty).route;
+      const route = climbLevel(difficulty).route;
       const last = route.waypoints[route.waypoints.length - 1]!;
       return route.startPosition.y - last.y;
     };
@@ -148,7 +165,7 @@ describe("Rocky Ascent scenario", () => {
     expect(rise(4)).toBeGreaterThan(rise(1));
     expect(rise(3)).toBeGreaterThan(rise(1));
     // ...and its summit sits nearer the top of the frame.
-    const summitY = (d: number) => level(d).route.destination.y;
+    const summitY = (d: number) => climbLevel(d).route.destination.y;
     expect(summitY(4)).toBeLessThan(summitY(3));
     expect(summitY(3)).toBeLessThan(summitY(2));
     expect(summitY(2)).toBeLessThan(summitY(1));
@@ -177,7 +194,7 @@ describe("Rocky Ascent scenario", () => {
   });
 
   it("binds every class asset slot to a resolvable URL", () => {
-    const bindings = ROCKY_ASCENT.assetBindings;
+    const bindings = ASCENT.bindings;
     expect(bindings.climberPoses).toHaveLength(4);
     expect(bindings.stepEffects).toHaveLength(2);
     const ids = [

@@ -15,7 +15,11 @@ import { rankForStars, GOAT_RANKS } from "../src/game/ranks.js";
 import { DIFFICULTY_SEQUENCE, RunState, RUN_SLOT_COUNT } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import type { Judged, Scene, Sprite } from "../src/minigame/api.js";
-import { ClimbMinigame } from "../src/scenario/minigames/climb-minigame.js";
+import {
+  ClimbMinigame,
+  climbConfig,
+  climbLevelData,
+} from "../src/scenario/minigames/climb-minigame.js";
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import type { RunKey } from "../src/music/keys.js";
 
@@ -94,6 +98,23 @@ function playFlawlessly(difficulty: number): {
 /* canvas anywhere near it.                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** Rocky Ascent's climb config and per-level data, narrowed for assertions. */
+const ASCENT = climbConfig(ROCKY_ASCENT.config);
+const ascentLevel = (difficulty: number) =>
+  climbLevelData(ROCKY_ASCENT.levels.get(difficulty)!.data);
+
+/**
+ * The attempt's minigame, as the concrete class.
+ *
+ * `AttemptRuntime.minigame` is a `Minigame` -- the runtime genuinely does not
+ * know it is running a climb -- so a climb-specific assertion has to say so.
+ */
+function climbIn(attempt: AttemptRuntime): ClimbMinigame {
+  const minigame = attempt.minigame;
+  if (!(minigame instanceof ClimbMinigame)) throw new Error("attempt is not a climb");
+  return minigame;
+}
+
 function scene(minigame: ClimbMinigame, beat = 0): Scene {
   return minigame.renderScene(beat);
 }
@@ -113,7 +134,7 @@ function effectsAt(
   minigame: ClimbMinigame,
   beat = 0
 ): { contact: Sprite[]; accent: Sprite[] } {
-  const [contactId, accentId] = ROCKY_ASCENT.assetBindings.stepEffects;
+  const [contactId, accentId] = ASCENT.bindings.stepEffects;
   const fx = scene(minigame, beat).sprites.filter((entry) => entry.key.startsWith("fx-"));
   return {
     contact: fx.filter((entry) => entry.assetId === contactId),
@@ -129,11 +150,11 @@ function judged(outcome: Judged["outcome"], beat: number): Judged {
 describe("ClimbMinigame progress", () => {
   it("starts at the route's start position, on no waypoint", () => {
     const { attempt } = harness(1);
-    const progress = attempt.minigame.progress;
+    const progress = climbIn(attempt).progress;
     expect(progress.waypointIndex).toBe(-1);
     expect(progress.successfulNotes).toBe(0);
-    const start = ROCKY_ASCENT.levels.get(1)!.route.startPosition;
-    const climber = climberAt(attempt.minigame);
+    const start = ascentLevel(1).route.startPosition;
+    const climber = climberAt(climbIn(attempt));
     expect({ x: climber.x, y: climber.y }).toEqual(start);
   });
 
@@ -142,8 +163,8 @@ describe("ClimbMinigame progress", () => {
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    expect(h.attempt.minigame.progress.waypointIndex).toBe(0);
-    expect(h.attempt.minigame.progress.successfulNotes).toBe(1);
+    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
+    expect(climbIn(h.attempt).progress.successfulNotes).toBe(1);
   });
 
   it("advances exactly one waypoint on a Good note too", () => {
@@ -152,7 +173,7 @@ describe("ClimbMinigame progress", () => {
     h.playAt(target.midi, target.startBeat, 0.4); // late, but successful
     h.advanceTo(0.45);
     expect(h.events.some((e) => e.type === "judgment" && e.judgment.type === "GoodNote")).toBe(true);
-    expect(h.attempt.minigame.progress.waypointIndex).toBe(0);
+    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
   });
 
   it("does not advance on a wrong note, and does not lose earned progress", () => {
@@ -160,24 +181,24 @@ describe("ClimbMinigame progress", () => {
     const first = h.attempt.targets[0]!;
     h.playAt(first.midi, first.startBeat);
     h.advanceTo(0.01);
-    const earned = h.attempt.minigame.progress.waypointIndex;
+    const earned = climbIn(h.attempt).progress.waypointIndex;
 
     const second = h.attempt.targets[1]!;
     h.playAt(second.midi + 1, second.startBeat); // a semitone off
     h.advanceTo(second.startBeat + 0.01);
 
-    const progress = h.attempt.minigame.progress;
+    const progress = climbIn(h.attempt).progress;
     expect(progress.waypointIndex).toBe(earned);
     expect(progress.successfulNotes).toBe(1);
     // Wobble is a lean, not a fall: the climber tilts and is still on the same
     // foothold.
-    expect(climberAt(h.attempt.minigame, second.startBeat).rotationDeg).not.toBe(0);
+    expect(climberAt(climbIn(h.attempt), second.startBeat).rotationDeg).not.toBe(0);
   });
 
   it("does not advance on a miss", () => {
     const h = harness(1);
     h.advanceTo(2); // let the first two targets expire unplayed
-    expect(h.attempt.minigame.progress.waypointIndex).toBe(-1);
+    expect(climbIn(h.attempt).progress.waypointIndex).toBe(-1);
     expect(h.events.filter((e) => e.type === "judgment" && e.judgment.type === "MissedNote").length)
       .toBeGreaterThan(0);
   });
@@ -185,11 +206,15 @@ describe("ClimbMinigame progress", () => {
   it("settles the wobble back to the same waypoint", () => {
     // Driven directly, because in a live attempt every expiring target sends
     // its own bad energy and would keep re-triggering the wobble.
-    const level = ROCKY_ASCENT.levels.get(1)!;
+    const level = ascentLevel(1);
     const climb = new ClimbMinigame({
       route: level.route,
-      bindings: ROCKY_ASCENT.assetBindings,
-      parameters: ROCKY_ASCENT.classParameters,
+      bindings: ASCENT.bindings,
+      parameters: {
+        badNotePolicy: ASCENT.badNotePolicy,
+        showDestinationFromStart: ASCENT.showDestinationFromStart,
+      },
+      resetBetweenMeasures: level.resetBetweenMeasures,
     });
 
     climb.onJudged(judged("perfect", 0), 0);
@@ -217,10 +242,10 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.01);
-      poses.push(climberAt(h.attempt.minigame, target.startBeat + 0.01).assetId);
+      poses.push(climberAt(climbIn(h.attempt), target.startBeat + 0.01).assetId);
     }
     expect(new Set(poses).size).toBeGreaterThan(1);
-    for (const pose of poses) expect(ROCKY_ASCENT.assetBindings.climberPoses).toContain(pose);
+    for (const pose of poses) expect(ASCENT.bindings.climberPoses).toContain(pose);
   });
 
   it("shows a contact effect and an accent, weaker for Good than for Perfect", () => {
@@ -228,23 +253,23 @@ describe("ClimbMinigame progress", () => {
     const first = perfect.attempt.targets[0]!;
     perfect.playAt(first.midi, first.startBeat);
     perfect.advanceTo(0.01);
-    const perfectFx = effectsAt(perfect.attempt.minigame, first.startBeat);
+    const perfectFx = effectsAt(climbIn(perfect.attempt), first.startBeat);
     expect(perfectFx.contact).toHaveLength(1);
     expect(perfectFx.accent).toHaveLength(1);
 
     const good = harness(1);
     good.playAt(first.midi, first.startBeat, 0.4);
     good.advanceTo(0.45);
-    const goodFx = effectsAt(good.attempt.minigame, first.startBeat + 0.4);
+    const goodFx = effectsAt(climbIn(good.attempt), first.startBeat + 0.4);
     // Same asset, drawn smaller: Perfect reads stronger than Good.
     expect(goodFx.accent[0]!.scale).toBeLessThan(perfectFx.accent[0]!.scale!);
   });
 
   it("draws one foothold per authored waypoint, lighting them as they are reached", () => {
     const h = harness(1);
-    const level = ROCKY_ASCENT.levels.get(1)!;
+    const level = ascentLevel(1);
     const footholds = () =>
-      scene(h.attempt.minigame).sprites.filter((entry) => entry.key.startsWith("step-"));
+      scene(climbIn(h.attempt)).sprites.filter((entry) => entry.key.startsWith("step-"));
 
     expect(footholds()).toHaveLength(level.route.waypoints.length);
     expect(footholds().every((entry) => entry.opacity !== 1)).toBe(true);
@@ -261,7 +286,7 @@ describe("ClimbMinigame progress", () => {
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    const keysAt = (beat: number) => scene(h.attempt.minigame, beat).sprites.map((s) => s.key);
+    const keysAt = (beat: number) => scene(climbIn(h.attempt), beat).sprites.map((s) => s.key);
     // The climber advances between these two frames; its key does not change.
     expect(keysAt(0.01)).toContain("climber");
     expect(keysAt(0.02)).toContain("climber");
@@ -276,7 +301,7 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.001);
-      seen.push(h.attempt.minigame.progress.waypointIndex);
+      seen.push(climbIn(h.attempt).progress.waypointIndex);
     }
     // Strictly increasing, one per note, right through the measure boundaries.
     expect(seen).toEqual([...Array(15).keys()]);
@@ -285,17 +310,17 @@ describe("ClimbMinigame progress", () => {
 
   it("maps every successful note onto its own waypoint at L4's 30 steps", () => {
     const { attempt } = playFlawlessly(4);
-    expect(attempt.minigame.progress.successfulNotes).toBe(30);
-    expect(attempt.minigame.progress.waypointCount).toBe(30);
+    expect(climbIn(attempt).progress.successfulNotes).toBe(30);
+    expect(climbIn(attempt).progress.waypointCount).toBe(30);
   });
 
   it("finishes at the destination when the attempt passes", () => {
     const { attempt, result } = playFlawlessly(1);
     expect(result.passed).toBe(true);
-    expect(attempt.minigame.progress.finished).toBe(true);
-    const climber = climberAt(attempt.minigame, 16);
-    expect({ x: climber.x, y: climber.y }).toEqual(ROCKY_ASCENT.levels.get(1)!.route.destination);
-    expect(climber.assetId).toBe(ROCKY_ASCENT.assetBindings.finishPose);
+    expect(climbIn(attempt).progress.finished).toBe(true);
+    const climber = climberAt(climbIn(attempt), 16);
+    expect({ x: climber.x, y: climber.y }).toEqual(ascentLevel(1).route.destination);
+    expect(climber.assetId).toBe(ASCENT.bindings.finishPose);
   });
 
   it("freezes at the furthest earned waypoint when the attempt fails", () => {
@@ -307,12 +332,12 @@ describe("ClimbMinigame progress", () => {
     const result = h.attempt.result!;
     expect(result.stars).toBe(0);
     expect(result.passed).toBe(false);
-    expect(h.attempt.minigame.progress.finished).toBe(false);
-    expect(h.attempt.minigame.progress.frozen).toBe(true);
-    expect(h.attempt.minigame.progress.waypointIndex).toBe(0);
+    expect(climbIn(h.attempt).progress.finished).toBe(false);
+    expect(climbIn(h.attempt).progress.frozen).toBe(true);
+    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
     // No bespoke failure art: it is still a climbing pose, just not the finish.
-    expect(climberAt(h.attempt.minigame, 16).assetId).not.toBe(
-      ROCKY_ASCENT.assetBindings.finishPose
+    expect(climberAt(climbIn(h.attempt), 16).assetId).not.toBe(
+      ASCENT.bindings.finishPose
     );
   });
 });
