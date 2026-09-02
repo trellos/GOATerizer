@@ -427,3 +427,15 @@ export const AUTOPLAY_PLUCK_GAP_SECONDS = 0.1;
 export const AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS = 0.08;
 /** Cap, so a whole note at 60bpm does not drone for four seconds. */
 export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;
+
+/**
+ * Loudness of the autoplay monitor (`src/dev/autoplay-monitor.ts`) — the
+ * audible pluck that lets a developer hear what autoplay played, independent
+ * of whichever sink (`synth` or `test`) is actually driving judgment. Mixed
+ * onto the same master bus as the bass and drums, so this is well under
+ * `AUTOPLAY_PLUCK_PEAK_GAIN`: loud enough to follow the performance, not loud
+ * enough to bury the backing track it exists to be checked against.
+ * Provisional per `AGENTS.md` §17 — nobody has designed a "how loud is a demo
+ * click track" answer.
+ */
+export const AUTOPLAY_MONITOR_GAIN = 0.35;
