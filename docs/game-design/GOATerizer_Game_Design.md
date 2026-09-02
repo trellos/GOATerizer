@@ -471,7 +471,8 @@ The contract it does that through is defined in:
 
 # 7. Stars and Minigame Progress
 
-Every minigame begins with three empty stars over the scenario.
+Every minigame begins with three empty stars, in the HUD's right column beside
+the score they are denominated against (§11.1).
 
 Scenario level data defines three cumulative performance thresholds:
 
@@ -1130,7 +1131,11 @@ The detailed content/runtime architecture is defined by:
 
 If this GDD conflicts with those documents on **game-level flow**, this GDD should be treated as the newer authority.
 
-For minigame-class visual behavior and scenario asset bindings, the companion specifications remain authoritative.
+Those companions were written for a scenario panel, which no longer exists. **On
+the playfield surface — what a minigame draws, and where — §11 of this GDD and
+`GOATerizer_Minigame_Authoring.md` are authoritative.** The companions remain
+authoritative for scenario premises, asset inventory and per-family visual
+intent, which the change of surface did not touch.
 
 ---
 
@@ -1247,8 +1252,8 @@ Minigame 1
     4 measures
     play prompted guitar exercise
     Tuninator judges performance
-    timeline emits good/bad energy
-    scenario responds
+    each judged note is handed to the minigame
+    the minigame reacts on the timeline
     earn 0–3 stars
     ↓
 0 stars? ── YES ──→ GAME OVER
@@ -1256,7 +1261,8 @@ Minigame 1
     NO
     ↓
 stars fly to history
-scenario strip slides left over 1 beat
+outgoing minigame's measures scroll off left
+incoming minigame's measures scroll in from the right
 music never stops
     ↓
 next minigame
