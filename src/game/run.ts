@@ -171,8 +171,13 @@ function fillSlots(
       return { ordinal, difficulty, scenario: null, result: null };
     }
 
+    // Dev-only pin, ahead of the reuse rule: the point is to see one scenario
+    // in every slot it can fill, not to see it once.
     const pinned = eligible.find((scenario) => scenario.id === pinnedScenarioId);
-    if (pinned) return { ordinal, difficulty, scenario: pinned, result: null };
+    if (pinned) {
+      used.add(pinned.id);
+      return { ordinal, difficulty, scenario: pinned, result: null };
+    }
 
     const unused = eligible.filter((scenario) => !used.has(scenario.id));
     const pool = unused.length > 0 ? unused : eligible;

@@ -11,10 +11,15 @@
  * of something every scenario has to author twice — and everything downstream
  * (the judge, the timeline, the autoplay planner, the actors) gets it for free,
  * because they all read this list and nothing else.
+ *
+ * It is also, for the same reason, the one place a *pentatonic* degree becomes
+ * a diatonic one: which lane `p3` sits on depends on whether the run is major
+ * or minor, and the run key is only known here (`music/degrees.ts`,
+ * {@link resolveDegree}).
  */
 
 import { ATTEMPT_REPEATS } from "../config/tuning.js";
-import { laneIndexOf, type ScaleDegreeRef } from "../music/degrees.js";
+import { laneIndexOf, resolveDegree, type ScaleDegreeRef } from "../music/degrees.js";
 import { degreeToMidi, type RunKey } from "../music/keys.js";
 import type { NoteDuration, ScenarioLevelData } from "../scenario/types.js";
 
@@ -34,6 +39,7 @@ export type ResolvedTarget = {
   startBeat: number;
   durationBeats: number;
   duration: NoteDuration;
+  /** Diatonic in the run key — already resolved from whatever was authored. */
   degree: ScaleDegreeRef;
   /** 0..7 in the Key View. */
   lane: number;
@@ -58,6 +64,7 @@ export function resolveTargets(level: ScenarioLevelData, key: RunKey): ResolvedT
   for (let pass = 0; pass < ATTEMPT_REPEATS; pass += 1) {
     for (const event of level.prompt) {
       if (event.type !== "note" || event.degree === null) continue;
+      const degree = resolveDegree(event.degree, key.mode);
       targets.push({
         opportunityIndex: targets.length,
         promptIndex: event.index,
@@ -65,9 +72,9 @@ export function resolveTargets(level: ScenarioLevelData, key: RunKey): ResolvedT
         startBeat: event.startBeat + pass * span,
         durationBeats: event.durationBeats,
         duration: event.duration,
-        degree: event.degree,
-        lane: laneIndexOf(event.degree),
-        midi: degreeToMidi(event.degree, key),
+        degree,
+        lane: laneIndexOf(degree),
+        midi: degreeToMidi(degree, key),
       });
     }
   }
