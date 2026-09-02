@@ -13,7 +13,14 @@ import {
   scenariosForFamily,
   type MinigameOverrideState,
 } from "../src/dev/minigame-families.js";
-import { CAN_CRUSHING, ROCKY_ASCENT, ROCKY_ASCENT_HIGH, ROCKY_DESCENT } from "../src/scenario/registry.js";
+import {
+  BUTT_BUTT_BONK,
+  CAN_CRUSHING,
+  ROCKY_ASCENT,
+  ROCKY_ASCENT_HIGH,
+  ROCKY_DESCENT,
+  scenariosForDifficulty,
+} from "../src/scenario/registry.js";
 
 const NO_OVERRIDE: MinigameOverrideState = {
   disabledCells: new Set(),
@@ -43,10 +50,13 @@ describe("minigame family table", () => {
     expect(scaleVariants).toContain(ROCKY_ASCENT_HIGH);
     expect(scaleVariants.every((scenario) => scenario.family === "Scale")).toBe(true);
     expect(scenariosForFamily("Straight Sixteenths")).toEqual([CAN_CRUSHING]);
+    expect(scenariosForFamily("Triplets")).toEqual([BUTT_BUTT_BONK]);
   });
 
   it("a family nothing authors yet lists no rows", () => {
-    expect(scenariosForFamily("Blues Lick")).toEqual([]);
+    // Four of six families now ship. TRAVERSE and BATTLE are the two left.
+    expect(scenariosForFamily("Scale Run")).toEqual([]);
+    expect(scenariosForFamily("Sixteenth Phrases")).toEqual([]);
   });
 });
 
@@ -106,11 +116,12 @@ describe("resolveMinigameOverride", () => {
     const state: MinigameOverrideState = {
       ...NO_OVERRIDE,
       targetDifficulty: 1,
-      disabledCells: new Set([
-        cellKey(ROCKY_ASCENT.id, 1),
-        cellKey(ROCKY_DESCENT.id, 1),
-        cellKey(CAN_CRUSHING.id, 1),
-      ]),
+      // Derived, not listed: "every eligible scenario" stopped meaning that the
+      // moment another family shipped content at L1, and hand-listing the ids
+      // makes this test quietly assert something weaker each time one does.
+      disabledCells: new Set(
+        scenariosForDifficulty(1).map((scenario) => cellKey(scenario.id, 1))
+      ),
     };
     const resolution = resolveMinigameOverride(slot, state, () => 0);
     expect(resolution?.scenario).toBeNull();

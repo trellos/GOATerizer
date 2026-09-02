@@ -663,7 +663,13 @@ export const PERFORM_MINIGAME: MinigameModule = {
   },
 
   parseLevel(raw: unknown, shape): PerformLevelData {
-    const visual = obj(raw, "level.visual");
+    // `parseLevel` is handed the WHOLE level object, not its `visual` block —
+    // the same contract CLIMB and THREE-STEP read against. Treating `raw` as
+    // the visual made every lookup here miss, so `flourishBeats` came back
+    // undefined and Goat Frontman threw at load, taking the whole registry
+    // import with it.
+    const level = obj(raw, "level");
+    const visual = obj(level["visual"], "level.visual");
     const flourishBeats = arr(visual["flourishBeats"], "level.visual.flourishBeats").map((entry, i) => {
       const beat = num(entry, `level.visual.flourishBeats[${i}]`);
       if (beat < 0) throw new ScenarioDataError(`level.visual.flourishBeats[${i}]`, "before the phrase");

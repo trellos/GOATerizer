@@ -5,7 +5,7 @@
  * placeholder art generator has no image-library dependency at all.
  */
 
-import { deflateSync } from "node:zlib";
+import { deflateSync, inflateSync } from "node:zlib";
 
 const CRC_TABLE = (() => {
   const table = new Int32Array(256);
@@ -124,4 +124,101 @@ export function lcg(seed) {
     state = (state * 1664525 + 1013904223) >>> 0;
     return state / 0x100000000;
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Decoding                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Reads a PNG into RGBA, so external art can be sliced into per-slot files.
+ *
+ * The encoder above exists because the placeholder art is *drawn*. This exists
+ * for the opposite case: art that already exists as somebody else's sprite
+ * sheet and has to be cut down to the one static billboard a slot binds. Both
+ * directions stay dependency-free — `zlib` is still the only hard part.
+ *
+ * Supports the 8-bit non-interlaced colour types real sprite sheets use
+ * (greyscale, RGB, palette, greyscale+alpha, RGBA) and throws on anything else
+ * rather than returning quietly wrong pixels.
+ */
+export function decodePng(buffer) {
+  let idat = [];
+  let ihdr = null;
+  let palette = null;
+  let transparency = null;
+
+  for (let i = 8; i < buffer.length; ) {
+    const length = buffer.readUInt32BE(i);
+    const type = buffer.toString("ascii", i + 4, i + 8);
+    const body = buffer.subarray(i + 8, i + 8 + length);
+    if (type === "IHDR") ihdr = body;
+    else if (type === "IDAT") idat.push(body);
+    else if (type === "PLTE") palette = body;
+    else if (type === "tRNS") transparency = body;
+    i += 12 + length;
+  }
+  if (!ihdr) throw new Error("not a PNG: no IHDR");
+
+  const width = ihdr.readUInt32BE(0);
+  const height = ihdr.readUInt32BE(4);
+  const depth = ihdr[8];
+  const colourType = ihdr[9];
+  const interlace = ihdr[12];
+  if (depth !== 8 || interlace !== 0) {
+    throw new Error(`unsupported PNG: bit depth ${depth}, interlace ${interlace}`);
+  }
+
+  const channels = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }[colourType];
+  if (!channels) throw new Error(`unsupported PNG colour type ${colourType}`);
+
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const lines = Buffer.alloc(stride * height);
+  let previous = Buffer.alloc(stride);
+  let offset = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[offset];
+    offset += 1;
+    const line = Buffer.from(raw.subarray(offset, offset + stride));
+    offset += stride;
+    for (let x = 0; x < stride; x += 1) {
+      const a = x >= channels ? line[x - channels] : 0;
+      const b = previous[x];
+      const c = x >= channels ? previous[x - channels] : 0;
+      if (filter === 1) line[x] = (line[x] + a) & 0xff;
+      else if (filter === 2) line[x] = (line[x] + b) & 0xff;
+      else if (filter === 3) line[x] = (line[x] + ((a + b) >> 1)) & 0xff;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a);
+        const pb = Math.abs(p - b);
+        const pc = Math.abs(p - c);
+        line[x] = (line[x] + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 0xff;
+      }
+    }
+    line.copy(lines, y * stride);
+    previous = line;
+  }
+
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < width * height; i += 1) {
+    const s = i * channels;
+    let r;
+    let g;
+    let b;
+    let a = 255;
+    if (colourType === 6) [r, g, b, a] = [lines[s], lines[s + 1], lines[s + 2], lines[s + 3]];
+    else if (colourType === 2) [r, g, b] = [lines[s], lines[s + 1], lines[s + 2]];
+    else if (colourType === 3) {
+      const index = lines[s];
+      [r, g, b] = [palette[index * 3], palette[index * 3 + 1], palette[index * 3 + 2]];
+      if (transparency && index < transparency.length) a = transparency[index];
+    } else if (colourType === 0) [r, g, b] = [lines[s], lines[s], lines[s]];
+    else [r, g, b, a] = [lines[s], lines[s], lines[s], lines[s + 1]];
+    data.set([r, g, b, a], i * 4);
+  }
+
+  return { width, height, data };
 }
