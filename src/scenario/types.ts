@@ -11,6 +11,7 @@
  * `load.ts`.
  */
 
+import type { NoteDuration } from "../minigame/api.js";
 import type { ScaleDegreeRef } from "../music/degrees.js";
 
 export type MinigameClassId =
@@ -21,7 +22,13 @@ export type MinigameClassId =
   | "RepeatMinigame"
   | "BattleMinigame";
 
-export type NoteDuration = "whole" | "half" | "quarter" | "eighth" | "sixteenth";
+/**
+ * Re-exported: a note's written duration is part of the minigame contract, not
+ * of this schema, because a minigame skinning the timeline has to be able to
+ * draw a sixteenth differently from a whole note. One definition, in
+ * `minigame/api.ts`.
+ */
+export type { NoteDuration };
 
 export const DURATION_BEATS: Readonly<Record<NoteDuration, number>> = {
   whole: 4,

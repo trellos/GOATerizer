@@ -6,27 +6,26 @@
  * they survive the current one — its identity is already decided, because the
  * whole 16-slot run is generated at run start.
  *
- * Rendering obeys the visual system's constraints: static billboards, shown,
- * hidden, translated, scaled and rotated. One foothold sprite is instantiated
- * once per waypoint. There is no frame animation and no particle system; the
- * apparent motion comes from *when* the player's guitar triggers each step.
+ * This view knows nothing about goats, waypoints or any other minigame's
+ * vocabulary. A minigame hands it a {@link Scene} — a background and a list of
+ * billboards in normalised panel space — and everything here is panel chrome
+ * (ground, vignette, label, star meter) plus one generic sprite blitter. That
+ * blitter is the whole visual system `AGENTS.md` §10 asks for: show/hide,
+ * translate, scale, rotate, and nothing else. There is no frame animation and
+ * no particle system; the apparent motion comes from *when* the player's guitar
+ * triggers each change.
  */
 
-import type { ClimbVisualState } from "../scenario/minigames/climb-minigame.js";
-import type { RouteData, ScenarioDefinition } from "../scenario/types.js";
+import type { Scene, Sprite } from "../minigame/api.js";
 import type { AssetStore } from "./assets.js";
 
 export type StripPanel = {
-  scenario: ScenarioDefinition | null;
-  route: RouteData | null;
-  /** Only the current panel has live climb state. */
-  climb: ClimbVisualState | null;
+  /** What the slot's minigame wants drawn, or null when nothing is authored. */
+  scene: Scene | null;
   stars: number;
   starProgress: number;
   difficulty: number;
   label: string;
-  /** Attempt-relative beat for THIS panel, so its effects decay correctly. */
-  beat: number;
 };
 
 export type StripRender = {
@@ -35,6 +34,22 @@ export type StripRender = {
   next: StripPanel | null;
   /** 0..1 through the one-beat slide transition. */
   slide: number;
+};
+
+/**
+ * Panel height that {@link Sprite.scale} 1 is calibrated against.
+ *
+ * Sprite size is `natural × scale × (panelHeight / this)`, so the art keeps its
+ * proportions on any panel and a minigame never sees a pixel.
+ */
+const SPRITE_REFERENCE_HEIGHT = 200;
+
+/** Coarse draw order. {@link Sprite.z} orders within a layer. */
+const LAYER_ORDER: Readonly<Record<NonNullable<Sprite["layer"]>, number>> = {
+  back: 0,
+  stage: 1,
+  actor: 2,
+  front: 3,
 };
 
 const PANEL_BACKDROP = "#0a0d11";
@@ -100,7 +115,7 @@ export class ScenarioStripView {
     ctx.rect(x, 0, width, this.#height);
     ctx.clip();
 
-    if (!panel.scenario) {
+    if (!panel.scene) {
       // A slot exists but the library authors nothing for its difficulty. Say
       // so, rather than inventing an exercise for it.
       ctx.fillStyle = "#0a0d11";
@@ -114,8 +129,8 @@ export class ScenarioStripView {
       return;
     }
 
-    this.#drawBackground(panel.scenario, x, width);
-    if (panel.route) this.#drawRoute(panel, x, width, panel.beat);
+    this.#drawBackground(panel.scene.background, x, width);
+    this.#drawSprites(panel.scene.sprites, x, width);
     this.#drawLabel(panel, x, width);
     if (isCurrent) this.#drawStarMeter(panel, x, width);
 
@@ -125,8 +140,8 @@ export class ScenarioStripView {
     ctx.restore();
   }
 
-  #drawBackground(scenario: ScenarioDefinition, x: number, width: number): void {
-    const image = this.#assets.get(scenario.assetBindings.background);
+  #drawBackground(assetId: string | undefined, x: number, width: number): void {
+    const image = assetId ? this.#assets.get(assetId) : null;
     const ctx = this.#ctx;
     if (!image) {
       ctx.fillStyle = "#141a22";
@@ -140,124 +155,49 @@ export class ScenarioStripView {
     ctx.drawImage(image, x + (width - w) / 2, (this.#height - h) / 2, w, h);
   }
 
-  #drawRoute(panel: StripPanel, x: number, width: number, beat: number): void {
+  /**
+   * The scene, in one pass.
+   *
+   * Sorted by layer then `z`, with the original order breaking ties, so a
+   * minigame that returns sprites in the order it wants them drawn gets exactly
+   * that. Position and size come from the panel, never from the sprite: a
+   * minigame works in 0..1 and cannot express a pixel.
+   */
+  #drawSprites(sprites: readonly Sprite[], panelX: number, panelWidth: number): void {
     const ctx = this.#ctx;
-    const route = panel.route;
-    const scenario = panel.scenario;
-    if (!route || !scenario) return;
+    const unit = this.#height / SPRITE_REFERENCE_HEIGHT;
 
-    const toScreen = (point: { x: number; y: number }) => ({
-      x: x + point.x * width,
-      y: point.y * this.#height,
-    });
+    const ordered = sprites
+      .map((sprite, index) => ({ sprite, index }))
+      .sort((a, b) => {
+        const layer =
+          LAYER_ORDER[a.sprite.layer ?? "stage"] - LAYER_ORDER[b.sprite.layer ?? "stage"];
+        if (layer !== 0) return layer;
+        const z = (a.sprite.z ?? 0) - (b.sprite.z ?? 0);
+        return z !== 0 ? z : a.index - b.index;
+      });
 
-    // Footholds: one reusable sprite, instantiated per waypoint, varied only by
-    // transform. Thirty of these is thirty draws of one 18x11 image.
-    const stepId = scenario.assetBindings.waypointVisuals[0];
-    const step = stepId ? this.#assets.get(stepId) : null;
-    const climb = panel.climb;
-
-    route.waypoints.forEach((waypoint, index) => {
-      const at = toScreen(waypoint);
-      const reached = climb ? index <= climb.waypointIndex : false;
-      const spriteScale = (this.#height / 260) * waypoint.scale * 1.6;
-      ctx.save();
-      ctx.translate(at.x, at.y);
-      ctx.rotate((waypoint.rotationDeg * Math.PI) / 180);
-      ctx.globalAlpha = reached ? 1 : 0.72;
-      if (step) {
-        ctx.drawImage(
-          step,
-          (-step.width * spriteScale) / 2,
-          (-step.height * spriteScale) / 2,
-          step.width * spriteScale,
-          step.height * spriteScale
-        );
-      } else {
-        ctx.fillStyle = "#7a7a84";
-        ctx.fillRect(-6, -3, 12, 6);
-      }
-      ctx.restore();
-    });
-
-    // The destination, visible from the start so the climb has a point.
-    const goal = this.#assets.get(scenario.assetBindings.destinationVisual);
-    const goalAt = toScreen(route.destination);
-    if (goal) {
-      const goalScale = (this.#height / 300) * 1.7;
-      ctx.drawImage(
-        goal,
-        goalAt.x - (goal.width * goalScale) / 2,
-        goalAt.y - goal.height * goalScale,
-        goal.width * goalScale,
-        goal.height * goalScale
-      );
-    }
-
-    if (climb) this.#drawClimber(panel, climb, toScreen, beat);
-  }
-
-  #drawClimber(
-    panel: StripPanel,
-    climb: ClimbVisualState,
-    toScreen: (point: { x: number; y: number }) => { x: number; y: number },
-    beat: number
-  ): void {
-    const ctx = this.#ctx;
-    const scenario = panel.scenario;
-    if (!scenario) return;
-
-    // Effects first, so the climber lands on top of its own dust.
-    for (const effect of climb.effects) {
-      const image = this.#assets.get(effect.assetId);
-      const at = toScreen(effect.position);
-      const age = Math.max(0, Math.min(1, (beat - effect.bornAtBeat) / effect.lifeBeats));
-      const alpha = 1 - age;
+    for (const { sprite } of ordered) {
+      const image = this.#assets.get(sprite.assetId);
+      // A missing sprite leaves a visible gap and is reported in the dev panel
+      // (`AssetStore.failed`), rather than taking the frame down.
       if (!image) continue;
 
+      const scale = (sprite.scale ?? 1) * unit;
+      const w = image.width * scale;
+      const h = image.height * scale;
+      const cx = panelX + sprite.x * panelWidth;
+      const cy = (sprite.y + (sprite.offsetY ?? 0)) * this.#height;
+
       ctx.save();
-      ctx.globalAlpha = alpha * (effect.kind === "accent" ? 1 : 0.85);
-      // The contact effect settles; the accent scales in and out.
-      const pulse =
-        effect.kind === "accent" ? 0.6 + Math.sin(age * Math.PI) * 0.9 : 1 + age * 0.35;
-      const scale = (this.#height / 240) * effect.strength * pulse * 1.4;
-      const offsetY = effect.kind === "contact" ? 6 : -10;
-      ctx.drawImage(
-        image,
-        at.x - (image.width * scale) / 2,
-        at.y - (image.height * scale) / 2 + offsetY,
-        image.width * scale,
-        image.height * scale
-      );
+      ctx.globalAlpha = Math.max(0, Math.min(1, sprite.opacity ?? 1));
+      ctx.translate(cx, cy);
+      if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
+      // The anchor is also the pivot: a climber tilts about its feet, a
+      // foothold about its middle.
+      ctx.drawImage(image, -w / 2, sprite.anchor === "bottom" ? -h : -h / 2, w, h);
       ctx.restore();
     }
-
-    const pose = this.#assets.get(climb.poseAssetId);
-    const at = toScreen(climb.position);
-    const scale = (this.#height / 200) * 1.5;
-
-    ctx.save();
-    ctx.translate(at.x, at.y);
-    if (climb.wobble > 0) {
-      // Wobble: a brief lean and a nudge, returning to the same waypoint. It
-      // never costs earned progress.
-      const swing = Math.sin(climb.wobble * Math.PI * 4) * climb.wobble;
-      ctx.rotate((swing * 9 * Math.PI) / 180);
-      ctx.translate(swing * 2.5, 0);
-    }
-    if (pose) {
-      ctx.drawImage(
-        pose,
-        (-pose.width * scale) / 2,
-        -pose.height * scale + 4,
-        pose.width * scale,
-        pose.height * scale
-      );
-    } else {
-      ctx.fillStyle = "#eee6d6";
-      ctx.fillRect(-8, -16, 16, 16);
-    }
-    ctx.restore();
   }
 
   #drawLabel(panel: StripPanel, x: number, width: number): void {

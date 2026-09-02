@@ -1082,16 +1082,16 @@ export class GameApp {
       // Only the attempt that actually belongs to this slot may drive it.
       const runtime = attempt?.slotOrdinal === slot.ordinal ? attempt.runtime : null;
       return {
-        scenario: slot.scenario,
-        route: slot.scenario?.levels.get(slot.difficulty)?.route ?? null,
-        climb: runtime ? runtime.climb.state : null,
+        // Each on-screen slot is drawn by its own minigame instance, at its own
+        // attempt-relative beat -- which is negative for the panel sliding in
+        // and past the attempt length for the one sliding out.
+        scene: runtime ? runtime.minigame.renderScene(runtime.toAttemptBeat(beat)) : null,
         stars: runtime ? runtime.starMeter.stars : slot.result?.stars ?? 0,
         starProgress: runtime ? runtime.starMeter.progressToNextStar : 0,
         difficulty: slot.difficulty,
         label: slot.scenario
           ? `${slot.scenario.displayName} · L${slot.difficulty}`
           : `L${slot.difficulty}`,
-        beat: runtime ? runtime.toAttemptBeat(beat) : 0,
       };
     };
 
@@ -1187,7 +1187,7 @@ export class GameApp {
       "judgment points": score ? String(score.judgmentPoints) : "—",
       stars: attempt ? String(attempt.starMeter.stars) : "—",
       waypoint: attempt
-        ? `${attempt.climb.state.waypointIndex + 1}/${attempt.climb.waypointCount}`
+        ? `${attempt.minigame.progress.waypointIndex + 1}/${attempt.minigame.progress.waypointCount}`
         : "—",
       "energy in flight": String(this.#energy?.activeCount ?? 0),
       autoplay: this.#autoplay === "off" ? "off" : `${this.#autoplay} seed ${this.#autoplaySeed}`,

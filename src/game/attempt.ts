@@ -16,7 +16,8 @@
 import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
 import type { RunKey } from "../music/keys.js";
-import { ClimbMinigame, type ClimbEnergy } from "../scenario/minigames/climb-minigame.js";
+import type { Judged } from "../minigame/api.js";
+import { ClimbMinigame } from "../scenario/minigames/climb-minigame.js";
 import type { ScenarioDefinition, ScenarioLevelData } from "../scenario/types.js";
 import { TargetJudge, type JudgmentEvent } from "./judgment.js";
 import { AttemptScore, type ScoreSnapshot } from "./scoring.js";
@@ -37,6 +38,10 @@ export type EnergyEvent = {
   lane: number | null;
   /** Attempt-relative beat the judgment happened on. */
   beat: number;
+  /** Which note opportunity this resolved. Null for an unmatched wrong note. */
+  opportunityIndex: number | null;
+  /** What the player played. Null for a miss — nothing was played. */
+  playedMidi: number | null;
 };
 
 export type AttemptResult = {
@@ -76,11 +81,13 @@ export class AttemptRuntime {
   readonly judge: TargetJudge;
   readonly score: AttemptScore;
   readonly starMeter: StarMeter;
-  readonly climb: ClimbMinigame;
+  readonly minigame: ClimbMinigame;
 
   readonly #toBeat: (contextTime: number) => number;
   readonly #listeners: ((event: AttemptEvent) => void)[] = [];
   #nextEnergyId = 1;
+  /** Latest attempt-relative beat seen by {@link AttemptRuntime.update}. */
+  #beat = 0;
   #measuresCompleted = 0;
   #complete = false;
   #result: AttemptResult | null = null;
@@ -105,7 +112,7 @@ export class AttemptRuntime {
     this.judge = new TargetJudge({ targets: this.targets, key: options.key });
     this.score = new AttemptScore({ streakBonusEligible: level.scoring.streakBonusEligible });
     this.starMeter = new StarMeter(level.stars);
-    this.climb = new ClimbMinigame({
+    this.minigame = new ClimbMinigame({
       route: level.route,
       bindings: options.scenario.assetBindings,
       parameters: options.scenario.classParameters,
@@ -166,13 +173,15 @@ export class AttemptRuntime {
   /** Drives expiry, effect decay and completion. Safe to call every frame. */
   update(absoluteBeat: number): void {
     if (this.#complete) {
-      this.climb.update(this.toAttemptBeat(absoluteBeat));
+      this.#beat = this.toAttemptBeat(absoluteBeat);
+      this.minigame.update(this.#beat);
       return;
     }
 
     const beat = this.toAttemptBeat(absoluteBeat);
+    this.#beat = beat;
     this.judge.tick(beat);
-    this.climb.update(beat);
+    this.minigame.update(beat);
 
     const measures = Math.min(
       this.level.measurePlan.attemptMeasures,
@@ -181,7 +190,7 @@ export class AttemptRuntime {
     while (this.#measuresCompleted < measures) {
       const index = this.#measuresCompleted;
       this.#measuresCompleted += 1;
-      this.climb.onMeasureComplete(index, beat);
+      this.minigame.onMeasure(index, beat);
       this.#emit({ type: "measureComplete", measureIndex: index });
     }
 
@@ -196,11 +205,15 @@ export class AttemptRuntime {
    * headless caller delivers immediately.
    */
   deliverEnergy(energy: EnergyEvent, atBeat: number): void {
-    const payload: ClimbEnergy =
-      energy.polarity === "good"
-        ? { polarity: "good", strength: energy.cause === "perfect" ? "perfect" : "good" }
-        : { polarity: "bad", cause: energy.cause === "miss" ? "miss" : "wrong" };
-    this.climb.applyEnergy(payload, atBeat);
+    const judged: Judged = {
+      id: energy.id,
+      outcome: energy.cause,
+      opportunityIndex: energy.opportunityIndex,
+      playedMidi: energy.playedMidi,
+      lane: energy.lane,
+      beat: energy.beat,
+    };
+    this.minigame.onJudged(judged, atBeat);
   }
 
   /* ------------------------------------------------------------------ */
@@ -211,7 +224,10 @@ export class AttemptRuntime {
 
     const before = this.starMeter.stars;
     const after = this.starMeter.update(this.score.judgmentPoints);
-    if (after > before) this.#emit({ type: "starEarned", stars: after });
+    if (after > before) {
+      this.minigame.onStarEarned(after, this.#beat);
+      this.#emit({ type: "starEarned", stars: after });
+    }
 
     const energy = this.#energyFor(judgment);
     if (energy) this.#emit({ type: "energy", energy });
@@ -220,25 +236,42 @@ export class AttemptRuntime {
   #energyFor(judgment: JudgmentEvent): EnergyEvent | null {
     switch (judgment.type) {
       case "PerfectNote":
-        return this.#energy("good", "perfect", judgment.target.lane, judgment.target.startBeat);
       case "GoodNote":
-        return this.#energy("good", "good", judgment.target.lane, judgment.target.startBeat);
+        return this.#energy({
+          polarity: "good",
+          cause: judgment.type === "PerfectNote" ? "perfect" : "good",
+          lane: judgment.target.lane,
+          beat: judgment.target.startBeat,
+          opportunityIndex: judgment.target.opportunityIndex,
+          playedMidi: judgment.playedMidi,
+        });
       case "MissedNote":
-        return this.#energy("bad", "miss", judgment.target.lane, judgment.target.startBeat);
+        return this.#energy({
+          polarity: "bad",
+          cause: "miss",
+          lane: judgment.target.lane,
+          beat: judgment.target.startBeat,
+          opportunityIndex: judgment.target.opportunityIndex,
+          // A miss is a target nothing was played for.
+          playedMidi: null,
+        });
       case "WrongNote":
-        return this.#energy("bad", "wrong", judgment.lanePosition, judgment.atBeat);
+        return this.#energy({
+          polarity: "bad",
+          cause: "wrong",
+          lane: judgment.lanePosition,
+          beat: judgment.atBeat,
+          // A wrong note matched no target, so it resolves no opportunity.
+          opportunityIndex: null,
+          playedMidi: judgment.playedMidi,
+        });
       default:
         return null;
     }
   }
 
-  #energy(
-    polarity: "good" | "bad",
-    cause: EnergyCause,
-    lane: number | null,
-    beat: number
-  ): EnergyEvent {
-    return { id: this.#nextEnergyId++, polarity, cause, lane, beat };
+  #energy(fields: Omit<EnergyEvent, "id">): EnergyEvent {
+    return { id: this.#nextEnergyId++, ...fields };
   }
 
   #finish(beat: number): void {
@@ -249,7 +282,7 @@ export class AttemptRuntime {
 
     const stars = this.starMeter.update(this.score.judgmentPoints);
     const passed = stars >= 1;
-    this.climb.complete(passed, beat);
+    this.minigame.onComplete(passed, stars, beat);
 
     this.#result = {
       scenarioId: this.scenario.id,

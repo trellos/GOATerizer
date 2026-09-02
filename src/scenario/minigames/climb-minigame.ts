@@ -13,8 +13,13 @@
  * Slot ordering is part of the class contract, not a scenario detail:
  * `stepEffects[0]` is the contact effect shown where the climber lands, and
  * `stepEffects[1]` is the clean-progress accent shown for a successful note.
+ *
+ * It implements {@link Minigame} and reaches the screen only through
+ * {@link ClimbMinigame.renderScene}: the host knows nothing about waypoints,
+ * poses or wobble, and this class knows nothing about canvases or pixels.
  */
 
+import { decay, type Judged, type Minigame, type Scene, type Sprite } from "../../minigame/api.js";
 import type {
   ClimbAssetBindings,
   ClimbClassParameters,
@@ -24,7 +29,7 @@ import type {
 
 export type ClimbEffectKind = "contact" | "accent";
 
-export type ClimbEffect = {
+type ClimbEffect = {
   id: number;
   kind: ClimbEffectKind;
   assetId: string;
@@ -34,29 +39,6 @@ export type ClimbEffect = {
   bornAtBeat: number;
   lifeBeats: number;
 };
-
-export type ClimbVisualState = {
-  /** Successful notes so far. Attempt-global; never reset by a measure. */
-  successfulNotes: number;
-  /** -1 before the first successful note, then 0..waypoints.length-1. */
-  waypointIndex: number;
-  position: RoutePoint;
-  scale: number;
-  rotationDeg: number;
-  /** Which `climberPoses[]` entry is showing. */
-  poseAssetId: string;
-  /** 0..1, decaying. Drives the Wobble bad-note reaction. */
-  wobble: number;
-  finished: boolean;
-  /** True once the attempt ended without passing. */
-  frozen: boolean;
-  effects: readonly ClimbEffect[];
-};
-
-/** What the class needs to know about one judged note. */
-export type ClimbEnergy =
-  | { polarity: "good"; strength: "perfect" | "good" }
-  | { polarity: "bad"; cause: "wrong" | "miss" };
 
 export type ClimbOptions = {
   route: RouteData;
@@ -69,7 +51,30 @@ const EFFECT_LIFE_BEATS = 0.55;
 /** How long a Wobble takes to settle, in beats. */
 const WOBBLE_DECAY_BEATS = 0.7;
 
-export class ClimbMinigame {
+/*
+ * Sprite sizing and registration.
+ *
+ * `Sprite.scale` multiplies the asset's natural size, and the host scales that
+ * with the panel. These constants carry over the per-sprite-type sizing the
+ * strip renderer used to hold, so the picture is unchanged; the y nudges are
+ * the small registration offsets that sink the climber's feet into the rock and
+ * lift the accent clear of the contact puff, expressed in normalised panel
+ * units rather than as fixed pixels so they hold at any panel size.
+ */
+const CLIMBER_SCALE = 1.5;
+const CLIMBER_SINK = 0.009;
+const FOOTHOLD_SCALE = 1.231;
+const FOOTHOLD_DIM = 0.72;
+const GOAL_SCALE = 1.133;
+const EFFECT_SCALE = 1.167;
+const CONTACT_DROP = 0.013;
+const ACCENT_LIFT = -0.022;
+/** Sideways lean during a Wobble, in normalised panel units. */
+const WOBBLE_SHIFT = 0.0035;
+/** Degrees of lean at full Wobble. */
+const WOBBLE_TILT = 9;
+
+export class ClimbMinigame implements Minigame {
   readonly #route: RouteData;
   readonly #bindings: ClimbAssetBindings;
   readonly #parameters: ClimbClassParameters;
@@ -90,59 +95,45 @@ export class ClimbMinigame {
     this.#parameters = options.parameters;
   }
 
-  get parameters(): ClimbClassParameters {
-    return this.#parameters;
-  }
-
-  get waypointCount(): number {
-    return this.#route.waypoints.length;
-  }
-
-  get destination(): RoutePoint {
-    return this.#route.destination;
-  }
-
-  get showDestination(): boolean {
-    return this.#parameters.showDestinationFromStart || this.#finished;
-  }
-
-  get state(): ClimbVisualState {
-    const waypoint = this.#route.waypoints[this.#waypointIndex];
-    const atStart = this.#waypointIndex < 0;
-    const position = this.#finished
-      ? this.#route.destination
-      : atStart
-        ? this.#route.startPosition
-        : { x: waypoint?.x ?? 0, y: waypoint?.y ?? 0 };
-
+  /**
+   * Route progress and terminal state, for the developer panel.
+   *
+   * Deliberately not the render path: the screen is fed by
+   * {@link ClimbMinigame.renderScene} alone, and nothing about this is drawn.
+   */
+  get progress(): {
+    successfulNotes: number;
+    waypointIndex: number;
+    waypointCount: number;
+    finished: boolean;
+    frozen: boolean;
+  } {
     return {
       successfulNotes: this.#successfulNotes,
       waypointIndex: this.#waypointIndex,
-      position,
-      scale: waypoint?.scale ?? 1,
-      rotationDeg: waypoint?.rotationDeg ?? 0,
-      poseAssetId: this.#finished
-        ? this.#bindings.finishPose
-        : (this.#bindings.climberPoses[this.#poseIndex] ?? this.#bindings.climberPoses[0] ?? ""),
-      wobble: this.#wobbleAmount(),
+      waypointCount: this.#route.waypoints.length,
       finished: this.#finished,
       frozen: this.#frozen,
-      effects: this.#effects,
     };
   }
 
+  /* ------------------------------------------------------------------ */
+  /* Minigame                                                            */
+  /* ------------------------------------------------------------------ */
+
   /**
-   * One judged note's energy.
+   * One judged note.
    *
    * Perfect and Good advance **identically** — both are successful notes, and
    * the difference between them is score, not distance. Nothing here advances
-   * two waypoints, ever.
+   * two waypoints, ever. Only the outcome is read; a climb does not care which
+   * pitch was played or where it sat in the octave.
    */
-  applyEnergy(energy: ClimbEnergy, beat: number): void {
+  onJudged(judged: Judged, beat: number): void {
     this.#beat = beat;
     if (this.#finished || this.#frozen) return;
 
-    if (energy.polarity === "bad") {
+    if (judged.outcome === "miss" || judged.outcome === "wrong") {
       // Wobble: a brief lean, then back to exactly the same waypoint. Earned
       // progress is never taken away.
       if (this.#parameters.badNotePolicy === "Wobble") this.#wobbleStartedAtBeat = beat;
@@ -163,19 +154,36 @@ export class ClimbMinigame {
     }
     if (accent) {
       // Stronger and cleaner for Perfect, smaller and weaker for Good.
-      this.#spawnEffect("accent", accent, landing, energy.strength === "perfect" ? 1 : 0.55, beat);
+      this.#spawnEffect("accent", accent, landing, judged.outcome === "perfect" ? 1 : 0.55, beat);
     }
   }
 
   /** Decays transient state. Purely visual; nothing here changes progress. */
   update(beat: number): void {
     this.#beat = beat;
-    this.#effects = this.#effects.filter(
-      (effect) => beat - effect.bornAtBeat < effect.lifeBeats
-    );
+    this.#effects = this.#effects.filter((effect) => beat - effect.bornAtBeat < effect.lifeBeats);
     if (this.#wobbleStartedAtBeat !== null && beat - this.#wobbleStartedAtBeat > WOBBLE_DECAY_BEATS) {
       this.#wobbleStartedAtBeat = null;
     }
+  }
+
+  /**
+   * Measure boundary. Rocky Ascent spans all four measures continuously, so
+   * this is a no-op for it — but the hook is where a `resetBetweenMeasures`
+   * climb scenario would restart its visual cycle without touching
+   * attempt-global progress.
+   */
+  onMeasure(_measureIndex: number, beat: number): void {
+    if (!this.#parameters.resetBetweenMeasures) return;
+    this.#waypointIndex = -1;
+    this.#effects = [];
+    this.#wobbleStartedAtBeat = null;
+    this.#beat = beat;
+  }
+
+  /** A climb is indifferent to the star tier; the route is the whole story. */
+  onStarEarned(_stars: number, beat: number): void {
+    this.#beat = beat;
   }
 
   /**
@@ -185,7 +193,7 @@ export class ClimbMinigame {
    * freeze at the furthest waypoint actually earned — no bespoke failure art,
    * because not getting there is the punishment.
    */
-  complete(passed: boolean, beat: number): void {
+  onComplete(passed: boolean, _stars: number, beat: number): void {
     this.#beat = beat;
     if (passed) {
       this.#finished = true;
@@ -196,17 +204,104 @@ export class ClimbMinigame {
   }
 
   /**
-   * Measure boundary. Rocky Ascent spans all four measures continuously, so
-   * this is a no-op for it — but the hook is where a `resetBetweenMeasures`
-   * climb scenario would restart its visual cycle without touching
-   * attempt-global progress.
+   * The panel: the route's footholds, the destination, any live effects, and
+   * the climber on top of its own dust.
+   *
+   * Every foothold keeps a stable key across frames, so the host can tell a
+   * reached one from an unreached one without the scene carrying that meaning
+   * itself, and the climber's key never changes as it advances — which is what
+   * would let the host interpolate between footholds later, if the design ever
+   * wants the goat to slide rather than step.
    */
-  onMeasureComplete(_measureIndex: number, beat: number): void {
-    if (!this.#parameters.resetBetweenMeasures) return;
-    this.#waypointIndex = -1;
-    this.#effects = [];
-    this.#wobbleStartedAtBeat = null;
-    this.#beat = beat;
+  renderScene(beat: number): Scene {
+    const sprites: Sprite[] = [];
+
+    const stepAsset = this.#bindings.waypointVisuals[0];
+    if (stepAsset) {
+      this.#route.waypoints.forEach((waypoint, index) => {
+        sprites.push({
+          key: `step-${index}`,
+          assetId: stepAsset,
+          x: waypoint.x,
+          y: waypoint.y,
+          scale: waypoint.scale * FOOTHOLD_SCALE,
+          rotationDeg: waypoint.rotationDeg,
+          opacity: index <= this.#waypointIndex ? 1 : FOOTHOLD_DIM,
+          layer: "stage",
+          z: index,
+        });
+      });
+    }
+
+    if (this.showDestination) {
+      sprites.push({
+        key: "goal",
+        assetId: this.#bindings.destinationVisual,
+        x: this.#route.destination.x,
+        y: this.#route.destination.y,
+        scale: GOAL_SCALE,
+        anchor: "bottom",
+        layer: "stage",
+        z: this.#route.waypoints.length + 1,
+      });
+    }
+
+    // Effects first, so the climber lands on top of its own dust.
+    for (const effect of this.#effects) {
+      const life = decay(effect.bornAtBeat, effect.lifeBeats, beat);
+      const age = 1 - life;
+      // The contact effect settles outward; the accent scales in and back out.
+      const pulse =
+        effect.kind === "accent" ? 0.6 + Math.sin(age * Math.PI) * 0.9 : 1 + age * 0.35;
+      sprites.push({
+        key: `fx-${effect.id}`,
+        assetId: effect.assetId,
+        x: effect.position.x,
+        y: effect.position.y,
+        scale: effect.strength * pulse * EFFECT_SCALE,
+        opacity: life * (effect.kind === "accent" ? 1 : 0.85),
+        offsetY: effect.kind === "contact" ? CONTACT_DROP : ACCENT_LIFT,
+        layer: "actor",
+        z: 0,
+      });
+    }
+
+    const wobble = this.#wobbleAmount(beat);
+    // A brief lean and a nudge, returning to exactly the same waypoint.
+    const swing = wobble > 0 ? Math.sin(wobble * Math.PI * 4) * wobble : 0;
+    const at = this.#position();
+    sprites.push({
+      key: "climber",
+      assetId: this.#poseAssetId(),
+      x: at.x + swing * WOBBLE_SHIFT,
+      y: at.y,
+      scale: CLIMBER_SCALE,
+      rotationDeg: swing * WOBBLE_TILT,
+      anchor: "bottom",
+      offsetY: CLIMBER_SINK,
+      layer: "actor",
+      z: 1,
+    });
+
+    return { background: this.#bindings.background, sprites };
+  }
+
+  /* ------------------------------------------------------------------ */
+
+  get showDestination(): boolean {
+    return this.#parameters.showDestinationFromStart || this.#finished;
+  }
+
+  #position(): RoutePoint {
+    if (this.#finished) return this.#route.destination;
+    if (this.#waypointIndex < 0) return this.#route.startPosition;
+    const waypoint = this.#route.waypoints[this.#waypointIndex];
+    return { x: waypoint?.x ?? 0, y: waypoint?.y ?? 0 };
+  }
+
+  #poseAssetId(): string {
+    if (this.#finished) return this.#bindings.finishPose;
+    return this.#bindings.climberPoses[this.#poseIndex] ?? this.#bindings.climberPoses[0] ?? "";
   }
 
   #spawnEffect(
@@ -230,9 +325,8 @@ export class ClimbMinigame {
     ];
   }
 
-  #wobbleAmount(): number {
+  #wobbleAmount(beat = this.#beat): number {
     if (this.#wobbleStartedAtBeat === null) return 0;
-    const elapsed = this.#beat - this.#wobbleStartedAtBeat;
-    return Math.max(0, 1 - elapsed / WOBBLE_DECAY_BEATS);
+    return decay(this.#wobbleStartedAtBeat, WOBBLE_DECAY_BEATS, beat);
   }
 }
