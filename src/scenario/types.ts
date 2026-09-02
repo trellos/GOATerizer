@@ -16,7 +16,7 @@
  */
 
 import type { MinigameId, NoteDuration } from "../minigame/api.js";
-import type { ScaleDegreeRef } from "../music/degrees.js";
+import type { AuthoredDegreeRef } from "../music/degrees.js";
 
 /**
  * Re-exported: a note's written duration is part of the minigame contract, not
@@ -47,10 +47,12 @@ export type PromptEvent = {
   /** 0-based beat position inside its measure. */
   beatWithinMeasure: number;
   /**
-   * Null for a rest. Already normalised out of the authored octave-band token,
-   * so nothing downstream parses strings.
+   * Null for a rest. Already normalised out of the authored token, so nothing
+   * downstream parses strings. Either vocabulary: a diatonic octave-band ref,
+   * or a pentatonic one that `game/targets.ts` resolves once the run's mode is
+   * known (`music/degrees.ts`).
    */
-  degree: ScaleDegreeRef | null;
+  degree: AuthoredDegreeRef | null;
 };
 
 /**

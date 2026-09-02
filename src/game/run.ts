@@ -52,6 +52,14 @@ export type RunOptions = {
    * grinding up to it. Normal play always uses {@link DIFFICULTY_SEQUENCE}.
    */
   difficultySequence?: readonly number[];
+  /**
+   * Fills every slot this scenario is eligible for with it. **Developer use
+   * only** — the browser suite and a designer looking at one scenario need
+   * to know which one they will get, and with several scenarios authoring the
+   * same difficulty the pick is otherwise random. Slots the scenario does not
+   * author still fill normally.
+   */
+  preferScenarioId?: string;
 };
 
 export class RunState {
@@ -66,7 +74,8 @@ export class RunState {
     this.bpm = options.bpm;
     this.slots = fillSlots(
       options.difficultySequence ?? DIFFICULTY_SEQUENCE,
-      options.random ?? Math.random
+      options.random ?? Math.random,
+      options.preferScenarioId ?? null
     );
   }
 
@@ -150,13 +159,25 @@ export class RunState {
  * any eligible scenario is still unused. There is deliberately no class
  * balancing (GDD §3.1).
  */
-function fillSlots(sequence: readonly number[], random: () => number): RunSlot[] {
+function fillSlots(
+  sequence: readonly number[],
+  random: () => number,
+  preferScenarioId: string | null
+): RunSlot[] {
   const used = new Set<string>();
 
   return sequence.map((difficulty, ordinal) => {
     const eligible = scenariosForDifficulty(difficulty);
     if (eligible.length === 0) {
       return { ordinal, difficulty, scenario: null, result: null };
+    }
+
+    // Dev-only preference, ahead of the reuse rule: the point is to see one
+    // scenario every slot it can fill, not to see it once.
+    const preferred = eligible.find((scenario) => scenario.id === preferScenarioId);
+    if (preferred) {
+      used.add(preferred.id);
+      return { ordinal, difficulty, scenario: preferred, result: null };
     }
 
     const unused = eligible.filter((scenario) => !used.has(scenario.id));

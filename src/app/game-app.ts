@@ -175,6 +175,8 @@ export class GameApp {
    * that is no longer always Rocky Ascent.
    */
   #devLevel: number | null = null;
+  /** `?dev=1&scenario=<id>`: fill every slot that scenario authors with it. */
+  #devScenario: string | null = null;
   #autoplay: AutoplayMode = "off";
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
@@ -423,6 +425,13 @@ export class GameApp {
     if (this.#devMode && Number.isInteger(level) && level >= 1 && level <= 7) {
       this.#devLevel = level;
     }
+
+    // `?dev=1&scenario=<id>` pins the pick where more than one scenario
+    // authors a difficulty. An unknown id is ignored rather than failing the
+    // run: the registry decides what exists, and the dev panel shows what was
+    // actually picked.
+    const requestedScenario = params.get("scenario");
+    if (this.#devMode && requestedScenario) this.#devScenario = requestedScenario;
 
     const requestedInput = params.get("input");
     if (this.#devMode && (requestedInput === "test" || requestedInput === "synth")) {
@@ -708,6 +717,7 @@ export class GameApp {
       ...(this.#devLevel !== null
         ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
         : {}),
+      ...(this.#devScenario !== null ? { preferScenarioId: this.#devScenario } : {}),
     });
     this.#current = null;
     this.#next = null;

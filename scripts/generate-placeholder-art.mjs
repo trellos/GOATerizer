@@ -42,6 +42,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import * as frontman from "./lib/frontman-art.mjs";
 import {
   background,
   crag,
@@ -90,6 +91,45 @@ for (const { dir, idPrefix, seed } of FAMILIES) {
     // scenario that omits the slot simply gets the host's default note bars.
     [`note_${idPrefix}_ledge`]: () => ledge(),
     [`note_${idPrefix}_crag`]: () => crag(),
+  };
+
+  mkdirSync(outDir, { recursive: true });
+  for (const [id, make] of Object.entries(assets)) {
+    const image = make();
+    writeFileSync(path.join(outDir, `${id}.png`), image.toPng());
+    console.log(`${dir}/${id}.png  ${image.width}x${image.height}`);
+  }
+  console.log(`Wrote ${Object.keys(assets).length} placeholder assets to ${path.relative(process.cwd(), outDir)}\n`);
+}
+
+/*
+ * Goat Frontman — the one `PerformMinigame` scenario. A different theme (a
+ * stage under coloured light) with its own drawing functions in
+ * `lib/frontman-art.mjs`, which borrow the Rocky goat body so the frontman is
+ * visibly the same animal. The asset ids are the canonical ones from
+ * `GOATerizer_Scenario_Asset_Slot_Bindings.md` §3 plus the two timeline
+ * note-art pieces the class binds.
+ */
+{
+  const dir = "goat-frontman";
+  const outDir = path.join(SCENARIOS_ROOT, dir);
+  const assets = {
+    bg_goat_frontman: () => frontman.background(),
+    goat_goat_frontman_perform_01: () => frontman.frontmanPose(0),
+    goat_goat_frontman_perform_02: () => frontman.frontmanPose(1),
+    goat_goat_frontman_perform_03: () => frontman.frontmanPose(2),
+    goat_goat_frontman_perform_04: () => frontman.frontmanPose(3),
+    goat_goat_frontman_bend: () => frontman.frontmanFlourish("bend"),
+    goat_goat_frontman_slur: () => frontman.frontmanFlourish("slur"),
+    goat_goat_frontman_finish: () => frontman.frontmanFinish(),
+    prop_goat_frontman_signature: () => frontman.micStand(),
+    react_goat_frontman_neutral: () => frontman.crowdGoat("neutral"),
+    react_goat_frontman_impressed: () => frontman.crowdGoat("impressed"),
+    fx_goat_frontman_swoosh: () => frontman.swoosh(),
+    fx_goat_frontman_sparkle: () => frontman.sparkle(),
+    fx_goat_frontman_burst: () => frontman.burst(),
+    note_goat_frontman_light: () => frontman.lightBar(),
+    note_goat_frontman_star: () => frontman.flourishStar(),
   };
 
   mkdirSync(outDir, { recursive: true });

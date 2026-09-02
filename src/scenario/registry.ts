@@ -14,6 +14,8 @@
 
 import { registerMinigame } from "../minigame/registry.js";
 import { CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
+import { PERFORM_MINIGAME } from "./minigames/perform-minigame.js";
+import goatFrontmanJson from "../../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
 import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
@@ -49,6 +51,7 @@ function urlsIn(scenarioDir: string): (assetId: string) => string {
  * which minigames it ships too.
  */
 registerMinigame(CLIMB_MINIGAME);
+registerMinigame(PERFORM_MINIGAME);
 
 export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
   rockyAscentJson,
@@ -77,11 +80,22 @@ export const ROCKY_DESCENT_HIGH: ScenarioDefinition = loadScenario(
   urlsIn("rocky-descent-high")
 );
 
+/**
+ * The one `PerformMinigame` scenario: a goat frontman working a crowd of goats
+ * that grows with every flourish it lands. Authored in pentatonic degrees —
+ * see `scripts/author-goat-frontman.mjs` for the notation.
+ */
+export const GOAT_FRONTMAN: ScenarioDefinition = loadScenario(
+  goatFrontmanJson,
+  urlsIn("goat-frontman")
+);
+
 export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
   ROCKY_DESCENT_HIGH,
+  GOAT_FRONTMAN,
 ];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {

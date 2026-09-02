@@ -23,9 +23,10 @@ import {
   registeredMinigameIds,
   registerMinigame,
 } from "../src/minigame/registry.js";
-import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
+import { formatDegreeToken, laneIndexOf, LANE_COUNT, resolveDegree } from "../src/music/degrees.js";
 import { loadScenario } from "../src/scenario/load.js";
 import {
+  GOAT_FRONTMAN,
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
@@ -36,14 +37,17 @@ import {
 } from "../src/scenario/registry.js";
 
 describe("scenario registry", () => {
-  it("holds all four Rocky-family scenarios, each a ClimbMinigame in the Scale family", () => {
-    expect(SCENARIOS).toHaveLength(4);
+  it("holds the four Rocky-family climbs and the one performance", () => {
+    expect(SCENARIOS).toHaveLength(5);
     for (const scenario of SCENARIOS) {
+      if (scenario === GOAT_FRONTMAN) continue;
       expect(scenario.minigameId).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
+    expect(GOAT_FRONTMAN.minigameId).toBe("PerformMinigame");
+    expect(GOAT_FRONTMAN.family).toBe("Blues Lick");
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
-      new Set(["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"])
+      new Set(["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high", "goat_frontman"])
     );
   });
 
@@ -63,10 +67,10 @@ describe("scenario registry", () => {
   });
 
   it.each([
-    [1, ["rocky_ascent", "rocky_descent"]],
-    [2, ["rocky_ascent", "rocky_descent"]],
-    [3, ["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
-    [4, ["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
+    [1, ["goat_frontman", "rocky_ascent", "rocky_descent"]],
+    [2, ["goat_frontman", "rocky_ascent", "rocky_descent"]],
+    [3, ["goat_frontman", "rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
+    [4, ["goat_frontman", "rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"]],
     [5, ["rocky_ascent_high", "rocky_descent_high"]],
     [6, ["rocky_ascent_high", "rocky_descent_high"]],
     [7, []],
@@ -81,19 +85,24 @@ describe("scenario registry", () => {
     expect(scenariosForDifficulty(7)).toHaveLength(0);
   });
 
-  it("authors every target inside the one-octave pitch space", () => {
+  it("authors every target inside the one-octave pitch space, in either mode", () => {
     for (const scenario of SCENARIOS) {
       for (const [difficulty, level] of scenario.levels) {
         for (const event of level.prompt) {
           if (!event.degree) continue;
-          const lane = laneIndexOf(event.degree);
-          expect(
-            lane,
-            `${scenario.id} L${difficulty} authors lane ${lane}`
-          ).toBeLessThan(LANE_COUNT);
-          // Band 1 is the octave root and nothing else — a `b3` in a scenario
-          // file would mean the two-octave vocabulary crept back in.
-          if (event.degree.octaveBand === 1) expect(event.degree.degree).toBe(1);
+          // A pentatonic token only becomes a lane once the mode is known, and
+          // it has to be a real lane in both.
+          for (const mode of ["major", "minor"] as const) {
+            const degree = resolveDegree(event.degree, mode);
+            const lane = laneIndexOf(degree);
+            expect(
+              lane,
+              `${scenario.id} L${difficulty} authors lane ${lane} in ${mode}`
+            ).toBeLessThan(LANE_COUNT);
+            // Band 1 is the octave root and nothing else — a `b3` in a scenario
+            // file would mean the two-octave vocabulary crept back in.
+            if (degree.octaveBand === 1) expect(degree.degree).toBe(1);
+          }
         }
       }
     }
@@ -131,9 +140,11 @@ describe("scenario registry", () => {
  * rather than halfway through a render call.
  */
 describe("minigame registry", () => {
-  it("registers the climb minigame by importing the scenario library", () => {
+  it("registers the climb and perform minigames by importing the scenario library", () => {
     expect(registeredMinigameIds()).toContain("ClimbMinigame");
+    expect(registeredMinigameIds()).toContain("PerformMinigame");
     expect(minigameById("ClimbMinigame")?.apiVersion).toBe(MINIGAME_API_VERSION);
+    expect(minigameById("PerformMinigame")?.apiVersion).toBe(MINIGAME_API_VERSION);
   });
 
   it("refuses a scenario whose minigame nobody registered, and says which exist", () => {

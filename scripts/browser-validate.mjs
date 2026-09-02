@@ -288,7 +288,10 @@ try {
 
   await page.addInitScript(MASTER_TAP);
 
-  await page.goto(`${BASE}/?dev=1&input=test`, { waitUntil: "networkidle" });
+  // `scenario=rocky_ascent` pins the pick: this part reads climb-specific dev
+  // rows and asserts a Rocky-family scenario, and Goat Frontman also authors
+  // L1 and L2 now.
+  await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(SHOTS, "01-start.png") });
   check("start screen renders", await page.isVisible("#start-play"));
   check(
@@ -599,7 +602,9 @@ try {
     [4, "09-route-l4.png"],
   ]) {
     const shot = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    await shot.goto(`${BASE}/?dev=1&input=test&level=${level}`, { waitUntil: "networkidle" });
+    await shot.goto(`${BASE}/?dev=1&input=test&level=${level}&scenario=rocky_ascent`, {
+      waitUntil: "networkidle",
+    });
     await shot.click("#start-play");
     await shot.waitForTimeout(1500);
     await shot.click("#pregame-play");
@@ -747,7 +752,7 @@ try {
   const tiers = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const tierErrors = [];
   tiers.on("pageerror", (error) => tierErrors.push(String(error)));
-  await tiers.goto(`${BASE}/?dev=1&input=test&autoplay=25&seed=7&level=3`, {
+  await tiers.goto(`${BASE}/?dev=1&input=test&autoplay=25&seed=7&level=3&scenario=rocky_ascent`, {
     waitUntil: "networkidle",
   });
   await tiers.click("#start-play");
@@ -848,6 +853,43 @@ try {
   );
   check("no page errors when switching source mid-run", livePageErrors.length === 0, livePageErrors.join(" | "));
   await livePage.close();
+
+  /* ==================================================================== */
+  /* Part 7 — Goat Frontman: a flourish draws a crowd, and more of one at  */
+  /*          a higher level                                                */
+  /* ==================================================================== */
+
+  const crowdAt = {};
+  for (const [level, file] of [
+    [1, "10-frontman-l1.png"],
+    [4, "11-frontman-l4.png"],
+  ]) {
+    const stage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const stageErrors = [];
+    stage.on("pageerror", (error) => stageErrors.push(String(error)));
+    await stage.goto(`${BASE}/?dev=1&input=test&level=${level}&scenario=goat_frontman`, {
+      waitUntil: "networkidle",
+    });
+    await stage.click("#start-play");
+    await stage.waitForTimeout(1500);
+    await stage.click("#pregame-play");
+    await stage.click("#dev-autoplay-perfect");
+
+    const scenarioName = await waitForDev(stage, "scenario", (value) => /^Goat Frontman L\d$/.test(value ?? ""));
+    check(`L${level} run is Goat Frontman when asked for it`, scenarioName === `Goat Frontman L${level}`, scenarioName ?? "");
+
+    // Two flourishes in: the crowd has started arriving and the phrase is
+    // still ahead of the performer.
+    const crowd = await waitForDev(stage, "crowd", (value) => Number(value ?? 0) >= 2, 30000);
+    crowdAt[level] = Number(crowd ?? 0);
+    check(`L${level}: flourishes draw a crowd`, crowdAt[level] >= 2, `crowd ${crowd}`);
+    await stage.evaluate(() => document.getElementById("dev-panel")?.setAttribute("hidden", ""));
+    await stage.waitForTimeout(150);
+    await stage.screenshot({ path: path.join(SHOTS, file) });
+    check(`no page errors on Goat Frontman L${level}`, stageErrors.length === 0, stageErrors.join(" | "));
+    await stage.close();
+  }
+  note("compare 10-frontman-l1.png and 11-frontman-l4.png: the L4 crowd arrives six goats a flourish");
 } finally {
   await browser.close();
   server.kill();
