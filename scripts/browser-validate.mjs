@@ -160,6 +160,46 @@ async function launchBrowser(args) {
  * covers the right-hand third of the frame, and its buttons are still needed
  * after the shot.
  */
+/**
+ * Is the scenario backdrop actually on screen, or merely painted?
+ *
+ * `canvasHasInk` reads the bitmap, so it passes just as happily when the
+ * backdrop is drawn and then covered by something opaque -- which is a real,
+ * reachable state: the whole overlay layout rests on
+ * `#screen-game[data-overlay="true"]` making `.timeline-pane` transparent,
+ * while `.timeline-pane`'s own rule paints it `var(--panel)`. Lose either and
+ * the backdrop is drawn perfectly and seen by nobody.
+ *
+ * The computed background is what binds this. `elementFromPoint` alone does
+ * not: the pane carries `pointer-events: none` in overlay mode, so hit testing
+ * passes straight through an opaque pane to the canvas underneath. The point
+ * sampling is the second half, for a covering element that thinking about one
+ * CSS rule would not anticipate.
+ */
+async function backdropIsVisible(page) {
+  return page.evaluate(() => {
+    const screen = document.getElementById("screen-game");
+    const pane = document.querySelector("#screen-game .timeline-pane");
+    const canvas = document.getElementById("scenario-canvas");
+    if (!screen || !pane || !(canvas instanceof HTMLCanvasElement)) return false;
+    if (screen.dataset["overlay"] !== "true") return false;
+
+    const background = getComputedStyle(pane).backgroundColor;
+    if (!/^(transparent$|rgba\(0, 0, 0, 0\)$)/.test(background)) return false;
+
+    // The dev panel legitimately covers the right-hand edge, so sample the left
+    // two thirds.
+    const box = canvas.getBoundingClientRect();
+    for (let fy = 0.2; fy < 0.9; fy += 0.15) {
+      for (let fx = 0.1; fx < 0.65; fx += 0.15) {
+        const top = document.elementFromPoint(box.x + box.width * fx, box.y + box.height * fy);
+        if (!top || top.id !== "scenario-canvas") return false;
+      }
+    }
+    return true;
+  });
+}
+
 async function shotWithoutDevPanel(page, file) {
   const panel = page.locator("#dev-panel");
   await panel.evaluate((element) => element.setAttribute("hidden", ""));
@@ -544,31 +584,7 @@ try {
    * It is kept as the second half because it catches a covering element that
    * the first half would not think to look at.
    */
-  check(
-    "the backdrop is visible, not merely painted",
-    await page.evaluate(() => {
-      const screen = document.getElementById("screen-game");
-      const pane = document.querySelector("#screen-game .timeline-pane");
-      const canvas = document.getElementById("scenario-canvas");
-      if (!screen || !pane || !(canvas instanceof HTMLCanvasElement)) return false;
-      if (screen.dataset["overlay"] !== "true") return false;
-
-      // Transparent in every notation a browser might compute it to.
-      const background = getComputedStyle(pane).backgroundColor;
-      if (!/^(transparent$|rgba\(0, 0, 0, 0\)$)/.test(background)) return false;
-
-      // Nothing opaque sitting on top of the backdrop's own area. The dev panel
-      // legitimately covers the right-hand edge, so sample the left two thirds.
-      const box = canvas.getBoundingClientRect();
-      for (let fy = 0.2; fy < 0.9; fy += 0.15) {
-        for (let fx = 0.1; fx < 0.65; fx += 0.15) {
-          const top = document.elementFromPoint(box.x + box.width * fx, box.y + box.height * fy);
-          if (!top || top.id !== "scenario-canvas") return false;
-        }
-      }
-      return true;
-    })
-  );
+  check("the backdrop is visible, not merely painted", await backdropIsVisible(page));
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
@@ -701,6 +717,11 @@ try {
       `crushed/missed ${wrong}`
     );
     check("the timeline is still drawing the performer", (await canvasHasInk(crush, "game-canvas")) > 200);
+    check("the beach backdrop is drawing", (await canvasHasInk(crush, "scenario-canvas")) > 200);
+    // Asserted per family, not once: the overlay layout is shared, but a
+    // screenshot of one scenario is no evidence about another, and mistaking a
+    // stale render of this screen for a real regression cost an hour.
+    check("the beach backdrop is visible, not merely painted", await backdropIsVisible(crush));
     await crush.close();
   }
 
