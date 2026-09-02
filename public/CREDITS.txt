@@ -1,0 +1,15 @@
+GOATerizer — third-party art credits
+
+This file ships with the build (everything under public/ is served as-is) so
+that CC-BY attribution travels with the game itself, not just with the
+repository's docs. Full provenance for every asset — including the CC0 ones,
+which do not require this file but are recorded anyway — lives in
+docs/assets/ASSET_SOURCES.md.
+
+Goat Frontman — crowd goat (react_goat_frontman_neutral.png,
+react_goat_frontman_impressed.png):
+
+  "Mountain Goat Sprites" by Sevarihk
+  https://opengameart.org/content/mountain-goat-sprites
+  License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  Used cropped and downsampled; no colour was changed.

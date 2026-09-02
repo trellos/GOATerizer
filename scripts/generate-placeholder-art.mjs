@@ -123,8 +123,8 @@ for (const { dir, idPrefix, seed } of FAMILIES) {
     goat_goat_frontman_slur: () => frontman.frontmanFlourish("slur"),
     goat_goat_frontman_finish: () => frontman.frontmanFinish(),
     prop_goat_frontman_signature: () => frontman.micStand(),
-    react_goat_frontman_neutral: () => frontman.crowdGoat("neutral"),
-    react_goat_frontman_impressed: () => frontman.crowdGoat("impressed"),
+    // react_goat_frontman_neutral and _impressed are shipped real art now
+    // (docs/assets/ASSET_SOURCES.md) — deliberately not regenerated here.
     fx_goat_frontman_swoosh: () => frontman.swoosh(),
     fx_goat_frontman_sparkle: () => frontman.sparkle(),
     fx_goat_frontman_burst: () => frontman.burst(),
