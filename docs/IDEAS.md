@@ -201,6 +201,29 @@ clamped and does not cross.
 Two other things also cross: the impact ring, which is a 1–2px stroke and
 probably fine, and the streak sparks.
 
+### The art network policy changed, and two recorded facts went stale with it
+
+`docs/assets/ASSET_SOURCES.md` states that `itch.io` and `opengameart.org` are
+"refused by the network policy", and that is the stated reason every shipped
+asset is drawn by `scripts/generate-placeholder-art.mjs` rather than sourced.
+Re-tested 2026-09-02: both return 200, files download, licence pages read. The
+paragraph is load-bearing for how someone reads that whole file, so it wants a
+correction and a date rather than a quiet deletion.
+
+Found while re-verifying the recorded swap-in list, which turned up a second
+thing: **`spring_goat_ram` is not a quadruped goat.** The plan on record is to
+use "frames 1-4 of `goat or ram_strip5.png` as the pose cycle" for
+`goat_rocky_ascent_advance_*`. Downloaded and viewed, the strip is a bipedal
+armoured ram throwing an axe, 55x51. Swapping it in as recorded puts an
+axe-throwing goat-man on the climbing bars. The art is good and wants using —
+as a fighting hero, not a climber — and the quadruped the Rocky swap actually
+wants is Sevarihk's Mountain Goat pack, at the cost of CC-BY attribution
+instead of CC0.
+
+Both sit behind `docs/game-design/PROPOSED_Next_Families.md` (DECISION-045),
+which is where the re-verification was done and where the full provenance table
+lives.
+
 ## Closed
 
 ### The gate sets itself, as early as there is signal — built, 2026-08-31 (DECISION-035)
