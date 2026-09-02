@@ -195,12 +195,12 @@ describe("a whole attempt", () => {
       () =>
         new AttemptRuntime({
           scenario: ROCKY_ASCENT,
-          difficulty: 6,
+          difficulty: 8,
           key: KEY,
           startBeat: 0,
           toBeat: (t) => t,
         })
-    ).toThrow(/no authored level 6/);
+    ).toThrow(/no authored level 8/);
   });
 });
 
@@ -249,7 +249,7 @@ describe("run shell", () => {
     );
   });
 
-  it("ends the run at the first slot nothing authors, as a content limit", () => {
+  it("plays every slot out now that the library authors the whole ladder", () => {
     const run = new RunState({ key: KEY, bpm: BPM, random: () => 0 });
     const pass = (stars: number): AttemptResult => ({
       scenarioId: run.currentSlot!.scenario!.id,
@@ -266,18 +266,20 @@ describe("run shell", () => {
       bestStreak: 1,
     });
 
-    // DIFFICULTY_SEQUENCE is [1,2,3,4,2,3,4,5,3,4,5,6,4,5,6,7]. With Rocky
-    // Ascent High and Rocky Descent High registered, every difficulty up to 6
-    // is authored by something -- slots 0..14 are all difficulties 1..6, and
-    // only the final slot (difficulty 7) is a real content limit.
-    for (let i = 0; i < 14; i += 1) expect(run.recordResult(pass(2))).toBeNull();
-    // Passing slot 14 (difficulty 6, the last authored slot) lands on slot 15,
-    // difficulty 7, which nothing in the library authors.
-    expect(run.recordResult(pass(2))).toBe("content-limit");
+    // DIFFICULTY_SEQUENCE is [1,2,3,4,2,3,4,5,3,4,5,6,4,5,6,7], and every one
+    // of those difficulties is authored by something — L7 by Rocky Ascent High.
+    // "content-limit" is still the rule for a slot nothing authors; the shipped
+    // library simply no longer has one, so a clean run reaches the end.
+    for (const slot of run.slots) {
+      expect(scenariosForDifficulty(slot.difficulty).length).toBeGreaterThan(0);
+      expect(slot.scenario).not.toBeNull();
+    }
+    for (let i = 0; i < RUN_SLOT_COUNT - 1; i += 1) expect(run.recordResult(pass(2))).toBeNull();
+    expect(run.recordResult(pass(2))).toBe("completed");
     expect(run.over).toBe(true);
-    expect(run.slotsPlayed).toBe(15);
-    expect(run.totalStars).toBe(30);
-    expect(run.summary.ending).toBe("content-limit");
+    expect(run.slotsPlayed).toBe(RUN_SLOT_COUNT);
+    expect(run.totalStars).toBe(2 * RUN_SLOT_COUNT);
+    expect(run.summary.ending).toBe("completed");
   });
 
   it("ends immediately on a zero-star attempt", () => {

@@ -73,10 +73,12 @@ describe("subdivision detection", () => {
 
 describe("the shipped scenarios' grids", () => {
   it("reads Rocky Ascent's ladder: quarters, then eighths", () => {
-    expect(subdivisionsOf(ROCKY_ASCENT.levels.get(1)!.prompt).size).toBe(0);
-    expect(subdivisionsOf(ROCKY_ASCENT.levels.get(2)!.prompt).size).toBe(0);
-    expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(3)!.prompt)]).toEqual(["eighth"]);
-    expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(4)!.prompt)]).toEqual(["eighth"]);
+    // L1-L4 are a quarter-note ladder; the eighths arrive with L5 and L6.
+    for (const difficulty of [1, 2, 3, 4]) {
+      expect(subdivisionsOf(ROCKY_ASCENT.levels.get(difficulty)!.prompt).size).toBe(0);
+    }
+    expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(5)!.prompt)]).toEqual(["eighth"]);
+    expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(6)!.prompt)]).toEqual(["eighth"]);
   });
 
   it("selects the triplet feel from exactly one scenario, and nothing else", () => {

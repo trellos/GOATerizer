@@ -223,7 +223,7 @@ describe("target resolution", () => {
   });
 
   it("skips rests and keeps opportunity indices contiguous", () => {
-    const level = ROCKY_ASCENT.levels.get(4)!;
+    const level = ROCKY_ASCENT.levels.get(6)!;
     const targets = resolveTargets(level, C_MAJOR);
     expect(targets).toHaveLength(30 * ATTEMPT_REPEATS);
     expect(targets.map((t) => t.opportunityIndex)).toEqual([
@@ -240,7 +240,7 @@ describe("target resolution", () => {
   });
 
   it("transposes the same authored level into every key without changing its shape", () => {
-    const level = ROCKY_ASCENT.levels.get(3)!;
+    const level = ROCKY_ASCENT.levels.get(5)!;
     for (const { key } of KEY_WEIGHTS) {
       const targets = resolveTargets(level, key);
       expect(targets).toHaveLength(23 * ATTEMPT_REPEATS);

@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { Judged, Opportunity, StageView } from "../src/minigame/api.js";
+import type { Judged, NoteDuration, Opportunity, StageView } from "../src/minigame/api.js";
 import { MINIGAME_API_VERSION } from "../src/minigame/api.js";
 import {
   stepOf,
@@ -27,7 +27,7 @@ function opportunity(
   index: number,
   startBeat: number,
   lane = 0,
-  duration = "eighthTriplet" as const
+  duration: NoteDuration = "eighthTriplet"
 ): Opportunity {
   return {
     index,
@@ -61,7 +61,7 @@ function instance(opportunities: readonly Opportunity[]) {
     config: BUTT_BUTT_BONK.config,
     data: BUTT_BUTT_BONK.levels.get(1)?.data,
     assets: [],
-    plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16 },
+    plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
     opportunities,
   });
 }

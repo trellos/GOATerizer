@@ -459,17 +459,17 @@
           15
         ],
         "goatsPerFlourish": 1,
-        "expectedCrowd": 4,
+        "expectedCrowd": 8,
         "progressTrigger": "successful_note_on_a_flourish_opportunity"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 72,
-        "star2Threshold": 128,
-        "star3Threshold": 160,
+        "star2Threshold": 256,
+        "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. 160 points are available across the attempt. Pass is 45% of a single pass (160), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. 320 points are available across the attempt. Pass is 45% of a single pass (160), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -694,17 +694,17 @@
           15
         ],
         "goatsPerFlourish": 2,
-        "expectedCrowd": 8,
+        "expectedCrowd": 16,
         "progressTrigger": "successful_note_on_a_flourish_opportunity"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 81,
-        "star2Threshold": 144,
-        "star3Threshold": 180,
+        "star2Threshold": 288,
+        "star3Threshold": 360,
         "provisional": true,
-        "note": "PROVISIONAL. 180 points are available across the attempt. Pass is 45% of a single pass (180), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. 360 points are available across the attempt. Pass is 45% of a single pass (180), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -909,17 +909,17 @@
           14
         ],
         "goatsPerFlourish": 3,
-        "expectedCrowd": 12,
+        "expectedCrowd": 24,
         "progressTrigger": "successful_note_on_a_flourish_opportunity"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 72,
-        "star2Threshold": 128,
-        "star3Threshold": 160,
+        "star2Threshold": 256,
+        "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. 160 points are available across the attempt. Pass is 45% of a single pass (160), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. 320 points are available across the attempt. Pass is 45% of a single pass (160), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1216,17 +1216,17 @@
           11.5
         ],
         "goatsPerFlourish": 6,
-        "expectedCrowd": 12,
+        "expectedCrowd": 24,
         "progressTrigger": "successful_note_on_a_flourish_opportunity"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
         "passThreshold": 99,
-        "star2Threshold": 176,
-        "star3Threshold": 220,
+        "star2Threshold": 352,
+        "star3Threshold": 440,
         "provisional": true,
-        "note": "PROVISIONAL. 220 points are available across the attempt. Pass is 45% of a single pass (220), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. 440 points are available across the attempt. Pass is 45% of a single pass (220), two stars 80% and three stars 100% of the full attempt, so ★★★ requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",

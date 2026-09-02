@@ -20,10 +20,10 @@ import {
   CLIMB_MINIGAME,
 } from "../src/scenario/minigames/climb-minigame.js";
 
-const LEVELS = [1, 2, 3, 4] as const;
+const LEVELS = [1, 2, 3, 4, 5, 6] as const;
 
 /** difficulty -> note opportunities, from the Rocky Ascent specification. */
-const EXPECTED_OPPORTUNITIES: Record<number, number> = { 1: 15, 2: 14, 3: 23, 4: 30 };
+const EXPECTED_OPPORTUNITIES: Record<number, number> = { 1: 15, 2: 14, 3: 9, 4: 12, 5: 23, 6: 30 };
 
 /** The whole authored vocabulary: one octave, root to root. */
 const OCTAVE = ["1", "2", "3", "4", "5", "6", "7", "b1"] as const;
@@ -42,12 +42,12 @@ function level(difficulty: number): ScenarioLevelData {
 const ASCENT_CONFIG = climbConfig(ROCKY_ASCENT.config);
 
 describe("Rocky Ascent scenario", () => {
-  it("is a ClimbMinigame supporting exactly L1-L4", () => {
+  it("is a ClimbMinigame supporting exactly L1-L6", () => {
     expect(ROCKY_ASCENT.id).toBe("rocky_ascent");
     expect(ROCKY_ASCENT.minigameId).toBe("ClimbMinigame");
     expect(ROCKY_ASCENT.family).toBe("Scale");
-    expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
-    expect([...ROCKY_ASCENT.levels.keys()]).toEqual([1, 2, 3, 4]);
+    expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4, 5, 6]);
+    expect([...ROCKY_ASCENT.levels.keys()]).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it("runs one continuous four-measure visual arc with no measure reset", () => {
@@ -105,21 +105,43 @@ describe("Rocky Ascent scenario", () => {
     expect(halves.map((e) => e.startBeat)).toEqual([6, 14]);
   });
 
-  it("L3 repeats the eight-note eighth octave twice after a half note on 7", () => {
-    const eighths = level(3).prompt.filter((e) => e.duration === "eighth");
+  it("L3 walks the top of the octave in quarters, resting between each step", () => {
+    const tokens = level(3).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
+    expect(tokens).toEqual([
+      "4", "rest", "5", "rest", "6", "rest", "7", "rest",
+      "4", "5", "6", "7", "b1", "rest",
+    ]);
+    // The rests drop away for the second half: the same four steps, no breath.
+    expect(level(3).prompt.slice(8).some((e) => e.type === "rest" && e.startBeat < 14)).toBe(false);
+  });
+
+  it("L4 climbs in overlapping three-note groups, each cut off by a rest", () => {
+    const tokens = level(4).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
+    expect(tokens).toEqual([
+      "3", "4", "5", "rest",
+      "4", "5", "6", "rest",
+      "5", "6", "7", "rest",
+      "6", "7", "b1",
+    ]);
+    // The octave root is the arrival, and it is held: a half note to finish.
+    expect(level(4).prompt.at(-1)?.duration).toBe("half");
+  });
+
+  it("L5 repeats the eight-note eighth octave twice after a half note on 7", () => {
+    const eighths = level(5).prompt.filter((e) => e.duration === "eighth");
     expect(eighths).toHaveLength(16);
     expect(eighths.map((e) => formatDegreeToken(e.degree!))).toEqual([...OCTAVE, ...OCTAVE]);
     // The eighth run starts on beat 8 -- the second half of the attempt.
     expect(eighths[0]?.startBeat).toBe(8);
   });
 
-  it("L4 is the octave plus a truncated second climb and a rest, played twice", () => {
-    const tokens = level(4).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
+  it("L6 is the octave plus a truncated second climb and a rest, played twice", () => {
+    const tokens = level(6).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "rest"));
     const half = [...OCTAVE, "1", "2", "3", "4", "5", "6", "7", "rest"];
     expect(tokens).toEqual([...half, ...half]);
-    expect(level(4).prompt.every((e) => e.duration === "eighth")).toBe(true);
+    expect(level(6).prompt.every((e) => e.duration === "eighth")).toBe(true);
     // Second pass starts exactly halfway through the attempt.
-    expect(level(4).prompt[16]?.startBeat).toBe(8);
+    expect(level(6).prompt[16]?.startBeat).toBe(8);
   });
 
   it.each(LEVELS)("L%i stays inside the one-octave vocabulary", (difficulty) => {
@@ -181,10 +203,10 @@ describe("Rocky Ascent scenario", () => {
     for (const difficulty of LEVELS) {
       expect(scenariosForDifficulty(difficulty)).toContain(ROCKY_ASCENT);
     }
-    // Not "the pool is empty" — Rocky Ascent High now authors 5 and 6, and
-    // this scenario's own boundary is what is under test here. The registry's
+    // Not "the pool is empty" — Rocky Ascent High authors 7, and this
+    // scenario's own boundary is what is under test here. The registry's
     // pooling across scenarios is covered in scenario-registry.test.ts.
-    for (const difficulty of [5, 6, 7]) {
+    for (const difficulty of [7]) {
       expect(scenariosForDifficulty(difficulty)).not.toContain(ROCKY_ASCENT);
     }
   });
