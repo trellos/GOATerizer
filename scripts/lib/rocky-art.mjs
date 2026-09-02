@@ -7,9 +7,11 @@
  * same `ClimbMinigame` shapes wearing different route/register data — the
  * scenario files for the three companions say as much explicitly ("Placeholder
  * source families may be reused from the normal version; final art can
- * distinguish the high version later"). This module is that reuse: one set of
- * drawing functions, parameterized by palette and RNG seed so each family gets
- * its own (still deterministic) files rather than four byte-identical copies.
+ * distinguish the high version later"). This module used to draw all six;
+ * three now ship real third-party art instead (the goat pose cycle, the
+ * foothold and the mountain backdrop — see docs/assets/ASSET_SOURCES.md), so
+ * only the destination cairn, the dust puff and the tick glint are still
+ * drawn here.
  *
  * Extracted from `generate-placeholder-art.mjs`, which was the first caller and
  * still owns the canonical Rocky Ascent palette and seeds.
@@ -39,19 +41,6 @@ export const DEFAULT_PALETTE = {
   tick: [255, 246, 196],
   tickHot: [255, 255, 255],
 };
-
-/** One reusable foothold. Instantiated once per waypoint, transform-varied. */
-export function step(C = DEFAULT_PALETTE) {
-  const image = new Pixels(18, 11);
-  image.fillEllipse(9, 8, 8.5, 3.6, C.rock);
-  image.fillEllipse(7, 6.5, 5.5, 2.8, C.rockLight);
-  image.fillEllipse(12.5, 7, 3.4, 2, C.rockLight);
-  // A couple of dark seams so the shape reads as stone rather than a pill.
-  image.fillRect(4, 9, 3, 1, C.rockDark);
-  image.fillRect(11, 9, 5, 1, C.rockDark);
-  image.fillEllipse(14, 5.6, 1.6, 1, C.rockMoss);
-  return image;
-}
 
 /** The destination cairn, visible from the start of the attempt. */
 export function goal(C = DEFAULT_PALETTE) {
@@ -115,69 +104,5 @@ export function tick(C = DEFAULT_PALETTE) {
     image.set(Math.round(c + i), Math.round(c - i), [...C.tick, alpha]);
   }
   image.fillEllipse(c, c, 2.2, 2.2, C.tickHot);
-  return image;
-}
-
-/**
- * The scenario backdrop: 384x216 (16:9 at a pixel-art scale).
- *
- * Opaque, with the centre-right corridor left uncluttered so a route of up to
- * thirty footholds stays readable on top of it.
- */
-export function background(C = DEFAULT_PALETTE, seed = 0x60a7) {
-  const W = 384;
-  const H = 216;
-  const image = new Pixels(W, H);
-  const random = lcg(seed);
-
-  const mix = (a, b, t) => [
-    Math.round(a[0] + (b[0] - a[0]) * t),
-    Math.round(a[1] + (b[1] - a[1]) * t),
-    Math.round(a[2] + (b[2] - a[2]) * t),
-  ];
-
-  // Sky: night at the top grading into a low alpine sunset.
-  for (let y = 0; y < H; y += 1) {
-    const t = y / H;
-    const colour =
-      t < 0.55
-        ? mix(C.skyTop, C.skyMid, t / 0.55)
-        : t < 0.78
-          ? mix(C.skyMid, C.skyLow, (t - 0.55) / 0.23)
-          : mix(C.skyLow, C.skyGlow, (t - 0.78) / 0.22);
-    image.fillRect(0, y, W, 1, colour);
-  }
-
-  // Stars, thinning out towards the glow.
-  for (let i = 0; i < 90; i += 1) {
-    const y = Math.floor(random() * H * 0.5);
-    image.set(Math.floor(random() * W), y, [235, 238, 250, 200 - y]);
-  }
-
-  /** One ridge line: a sum of sines, so it is deterministic and unfussy. */
-  const ridge = (baseY, amplitude, frequency, phase, colour, snowLine) => {
-    for (let x = 0; x < W; x += 1) {
-      const h =
-        Math.sin((x / W) * Math.PI * frequency + phase) * amplitude +
-        Math.sin((x / W) * Math.PI * frequency * 2.7 + phase * 1.7) * amplitude * 0.35;
-      const top = Math.round(baseY - h);
-      image.fillRect(x, top, 1, H - top, colour);
-      if (snowLine !== undefined && top < snowLine) {
-        image.fillRect(x, top, 1, Math.min(6, snowLine - top), C.snow);
-      }
-    }
-  };
-
-  ridge(120, 42, 3.1, 0.4, C.farRidge, 96);
-  ridge(150, 34, 2.3, 2.1, C.midRidge, 128);
-  ridge(196, 26, 1.6, 4.2, C.nearRidge);
-
-  // Foreground scree, so the bottom of the frame is not a flat silhouette.
-  for (let i = 0; i < 180; i += 1) {
-    const x = Math.floor(random() * W);
-    const y = 188 + Math.floor(random() * 28);
-    image.set(x, y, random() < 0.5 ? C.rockDark : C.nearRidge);
-  }
-
   return image;
 }
