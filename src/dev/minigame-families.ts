@@ -14,7 +14,7 @@
 
 import { DIFFICULTY_SEQUENCE, type RunSlot } from "../game/run.js";
 import { scenariosForDifficulty } from "../scenario/registry.js";
-import type { MinigameClassId, ScenarioDefinition } from "../scenario/types.js";
+import type { MinigameId, ScenarioDefinition } from "../scenario/types.js";
 
 /**
  * The six permanent minigame families (`AGENTS.md` §1, GDD §1.2), fixed
@@ -23,7 +23,7 @@ import type { MinigameClassId, ScenarioDefinition } from "../scenario/types.js";
  * a row in the table, entirely blank, because the table describes the game's
  * structure rather than today's content.
  */
-export const MINIGAME_FAMILIES: readonly { family: string; minigameClass: MinigameClassId }[] = [
+export const MINIGAME_FAMILIES: readonly { family: string; minigameClass: MinigameId }[] = [
   { family: "Scale", minigameClass: "ClimbMinigame" },
   { family: "Blues Lick", minigameClass: "PerformMinigame" },
   { family: "Scale Run", minigameClass: "TraverseMinigame" },

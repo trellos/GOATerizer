@@ -323,6 +323,14 @@ export class GameApp {
   #devDisabledCells = new Set<string>();
   #devTargetDifficulty: number | null = null;
   #devPendingPin: { family: string; difficulty: number } | null = null;
+  /**
+   * Set the moment a pin lands mid-run: the absolute transport beat at which
+   * `#current` gets torn down and replaced by the pinned scenario, so a pin
+   * takes effect on the next bar line rather than waiting for the in-flight
+   * attempt — and the one already queued behind it — to finish on their own.
+   * See `#applyDevPinSwap`.
+   */
+  #devPinSwapBeat: number | null = null;
   /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
   #devCalibrateOffsetMs: number | null = null;
   /**
@@ -1337,6 +1345,7 @@ export class GameApp {
     this.#next = null;
     this.#previous = null;
     this.#slideStartBeat = null;
+    this.#devPinSwapBeat = null;
     this.#timeline.clearTargets();
     this.#timeline.clearPlayed();
     this.#energy?.clear();
@@ -1593,6 +1602,7 @@ export class GameApp {
 
     this.#current = null;
     this.#next = null;
+    this.#devPinSwapBeat = null;
     this.#debug?.setMinigameCurrentDifficulty(null);
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
@@ -1673,6 +1683,12 @@ export class GameApp {
       this.#provider.pump(this.#audio.now());
     }
     this.#syncAutoplay();
+
+    if (this.#devPinSwapBeat !== null && beat >= this.#devPinSwapBeat) {
+      const swapBeat = this.#devPinSwapBeat;
+      this.#devPinSwapBeat = null;
+      this.#applyDevPinSwap(swapBeat);
+    }
 
     this.#current?.runtime.update(beat);
     this.#next?.runtime.update(beat);
@@ -2084,6 +2100,12 @@ export class GameApp {
   /**
    * Pinning re-enables the cell: pulsing a cell the player just disabled would
    * promise a minigame that can never be selected.
+   *
+   * With an attempt already in flight, leaving the pin for `#queueNextAttempt`
+   * to pick up would apply it to `run.nextSlot` — which was already turned
+   * into `#next` the moment `#current` started, so the pinned scenario would
+   * not actually play until *that* attempt finished too. Scheduling the swap
+   * here instead makes the pin take effect on the next bar line.
    */
   #onMinigameCellPin(family: string, level: number): void {
     const key = cellKey(family, level);
@@ -2091,6 +2113,7 @@ export class GameApp {
     this.#devPendingPin = { family, difficulty: level };
     this.#debug?.setMinigameCellDisabled(family, level, false);
     this.#debug?.setMinigamePendingPin(key);
+    if (this.#current) this.#devPinSwapBeat = this.#transport.nextMeasureBoundary(this.#heardBeat);
   }
 
   /**
@@ -2113,6 +2136,35 @@ export class GameApp {
       this.#devPendingPin = null;
       this.#debug?.setMinigamePendingPin(null);
     }
+  }
+
+  /**
+   * Tears down the in-flight attempt and replaces it, in place, with a fresh
+   * one for the (now-overridden) current slot starting at `swapBeat` — called
+   * from `#tick` once the transport reaches the bar line `#onMinigameCellPin`
+   * scheduled. `run.currentSlot`'s ordinal never changes, so the strip keeps
+   * treating it as the current panel; only what is actually playing there
+   * changes. `#next` was queued against the truncated attempt's own end beat
+   * and is no longer valid, so it is discarded and requeued against the
+   * replacement's.
+   */
+  #applyDevPinSwap(swapBeat: number): void {
+    const run = this.#run;
+    const current = this.#current;
+    if (!run || !current) return;
+    this.#resolveDevMinigameSlot(run.currentSlot);
+    const replacement = this.#createAttempt(run.currentSlot, swapBeat);
+    if (!replacement) return;
+    this.#timeline.removeTargets(current.timelineKey);
+    if (this.#next) {
+      this.#timeline.removeTargets(this.#next.timelineKey);
+      this.#next = null;
+    }
+    this.#current = replacement;
+    this.#debug?.setMinigameCurrentDifficulty(this.#current.runtime.difficulty);
+    this.#resetDuck();
+    this.#refreshDrumBeat();
+    this.#queueNextAttempt();
   }
 
   /* ------------------------------------------------------------------ */
