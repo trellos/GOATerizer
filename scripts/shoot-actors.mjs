@@ -103,25 +103,64 @@ async function strip(page, { count, every = 1, width, height, offsetX = 0, offse
          * palette is nothing like the timeline's, so scanning a narrow column
          * around where it stands for its own cream (or the crusher's vest red)
          * locates it without production code having to expose anything.
+         *
+         * The colour is not unique in the column, though, and taking the median
+         * row of every hit assumed it was. Measured on Can Crushing, the scan
+         * finds three separate bands of vest-red: his vest at rows 473-501, the
+         * crushed pile below the lane band at 628-631, and — once a can is on
+         * its way in — that can's label at 616-619. Vest and pile weigh almost
+         * exactly the same (58 pixels against 57), so the median sat on the
+         * vest's bottom edge from the start and the arrival of a third band
+         * tipped it to row 617. The crop then framed his legs and the pile,
+         * with the whole character above it. The still shot escaped only by
+         * being taken before the can appeared.
+         *
+         * So cluster the hit rows into bands and pick one, rather than
+         * averaging across all of them. The topmost substantial band is the
+         * character in both scenarios: the crusher's torso is above both his
+         * palm and the pile, and the live goat is above the floor strip where
+         * fallen ones lie. "Substantial" is relative to the biggest band found,
+         * so a stray pixel cannot win and the threshold survives a viewport
+         * change.
          */
         const centreY = () => {
           if (!find) return source.height / 2 + offsetY * dpr;
           const scan = source
             .getContext("2d")
             .getImageData(Math.max(0, cx - 40 * dpr), 0, Math.min(80 * dpr, source.width), source.height);
-          const hits = [];
+
+          const perRow = new Array(scan.height).fill(0);
+          let total = 0;
           for (let y = 0; y < scan.height; y += 1) {
             for (let x = 0; x < scan.width; x += 1) {
               const i = (y * scan.width + x) * 4;
               const [r, g, b] = [scan.data[i], scan.data[i + 1], scan.data[i + 2]];
               if (find === "goat" ? r > 200 && g > 190 && b > 165 : r > 195 && g < 130 && b < 130) {
-                hits.push(y);
+                perRow[y] += 1;
+                total += 1;
               }
             }
           }
-          if (hits.length < 8) return source.height / 2 + offsetY * dpr;
-          hits.sort((a, b) => a - b);
-          return hits[Math.floor(hits.length / 2)];
+          if (total < 8) return source.height / 2 + offsetY * dpr;
+
+          // A gap of more than four rows separates two bands. Smaller than that
+          // is a gap inside one — an arm crossing the torso, a headband.
+          const bands = [];
+          for (let y = 0; y < perRow.length; y += 1) {
+            if (perRow[y] === 0) continue;
+            const last = bands[bands.length - 1];
+            if (last && y - last.to <= 4) {
+              last.to = y;
+              last.weight += perRow[y];
+            } else {
+              bands.push({ from: y, to: y, weight: perRow[y] });
+            }
+          }
+
+          const heaviest = Math.max(...bands.map((band) => band.weight));
+          const character = bands.find((band) => band.weight >= heaviest * 0.25);
+          if (!character) return source.height / 2 + offsetY * dpr;
+          return (character.from + character.to) / 2;
         };
 
         const cy = centreY();
