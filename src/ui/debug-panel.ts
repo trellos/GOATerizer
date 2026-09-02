@@ -108,9 +108,12 @@ export class DebugPanel {
    * Ascent High both author "Scale") gets one row per scenario rather than
    * one row per family: two scenarios that both author the same level used
    * to share that level's single cell, so a toggle or a pin there could not
-   * say which of them it meant. The family name still heads its rows, via
-   * `rowSpan`, so the table still reads as family x difficulty at a glance.
-   * A family nothing authors yet keeps its old blank row.
+   * say which of them it meant. The family name heads its scenarios as its
+   * own full-width row rather than a second label column — the panel is
+   * narrow, and a second column of mostly-repeated family names was making
+   * the table wider than the panel for no information the heading row does
+   * not already give. A family nothing authors yet is just its heading, with
+   * no rows under it.
    *
    * One delegated listener pair per event type rather than one per cell:
    * `click` toggles a cell or selects a difficulty column, `dblclick` pins a
@@ -123,7 +126,6 @@ export class DebugPanel {
     table.className = "mg-table";
 
     const headRow = document.createElement("tr");
-    headRow.appendChild(document.createElement("th"));
     headRow.appendChild(document.createElement("th"));
     for (const level of MINIGAME_DIFFICULTY_LEVELS) {
       const th = document.createElement("th");
@@ -139,29 +141,27 @@ export class DebugPanel {
     thead.append(headRow);
     table.append(thead);
 
+    const columnCount = 1 + MINIGAME_DIFFICULTY_LEVELS.length;
     const tbody = document.createElement("tbody");
     for (const { family } of MINIGAME_FAMILIES) {
-      const variants = scenariosForFamily(family);
-      const rows = variants.length > 0 ? variants : [null];
+      const familyRow = document.createElement("tr");
+      familyRow.className = "mg-family-row";
+      const familyLabel = document.createElement("th");
+      familyLabel.colSpan = columnCount;
+      familyLabel.textContent = family;
+      familyRow.append(familyLabel);
+      tbody.append(familyRow);
 
-      rows.forEach((scenario, index) => {
+      for (const scenario of scenariosForFamily(family)) {
         const row = document.createElement("tr");
-        if (index === 0) {
-          const familyLabel = document.createElement("th");
-          familyLabel.scope = "rowgroup";
-          familyLabel.rowSpan = rows.length;
-          familyLabel.textContent = family;
-          row.append(familyLabel);
-        }
-
         const variantLabel = document.createElement("th");
         variantLabel.scope = "row";
-        variantLabel.textContent = scenario?.displayName ?? "";
+        variantLabel.textContent = scenario.displayName;
         row.append(variantLabel);
 
         for (const level of MINIGAME_DIFFICULTY_LEVELS) {
           const cell = document.createElement("td");
-          if (scenario?.levels.has(level)) {
+          if (scenario.levels.has(level)) {
             const button = document.createElement("button");
             button.type = "button";
             button.className = "mg-cell";
@@ -175,7 +175,7 @@ export class DebugPanel {
           row.append(cell);
         }
         tbody.append(row);
-      });
+      }
     }
     table.append(tbody);
     container.replaceChildren(table);

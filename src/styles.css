@@ -817,14 +817,15 @@ button.chip[data-selected="true"] {
 }
 
 /*
- * The minigame family x difficulty table. Columns are 1-7; rows are one per
- * registered scenario, grouped under its family (`src/dev/minigame-families.ts`)
- * — a family with several scenarios (Rocky Ascent, Rocky Ascent High, ...)
- * gets one row per variant rather than folding them into a single cell, so
- * each can be toggled or pinned on its own. A family nothing authors yet
- * keeps a single blank row. A blank cell means this row's scenario does not
- * author that level. An `o` button toggles that cell's availability; the
- * header numbers pick the sticky forced difficulty.
+ * The minigame family x difficulty table. Columns are 1-7; a bold, full-width
+ * heading row names each family (`src/dev/minigame-families.ts`), and below
+ * it one row per scenario that family actually has registered — a family
+ * with several (Rocky Ascent, Rocky Ascent High, ...) gets one row per
+ * variant rather than folding them into a single cell, so each can be
+ * toggled or pinned on its own. A family nothing authors yet is just its
+ * heading, with no rows under it. A blank cell means this row's scenario
+ * does not author that level. An `o` button toggles that cell's
+ * availability; the header numbers pick the sticky forced difficulty.
  */
 .mg-table-wrap {
   overflow-x: auto;
@@ -848,16 +849,21 @@ button.chip[data-selected="true"] {
   padding: 0.05rem 0.3rem;
 }
 
-/* The family name spanning its variant rows (or its one blank row). */
-.mg-table tbody th[scope="rowgroup"] {
+/* The family name, as its own full-width row above its variants. */
+.mg-family-row th {
   color: var(--text);
   font-weight: 600;
-  vertical-align: top;
+  text-align: left;
+  padding-top: 0.35rem;
 }
 
-/* The variant's own name, indented under its family. */
+.mg-family-row:first-child th {
+  padding-top: 0.05rem;
+}
+
+/* The variant's own name, indented under its family heading. */
 .mg-table tbody th[scope="row"] {
-  padding-left: 0.6rem;
+  padding-left: 0.9rem;
 }
 
 .mg-table thead th {
