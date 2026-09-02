@@ -1,32 +1,25 @@
 /**
- * Short flights across the screen, in musical time.
+ * Streaks: a short flight from one place on screen to another, whose *arrival*
+ * fires a callback.
  *
- * One caller now: the stars earned by a finished minigame flying from the
- * timeline up into their slot in the run history. That is a real distance
- * between two regions, and the flight is what connects them.
+ * It began as the link between a judged note and the scenario — the streak flew
+ * up from the note and its landing made the goat climb, so the player read
+ * causation rather than two things happening near each other. Both ends of that
+ * flight are now the same place: the actors live on the note bars, so a
+ * judgment moves them where it happens.
  *
- * It used to have a second and more important job — carrying a judged note from
- * the timeline into the scenario panel, with its *arrival* triggering the
- * reaction so the player read causation rather than coincidence. The scenario
- * panel is gone (GDD §11.2): the note and the reaction are now the same pixels,
- * so a streak between them would have nowhere to go. Whether any *delay* should
- * survive that is `REACTION_DELAY_BEATS` in `config/tuning.ts`, and it belongs
- * to the attempt runtime rather than to a visual effect.
+ * What is left is the one flight that still crosses the screen: the stars
+ * earned by a finished attempt travelling from the scenario to the trophy shelf
+ * in the top bar, each landing adding an ornament to the trophy it builds.
  *
  * Flight time is measured in **beats**, not milliseconds, so it stays
- * proportionate at 60bpm and at 140bpm.
+ * proportionate at 60bpm and at 140bpm. It is deliberately short: any longer and
+ * it stops reading as causation.
  */
 
 const FLIGHT_BEATS = 0.28;
 const TRAIL_SEGMENTS = 7;
 
-/**
- * Kept, though only `"good"` has a producer today.
- *
- * The bad-energy flight died with the scenario panel. This is one line and a
- * colour, and a minigame reaction that ever wants to throw something across the
- * screen will want the other half of it back.
- */
 export type EnergyPolarity = "good" | "bad";
 
 export type StreakOptions = {
@@ -50,6 +43,8 @@ export class EnergyLayer {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   #streaks: Streak[] = [];
+  /** True while the canvas has something on it that will need clearing. */
+  #painted = false;
   #width = 0;
   #height = 0;
 
@@ -70,14 +65,16 @@ export class EnergyLayer {
 
   clear(): void {
     this.#streaks = [];
+    // Not `#painted = false`: whatever was mid-flight is still on the canvas
+    // and needs one more pass to wipe it.
   }
 
   /**
    * Advances flights and fires arrivals.
    *
-   * Arrivals fire here rather than in the draw pass, so a hidden or offscreen
-   * canvas still runs the callback: a star must land in the history bar whether
-   * or not anyone watched it fly.
+   * Arrivals fire here rather than in the draw pass so a hidden or offscreen
+   * canvas still delivers its energy — the scenario must never stall because
+   * the streak was not painted.
    */
   update(nowBeat: number): void {
     for (const streak of this.#streaks) {
@@ -93,9 +90,16 @@ export class EnergyLayer {
   }
 
   render(nowBeat: number): void {
+    // This layer is empty almost always — streaks exist for a fraction of a
+    // second at the end of an attempt — and it is a full-viewport canvas over
+    // the whole game. Clearing it every frame regardless was a third of the
+    // per-frame fill for nothing at all.
+    if (this.#streaks.length === 0 && !this.#painted) return;
+
     this.#resize();
     const ctx = this.#ctx;
     ctx.clearRect(0, 0, this.#width, this.#height);
+    this.#painted = this.#streaks.length > 0;
 
     for (const streak of this.#streaks) {
       const t = Math.min(1, (nowBeat - streak.bornBeat) / FLIGHT_BEATS);

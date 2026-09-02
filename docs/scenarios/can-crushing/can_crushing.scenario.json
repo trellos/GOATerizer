@@ -1,0 +1,1182 @@
+{
+  "$schema": "https://goaterizer.local/schema/scenario-v1.json",
+  "id": "can_crushing",
+  "displayName": "Can Crushing",
+  "theme": "80s TRAINING & PARTY MONTAGE",
+  "minigameClass": "RepeatMinigame",
+  "family": "Straight Sixteenths",
+  "visualVerb": "REPEAT",
+  "supportedLevels": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "scenarioPremise": "A bro on a beach crushes one beer can after another on the same beat. The exercise is one pitch held steady against a moving rhythm: every can the player places on his lane gets crushed and joins the pile, and every can placed anywhere else sails past his head.",
+  "runTransposition": {
+    "promptRepresentation": "diatonic_scale_degree",
+    "degreeVocabulary": [
+      "1"
+    ],
+    "transposeToRunKey": true,
+    "nonDiatonicTargetsAllowed": false,
+    "note": "One pitch: the run key's root. The performer stands at one lane for the whole attempt, so material off that lane would ask the player to place a can he cannot reach."
+  },
+  "classParameters": {
+    "visualSpanMeasures": 1,
+    "repeatMode": "sequence",
+    "performerMovesBetweenMeasures": false,
+    "goodNoteBehavior": [
+      "materialise prop_can_crushing_intact in the note bar at the performer's lane",
+      "swap to hero80_can_crushing_action for the beat",
+      "replace it with prop_can_crushing_done and add one to the pile",
+      "show fx_can_crushing_impact at the contact point"
+    ],
+    "badNoteBehavior": [
+      "materialise the can at the lane the player actually played, not the authored one",
+      "it sails into the performer instead of being crushed; the pile does not grow",
+      "off-scale or unpitched input spawns the can wobbling rather than snapped to a lane"
+    ],
+    "minigameCompleteBehavior": [
+      "if passed, show hero80_can_crushing_finish beside the pile",
+      "otherwise leave the performer neutral beside whatever pile was earned"
+    ]
+  },
+  "assetBindings": {
+    "background": [
+      "bg_can_crushing"
+    ],
+    "performerNeutral": [
+      "hero80_can_crushing_ready"
+    ],
+    "performerAction": [
+      "hero80_can_crushing_action"
+    ],
+    "performerFinish": [
+      "hero80_can_crushing_finish"
+    ],
+    "repeatTarget": [
+      "prop_can_crushing_intact"
+    ],
+    "targetCompletedState": [
+      "prop_can_crushing_done"
+    ],
+    "impactEffects": [
+      "fx_can_crushing_impact"
+    ]
+  },
+  "assets": [
+    {
+      "id": "bg_can_crushing",
+      "slot": "background",
+      "type": "background",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "Beach at golden hour; leave the middle band readable under the timeline.",
+      "runtimeNotes": "Opaque. Static. One background serves all four levels."
+    },
+    {
+      "id": "hero80_can_crushing_ready",
+      "slot": "performerNeutral",
+      "type": "sprite",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "One body, arms down.",
+      "runtimeNotes": "Persistent ready/reset pose. Held between crushes."
+    },
+    {
+      "id": "hero80_can_crushing_action",
+      "slot": "performerAction",
+      "type": "sprite",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "The same body with the crush arm block swapped in.",
+      "runtimeNotes": "Single repeated successful-note action pose, one beat long."
+    },
+    {
+      "id": "hero80_can_crushing_finish",
+      "slot": "performerFinish",
+      "type": "sprite",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "The same body, arms up.",
+      "runtimeNotes": "Completion pose beside the accumulated pile."
+    },
+    {
+      "id": "prop_can_crushing_intact",
+      "slot": "repeatTarget",
+      "type": "prop",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "One can, upright, with a label band.",
+      "runtimeNotes": "The reusable unit. One instance per note opportunity."
+    },
+    {
+      "id": "prop_can_crushing_done",
+      "slot": "targetCompletedState",
+      "type": "prop",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "The same can flattened and splayed, so it reads as the same object.",
+      "runtimeNotes": "Registered post-action state. Accumulates into the pile."
+    },
+    {
+      "id": "fx_can_crushing_impact",
+      "slot": "impactEffects[]",
+      "type": "effect",
+      "placeholderSourceId": "goaterizer_generated_crusher",
+      "sourceSelection": "A one-frame spark burst.",
+      "runtimeNotes": "Immediate hit feedback. Static billboard, not an animation strip."
+    }
+  ],
+  "placeholderSources": [
+    {
+      "id": "goaterizer_generated_crusher",
+      "title": "GOATerizer generated placeholder art — Can Crushing",
+      "author": "original work for this repository",
+      "licence": "CC0 / public domain",
+      "url": "scripts/lib/crusher-art.mjs",
+      "note": "Generated by scripts/generate-placeholder-art.mjs. No third-party rights are involved. Provenance is recorded in docs/assets/ASSET_SOURCES.md."
+    }
+  ],
+  "productionNotes": [
+    "PROTOTYPE. This scenario exists to exercise the RepeatMinigame class and the placed-can rule in docs/game-design/PROPOSED_Timeline_Actors.md §5.",
+    "The canonical spec puts Can Crushing at L1–7 in the Straight Sixteenths family. The draft authors L1–4 and no sixteenth material; the density ladder is later work.",
+    "Every authored note is the run key's root, because the performer is stationary and a can is only crushed on his lane. Authoring off his lane would punish correct play.",
+    "The measure plan declares the canonical 1m visual span, but the draft runtime does not reset per measure: the cans are transient by their own lifetime and the pile is deliberately attempt-global spectacle.",
+    "Do not animate the placeholder poses as a strip. They are three independent static billboards sharing one body.",
+    "The phrase tables and star thresholds are regenerable via scripts/author-can-crushing.mjs."
+  ],
+  "designerReview": {
+    "blockingIssues": [],
+    "nonBlockingTBD": [
+      "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
+      "The performer does not move between measures. The hook is designed, not built.",
+      "L5–7 are unauthored; the canonical spec supports them."
+    ]
+  },
+  "levels": {
+    "1": {
+      "difficulty": 1,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 1,
+        "resetBetweenMeasures": true
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 3,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 7,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 11,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 15,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4
+        }
+      ],
+      "noteOpportunityCount": 12,
+      "authoredBeatCount": 16,
+      "visual": {
+        "levelCharacter": "a few cans, comfortably spaced; the pile is a novelty",
+        "targetCharacter": "beer can",
+        "performerStation": "fixed at the lane of scale degree 1 for the whole attempt",
+        "expectedCans": 12,
+        "progressTrigger": "played_pitch_arrives_on_the_performer_lane",
+        "sustainBehavior": "a sustained note crushes once, on the attack; holding it adds nothing"
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 54,
+        "star2Threshold": 192,
+        "star3Threshold": 240,
+        "provisional": true,
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 240 points are available. Pass is the 45% of a single pass (120) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "The draft authors quarters and eighths, not the sixteenth material GDD §9.2 makes streak-eligible. The streak is still tracked, and still feeds the second-star consistency comparison."
+      }
+    },
+    "2": {
+      "difficulty": 2,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 1,
+        "resetBetweenMeasures": true
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 15,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        }
+      ],
+      "noteOpportunityCount": 16,
+      "authoredBeatCount": 16,
+      "visual": {
+        "levelCharacter": "a steady conveyor of cans, no gaps to reset in",
+        "targetCharacter": "beer can",
+        "performerStation": "fixed at the lane of scale degree 1 for the whole attempt",
+        "expectedCans": 16,
+        "progressTrigger": "played_pitch_arrives_on_the_performer_lane",
+        "sustainBehavior": "a sustained note crushes once, on the attack; holding it adds nothing"
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 72,
+        "star2Threshold": 256,
+        "star3Threshold": 320,
+        "provisional": true,
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 320 points are available. Pass is the 45% of a single pass (160) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "The draft authors quarters and eighths, not the sixteenth material GDD §9.2 makes streak-eligible. The streak is still tracked, and still feeds the second-star consistency comparison."
+      }
+    },
+    "3": {
+      "difficulty": 3,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 1,
+        "resetBetweenMeasures": true
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 15,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 16,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 17,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 18,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 19,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 20,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 21,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 22,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 23,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.5,
+          "scaleDegree": "1"
+        }
+      ],
+      "noteOpportunityCount": 24,
+      "authoredBeatCount": 16,
+      "visual": {
+        "levelCharacter": "a slow opening half, then the cans arrive twice as fast",
+        "targetCharacter": "beer can",
+        "performerStation": "fixed at the lane of scale degree 1 for the whole attempt",
+        "expectedCans": 24,
+        "progressTrigger": "played_pitch_arrives_on_the_performer_lane",
+        "sustainBehavior": "a sustained note crushes once, on the attack; holding it adds nothing"
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 108,
+        "star2Threshold": 384,
+        "star3Threshold": 480,
+        "provisional": true,
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 480 points are available. Pass is the 45% of a single pass (240) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "The draft authors quarters and eighths, not the sixteenth material GDD §9.2 makes streak-eligible. The streak is still tracked, and still feeds the second-star consistency comparison."
+      }
+    },
+    "4": {
+      "difficulty": 4,
+      "supported": true,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 1,
+        "resetBetweenMeasures": true
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 0.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 1.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 2.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 7,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 3.5,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4.5
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 4.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 5.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 6.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 15,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 7.5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4.5
+        },
+        {
+          "index": 16,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 17,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 8.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 18,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 19,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 9.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 20,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 21,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 10.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 22,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 23,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 11.5,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.5
+        },
+        {
+          "index": 24,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 25,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 12.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 26,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 27,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 13.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 28,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 29,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 14.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 30,
+          "type": "note",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 31,
+          "type": "rest",
+          "duration": "eighth",
+          "durationBeats": 0.5,
+          "startBeat": 15.5,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.5
+        }
+      ],
+      "noteOpportunityCount": 28,
+      "authoredBeatCount": 16,
+      "visual": {
+        "levelCharacter": "a wall of cans, one eighth of breath per bar",
+        "targetCharacter": "beer can",
+        "performerStation": "fixed at the lane of scale degree 1 for the whole attempt",
+        "expectedCans": 28,
+        "progressTrigger": "played_pitch_arrives_on_the_performer_lane",
+        "sustainBehavior": "a sustained note crushes once, on the attack; holding it adds nothing"
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 126,
+        "star2Threshold": 448,
+        "star3Threshold": 560,
+        "provisional": true,
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 560 points are available. Pass is the 45% of a single pass (280) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "The draft authors quarters and eighths, not the sixteenth material GDD §9.2 makes streak-eligible. The streak is still tracked, and still feeds the second-star consistency comparison."
+      }
+    }
+  }
+}

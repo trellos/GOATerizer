@@ -11,6 +11,7 @@ import {
   SCORE_VALUES,
   STREAK_BONUS_MAX_NOTES,
   STREAK_BONUS_MIN_LENGTH,
+  CONSISTENCY_POINTS_PER_NOTE,
   STREAK_BONUS_PER_NOTE,
   JUDGMENT_POINTS,
   WRONG_NOTE_BREAKS_STREAK,
@@ -72,6 +73,20 @@ export class AttemptScore {
     return this.#judgmentPoints;
   }
 
+  /**
+   * The consistency bonus, in judgment-point units, for the star meter's
+   * second-star comparison only (`stars.ts`).
+   *
+   * One point per unbroken note, against ten for a Perfect. So a flawless
+   * attempt earns a bonus worth exactly 10% of its own all-Perfect maximum,
+   * whatever the note count — no scenario-specific tuning, and it cannot be
+   * gamed by a long exercise. PROVISIONAL: 10% is a starting number to play
+   * against, not a derived one.
+   */
+  get consistencyPoints(): number {
+    return this.#bestStreak * CONSISTENCY_POINTS_PER_NOTE;
+  }
+
   get score(): number {
     return this.#score;
   }
@@ -98,6 +113,24 @@ export class AttemptScore {
         this.#wrongNotes += 1;
         this.#score += SCORE_VALUES.wrongNote;
         if (this.#wrongBreaksStreak) this.#streak = 0;
+        break;
+      case "NoteReleasedOnTime":
+        /*
+         * Explicitly worth nothing, and this case exists to say so out loud
+         * rather than let a `default` decide it by accident.
+         *
+         * A release is a second event about a note that has already been scored
+         * at its attack, so any value here would be paid twice for one note.
+         * Judgment points are the units authored star thresholds are written in
+         * (`config/tuning.ts`), and ★★★ is authored at exactly
+         * `noteOpportunityCount * JUDGMENT_POINTS.perfect` — so a single point
+         * here would not just inflate the score, it would make three stars
+         * reachable on a performance that is not flawless, and would do it
+         * differently on every scenario depending on how sustained its material
+         * happens to be. It would break the streak counters for the same
+         * reason. What a clean release actually feeds is the backing-track duck
+         * in `game/backing-duck.ts`, which is not a scoring system.
+         */
         break;
       default:
         break;

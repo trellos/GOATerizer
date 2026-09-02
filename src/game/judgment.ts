@@ -13,9 +13,14 @@
  *   - a target resolves exactly once, to Perfect, Good or Miss;
  *   - one sustained wrong pitch does not produce a stream of wrong-note events;
  *   - windows are duration-aware data, not one hard-coded millisecond figure.
+ *
+ * It also watches note *endings* — see {@link TargetJudge.release} — but only
+ * ever reports them; nothing about a release changes what a target resolved to
+ * or what it was worth. Judgment of a target happens once, at its attack.
  */
 
 import {
+  GOOD_WINDOW_FLOOR_BEATS,
   OCTAVE_EQUIVALENT_MATCH,
   TIMING_WINDOWS_BEATS,
   WRONG_NOTE_DEBOUNCE_BEATS,
@@ -63,7 +68,29 @@ export type JudgmentEvent =
    * A previously-judged played note changed pitch under revision. The timeline
    * redraws that note; nothing is scored twice.
    */
-  | { type: "PlayedNoteRevised"; attackId: string; playedMidi: number };
+  | { type: "PlayedNoteRevised"; attackId: string; playedMidi: number }
+  /**
+   * A note that already landed on its target was also *let go* near where the
+   * target ends. See {@link TargetJudge.release} for the exact window and for
+   * why this is a strictly weaker claim than "held for its written duration".
+   *
+   * This event scores nothing. It does not touch the score, the judgment
+   * points, the star meter, the timeline actor or the can crusher, and the
+   * target it names has already been resolved and will not be resolved again.
+   * It exists so that something downstream — today, the backing-track duck in
+   * `game/backing-duck.ts` — can tell the difference between a player who is
+   * hitting attacks and letting the notes fall over, and one who is actually in
+   * control of the phrase. Adding it to a scoring path would silently change
+   * every authored star threshold, which are denominated in judgment points
+   * against a maximum of `noteOpportunityCount * JUDGMENT_POINTS.perfect`.
+   */
+  | {
+      type: "NoteReleasedOnTime";
+      target: ResolvedTarget;
+      attackId: string;
+      /** Signed beats from the target's end. Negative is an early release. */
+      beatDelta: number;
+    };
 
 /** Per-target timing tolerance, after neighbour clamping. */
 export type TargetWindows = SubdivisionWindows;
@@ -71,11 +98,21 @@ export type TargetWindows = SubdivisionWindows;
 /**
  * Timing windows for a whole level.
  *
- * Each target starts from its subdivision's authored window, then has its Good
- * window clamped to half the distance to its nearest neighbouring target. The
- * subdivision table already encodes that for uniform material; the clamp makes
- * it hold for *any* authored rhythm — a quarter note followed by an eighth
- * cannot claim a played note that belongs to the eighth.
+ * Each target starts from its subdivision's authored window and has its Good
+ * window clamped to half the distance to its nearest neighbouring target, so
+ * that dense material does not hand one played note to a target it obviously
+ * does not belong to.
+ *
+ * Then {@link GOOD_WINDOW_FLOOR_BEATS} puts a floor under the result, and the
+ * floor wins. The clamp on its own made eighth-note material break as a cliff
+ * under any systematic offset past 0.25 beats — see that constant for the
+ * measurement — and its stated purpose, stopping two targets claiming one note,
+ * is something `#findMatch` already guarantees structurally: candidates are
+ * filtered by pitch, the nearest survivor wins, and a resolved target is never
+ * offered again.
+ *
+ * Perfect is *not* floored. Widening what counts as a hit is forgiveness;
+ * widening what counts as flawless would make three stars mean less.
  */
 export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindows[] {
   return targets.map((target, index) => {
@@ -86,6 +123,7 @@ export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindow
     let good = base.good;
     if (previous) good = Math.min(good, (target.startBeat - previous.startBeat) / 2);
     if (next) good = Math.min(good, (next.startBeat - target.startBeat) / 2);
+    good = Math.max(good, GOOD_WINDOW_FLOOR_BEATS);
 
     return { perfect: Math.min(base.perfect, good), good };
   });
@@ -103,8 +141,20 @@ type TargetSlot = {
 type AttackRecord = {
   midi: number;
   beat: number;
-  resolvedTarget: number | null;
+  /**
+   * Index into `#slots` of the target this note resolved, or null while it has
+   * resolved nothing. A slot index rather than an `opportunityIndex`: the two
+   * happen to coincide for targets built by `resolveTargets`, but the judge is
+   * handed an arbitrary target list and must not assume they do.
+   */
+  resolvedSlot: number | null;
   wrong: boolean;
+  /**
+   * Whether a release has already been accounted for. One played note gets one
+   * release; a recognizer that repeats itself must not be able to feed the same
+   * clean ending downstream twice.
+   */
+  released: boolean;
 };
 
 export type JudgeOptions = {
@@ -175,7 +225,13 @@ export class TargetJudge {
     const match = this.#findMatch(midi, beat);
 
     if (!match) {
-      this.#attacks.set(attackId, { midi, beat, resolvedTarget: null, wrong: true });
+      this.#attacks.set(attackId, {
+        midi,
+        beat,
+        resolvedSlot: null,
+        wrong: true,
+        released: false,
+      });
       this.#emitWrong(attackId, midi, beat);
       return;
     }
@@ -183,8 +239,9 @@ export class TargetJudge {
     this.#attacks.set(attackId, {
       midi,
       beat,
-      resolvedTarget: match.slot.target.opportunityIndex,
+      resolvedSlot: match.index,
       wrong: false,
+      released: false,
     });
     this.#resolve(match.slot, match.outcome, attackId, midi, beat, match.reason);
   }
@@ -205,15 +262,78 @@ export class TargetJudge {
     record.midi = midi;
     this.#emit({ type: "PlayedNoteRevised", attackId, playedMidi: midi });
 
-    if (record.resolvedTarget !== null) return;
+    if (record.resolvedSlot !== null) return;
 
     const at = beat ?? record.beat;
     const match = this.#findMatch(midi, at);
     if (!match) return;
 
     record.wrong = false;
-    record.resolvedTarget = match.slot.target.opportunityIndex;
+    record.resolvedSlot = match.index;
     this.#resolve(match.slot, match.outcome, attackId, midi, at, match.reason);
+  }
+
+  /**
+   * The player let a note go. `beat` is the release, latency-compensated the
+   * same way an attack is.
+   *
+   * Emits {@link JudgmentEvent} `NoteReleasedOnTime` when, and only when, all of
+   * this holds:
+   *
+   *   - the released note is one this judge has seen attacked;
+   *   - that attack already **resolved a target**, as Perfect or Good. A wrong
+   *     note has no target to be released against, and letting go of one
+   *     tidily is not a musical achievement. A note that landed nothing is
+   *     simply forgotten here;
+   *   - the release lands within that target's own Good window of the target's
+   *     **end** (`startBeat + durationBeats`);
+   *   - nothing has already been reported for this attack.
+   *
+   * The window is the target's existing, neighbour-clamped Good window rather
+   * than a new constant, and that is a deliberate reuse rather than laziness.
+   * It is already duration-aware data (`config/tuning.ts`), it is already
+   * clamped so no two targets can claim one played note, and for the uniform
+   * material every registered scenario authors it works out to exactly half the
+   * note's own length — a quarter note's Good window is 0.5 beats, an eighth's
+   * is 0.25. So "released on time" means, in practice, *held for at least half
+   * the written note and let go before half again as long*, at any tempo, with
+   * no second table of numbers to keep in step with the first.
+   *
+   * Note what this event does **not** claim. It is not "held for its written
+   * duration": the recognizer's note end is a silence-detection estimate, and
+   * the player may have re-articulated, palm-muted or simply run out of sustain.
+   * It is the honest, weaker statement — the note stopped near where the prompt
+   * said it should — which is all the duck needs and all this can support.
+   *
+   * One deliberate hole: a note released *before* a late `retune` turns it from
+   * wrong into a hit will never report a release, because the release was
+   * already accounted for against a note that had resolved nothing. Reopening it
+   * would mean remembering release beats indefinitely so a revision could
+   * re-judge them, and the whole prize is one rung of a five-rung duck. Costing
+   * a rare recognizer revision one rung is a better trade than a second replay
+   * mechanism inside the judge.
+   */
+  release(attackId: string, beat: number): void {
+    const record = this.#attacks.get(attackId);
+    if (!record) return;
+    if (record.released) return;
+    // Recorded even when nothing is emitted below, so a repeat of this release
+    // cannot produce a second event by taking a different branch.
+    record.released = true;
+
+    if (record.resolvedSlot === null) return;
+    const slot = this.#slots[record.resolvedSlot];
+    if (!slot) return;
+    // Belt and braces: a slot an attack resolved is Perfect or Good by
+    // construction, and a released miss must never reach the duck.
+    if (slot.outcome !== "perfect" && slot.outcome !== "good") return;
+    if (slot.resolvedBy !== attackId) return;
+
+    const endBeat = slot.target.startBeat + slot.target.durationBeats;
+    const beatDelta = beat - endBeat;
+    if (Math.abs(beatDelta) > slot.windows.good) return;
+
+    this.#emit({ type: "NoteReleasedOnTime", target: slot.target, attackId, beatDelta });
   }
 
   /** Expires every target whose window has closed. Idempotent. */
@@ -232,11 +352,17 @@ export class TargetJudge {
   #findMatch(
     midi: number,
     beat: number
-  ): { slot: TargetSlot; outcome: JudgmentOutcome; reason: GoodReason } | null {
-    let best: { slot: TargetSlot; outcome: JudgmentOutcome; reason: GoodReason; rank: number; distance: number } | null =
-      null;
+  ): { slot: TargetSlot; index: number; outcome: JudgmentOutcome; reason: GoodReason } | null {
+    let best: {
+      slot: TargetSlot;
+      index: number;
+      outcome: JudgmentOutcome;
+      reason: GoodReason;
+      rank: number;
+      distance: number;
+    } | null = null;
 
-    for (const slot of this.#slots) {
+    for (const [index, slot] of this.#slots.entries()) {
       if (slot.outcome !== null) continue;
       const delta = beat - slot.target.startBeat;
       const distance = Math.abs(delta);
@@ -257,11 +383,13 @@ export class TargetJudge {
       const reason: GoodReason = exact ? "timing" : "octave";
 
       if (!best || rank < best.rank || (rank === best.rank && distance < best.distance)) {
-        best = { slot, outcome, reason, rank, distance };
+        best = { slot, index, outcome, reason, rank, distance };
       }
     }
 
-    return best ? { slot: best.slot, outcome: best.outcome, reason: best.reason } : null;
+    return best
+      ? { slot: best.slot, index: best.index, outcome: best.outcome, reason: best.reason }
+      : null;
   }
 
   #resolve(

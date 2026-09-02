@@ -15,30 +15,6 @@ The asset IDs below preserve the existing catalog. This document does **not** cr
 
 ## 1. Runtime Classes
 
-> ### The surface changed. The bindings did not.
->
-> This document was written when a minigame drew into its own panel above the
-> timeline. There is no panel. **The minigame draws the timeline** — it supplies
-> the background behind its own measures, skins the note bars the host lays down,
-> and puts its actors on those bars. See
-> [`GOATerizer_Minigame_Authoring.md`](./GOATerizer_Minigame_Authoring.md) for the
-> contract and the coordinate space, and GDD §11 for the geometry.
->
-> Three consequences for everything below:
->
-> - **Every scenario premise and every asset ID here is still correct.** What each
->   slot *is* changed; what art it names did not. Nothing in §3 needs rewriting.
-> - **Slots that described positions in a panel are gone.** `route` waypoint
->   coordinates in particular: the note bars are the footholds, so the host's note
->   geometry supplies every position an actor could want. Do not author routes.
-> - **"Minigame Class" here means a family, not a base class.** A minigame is a
->   `MinigameModule` implementing the `Minigame` interface (`src/minigame/api.ts`);
->   the six names below are the six families that interface serves, and a seventh
->   needs no change to the host.
->
-> §2 below annotates each family's canonical slots with what they become on the
-> timeline. §5 of the authoring brief carries the same table with more room.
-
 | Musical Family | Minigame Class | Visual Verb |
 |---|---|---|
 | Scale | `ClimbMinigame` | CLIMB |
@@ -52,10 +28,7 @@ The asset IDs below preserve the existing catalog. This document does **not** cr
 
 The parameterized behavior spec originally defined deliberately broad slots such as `climberPoses[]`, `effects[]`, and `threatPosesOrStates[]`. The asset catalog is more specific. This document therefore uses **semantic subslots** such as `finishPose`, `nearMissEffects[]`, `debrisEffects[]`, and `powerEffects[]`.
 
-These do not require more runtime families. A minigame parses its own `config`
-— the host passes it through as `unknown` and never reads it — so a family is
-free to name these slots however it likes, as named fields or as typed entries
-inside the generic arrays.
+These do not require more runtime classes. They can be implemented either as named serialized fields or as typed/named entries inside the existing generic arrays.
 
 ### Optional reaction slots
 
@@ -79,95 +52,33 @@ For these, `audienceStates[]` is explicitly **unbound**. Performance escalation 
 
 Attempt-global score, thresholds, star tier, and explicitly persistent spectacle survive visual-cycle resets.
 
-Visual span is the minigame's own decision, taken in `onMeasure(index, beat)`.
-The host does not enforce it: it scrolls four measures of notes per attempt and
-asks the minigame to render every frame, and whether that reads as one arc or
-four rounds is entirely what the minigame draws.
-
 ---
 
 ## 2. Canonical Slot Schemas
-
-Each family's slot list is unchanged. The note under it says what the slot
-becomes now that the minigame draws the timeline rather than a panel. Three rules
-are shared by all six:
-
-- **`background`** is `Stage.background`: one image behind exactly the measures
-  this minigame owns, fit to the lane band's height and tiled horizontally. It is
-  not a cover-fit panel image and it does not span the screen — the previous
-  minigame's background is still on the left while yours scrolls in.
-- **Anything named a *visual* on a note** — waypoints, targets, hazards standing
-  on the beat — is **note art**, supplied through `Stage.notes` as
-  `underlay`/`body`/`overlay`. The host owns the bar's geometry (a sixteenth is a
-  quarter of a quarter's width); you skin it. Art larger than the bar is drawn
-  centred on it, so glows and ornaments need no extra slot.
-- **Anything named a *pose* or an *effect*** is a sprite in normalised
-  coordinates: x across the playfield, y across the lane band, both free to leave
-  0..1. Anchor it to a note (`view.notes[i].rect`) or to `view.strikeX`.
 
 ### `ClimbMinigame`
 
 `background`, `climberPoses[]`, `finishPose`, `waypointVisuals[]`, `destinationVisual`, `stepEffects[]`
 
-The bars **are** the footholds: `waypointVisuals[]` is note art, and
-`climberPoses[]`/`finishPose` are one sprite anchored to the note the climber
-stands on. `destinationVisual` sits at or just past the last note.
-`stepEffects[]` fire at the note that was judged. **Authored `route` data —
-`startPosition`, `destination`, per-waypoint coordinates — is deleted**; it
-described positions in a panel, and the notes now supply every coordinate.
-
 ### `PerformMinigame`
 
 `background`, `performerPoses[]`, `flourishPoses[]`, `finishPose`, `signatureProps[]`, optional `audienceStates[]`, `flourishEffects[]`, `accentEffects[]`, `payoffEffects[]`
-
-The performer is not note-anchored: hold it near `strikeX`, where the player is
-already looking, and swap `performerPoses[]`/`flourishPoses[]` on judgment.
-`signatureProps[]` ride the performer. `audienceStates[]` go **below the band**
-(`y > 1`) across your own span and change at star thresholds — which is why the
-four scenarios that leave them unbound lose nothing. `payoffEffects[]` fire from
-`onStarEarned(3, …)`, `accentEffects[]` at the judged note.
 
 ### `TraverseMinigame`
 
 `background`, `travelerPoses[]`, `finishPose`, `waypointVisuals[]`, `hazardVisuals[]`, `travelEffects[]`, `nearMissEffects[]`
 
-As CLIMB, faster: `waypointVisuals[]` are note art and the traveler moves bar to
-bar. `hazardVisuals[]` are the family's own idea — place them at beat positions
-*between* notes, so the phrase's rests are the gaps that can be fallen into.
-`nearMissEffects[]` belong to a hazard cleared on a Good rather than a Perfect.
-
 ### `ThreeStepMinigame`
 
 `background`, `stepAPoseOrEffect`, `stepBPoseOrEffect`, `stepCPoseOrEffect`, `alternateStepC[]`, `finishPose`, `targetVisuals[]`, `minorStepEffects[]`, `majorStepEffects[]`, `groupEffects[]`
-
-`targetVisuals[]` are note art. Derive the A/B/C role from a note's position
-within its beat rather than from `index % 3`: authored rhythm is not uniform, and
-a rest inside the triplet would desynchronise a counter. `groupEffects[]` fire
-when all three of a group land. Author the notes as `eighthTriplet` — a third of
-a beat; the drums pick the triplet grid up from the phrase and mark it an
-attempt ahead.
 
 ### `RepeatMinigame`
 
 `background`, `performerNeutral`, `performerAction`, `performerFinish`, `repeatTarget`, `targetCompletedState`, `impactEffects[]`, `debrisEffects[]`, `streakEffects[]`
 
-The tidiest fit of the six, because **the can is the note**: `repeatTarget` and
-`targetCompletedState` are one note's `body` before and after it is hit, so the
-row of targets scrolling into `strikeX` is literally the rhythm. Put
-`performerNeutral`/`performerAction` at `strikeX` for them to arrive at.
-`debrisEffects[]` fall out of the band (`y > 1`); `streakEffects[]` are yours to
-count, since the host tells you each judgment but keeps no streak for you.
-
 ### `BattleMinigame`
 
 `background`, `heroPoses[]`, `threatPosesOrStates[]`, `stageHazards[] / arenaProps[]`, `impactEffects[]`, `powerEffects[]`, `debrisEffects[]`, composed `completionStates[]`
-
-Hero at `strikeX`. **The threat closes in along the timeline**: start it near
-x ≈ 1 and walk it toward `strikeX` as dominance shifts, so distance on screen
-*is* threat and the player reads the fight without a health bar.
-`stageHazards[]`/`arenaProps[]` sit below the band. `completionStates[]` compose
-in `onComplete`. The per-level visual span (1-measure rounds at L1–4, continuous
-at L5–7) is your decision inside `onMeasure`, not something the host imposes.
 
 ---
 

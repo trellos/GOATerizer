@@ -12,6 +12,14 @@
  * reproduces; the kick therefore leads with a click transient rather than
  * relying on its fundamental, and the snare and hats carry the beat in the
  * midrange where every speaker is honest.
+ *
+ * The kit is bigger than the pulse needs because the pattern it plays is not
+ * fixed: `drum-pattern.ts` picks one of seven intensities per minigame, and the
+ * top ones want cymbals and toms. Everything added for those — ride, crash,
+ * tom, floor — is deliberately quieter at the peak than the kick and hat, and
+ * earns its size from *length* instead. The drum bus feeds the master with no
+ * limiter anywhere in the chain, so a loud rung has to be loud by being dense,
+ * not by being closer to the ceiling.
  */
 
 import { BACKBEAT_PATTERN, type DrumHit, type DrumPattern } from "./drum-pattern.js";
@@ -127,10 +135,48 @@ export class DrumPlayer {
       case "trip":
         this.#tripletClick(at, hit.velocity);
         break;
+      case "ride":
+        this.#ride(at, hit.velocity);
+        break;
+      case "crash":
+        this.#crash(at, hit.velocity);
+        break;
+      case "tom":
+        this.#tom(at, hit.velocity, 260, 150, 0.22, 900);
+        break;
+      case "floor":
+        this.#tom(at, hit.velocity, 165, 92, 0.34, 620);
+        break;
       default:
         this.#hat(at, hit.velocity);
         break;
     }
+  }
+
+  /**
+   * A struck membrane: a sine swept downwards under a fast attack.
+   *
+   * Kick, rack tom and floor tom are the same instrument at three sizes, so they
+   * are one synth with three sets of numbers rather than three near-identical
+   * methods. The sweep is a third of the decay in every case, which is what
+   * makes a drum sound struck rather than plucked.
+   */
+  #drumTone(at: number, velocity: number, fromHz: number, toHz: number, seconds: number): void {
+    const osc = this.#context.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(fromHz, at);
+    osc.frequency.exponentialRampToValueAtTime(toHz, at + seconds * 0.32);
+
+    const gain = this.#context.createGain();
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.9 * velocity), at + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
+
+    osc.connect(gain);
+    gain.connect(this.#output);
+    osc.start(at);
+    osc.stop(at + seconds + 0.04);
+    this.#voices.push({ startTime: at, source: osc, gain });
   }
 
   /**
@@ -142,23 +188,54 @@ export class DrumPlayer {
    * one drum.
    */
   #kick(at: number, velocity: number): void {
-    const osc = this.#context.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(150, at);
-    osc.frequency.exponentialRampToValueAtTime(48, at + 0.09);
-
-    const gain = this.#context.createGain();
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.9 * velocity, at + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
-
-    osc.connect(gain);
-    gain.connect(this.#output);
-    osc.start(at);
-    osc.stop(at + 0.32);
-    this.#voices.push({ startTime: at, source: osc, gain });
-
+    this.#drumTone(at, velocity, 150, 48, 0.28);
     this.#noiseBurst(at, 0.02, velocity * 0.5, { type: "bandpass", frequency: 1400, Q: 0.8 });
+  }
+
+  /**
+   * A tom: the same membrane an octave or two up, with a stick attack.
+   *
+   * Toms only appear in the top rung's fill, where they have to be heard as
+   * *different drums* arriving rather than as the kick moving around. The tone
+   * is pulled back slightly and the attack noise pitched into the midrange, so
+   * the fill reads on a small speaker for the same reason the hat does.
+   */
+  #tom(
+    at: number,
+    velocity: number,
+    fromHz: number,
+    toHz: number,
+    seconds: number,
+    attackHz: number
+  ): void {
+    this.#drumTone(at, velocity * 0.85, fromHz, toHz, seconds);
+    this.#noiseBurst(at, 0.022, velocity * 0.2, { type: "bandpass", frequency: attackHz, Q: 1 });
+  }
+
+  /**
+   * The ride: a longer, lower-centred wash laid *over* the on-beat hat.
+   *
+   * It never replaces the hat, because the hat is the transient the pulse
+   * survives on. What the ride adds is sustain — the beat stops being a row of
+   * clicks and starts ringing — which is the cheapest way to make a bar sound
+   * bigger without making it louder. Its peak is deliberately well under the
+   * hat's for that reason.
+   */
+  #ride(at: number, velocity: number): void {
+    this.#noiseBurst(at, 0.25, velocity * 0.16, { type: "bandpass", frequency: 5200, Q: 1.8 });
+  }
+
+  /**
+   * The crash: a wide, bright wash lasting most of a beat.
+   *
+   * Peak level is modest and the *length* does the work, which is both how a
+   * crash actually behaves and what keeps the top rungs off the master's
+   * ceiling: the bus has no limiter, and a crash lands on the same instant as a
+   * kick and a hat. Capped under the noise buffer's one second, or it would be
+   * truncated rather than decayed.
+   */
+  #crash(at: number, velocity: number): void {
+    this.#noiseBurst(at, 0.85, velocity * 0.2, { type: "highpass", frequency: 3000, Q: 0.7 });
   }
 
   /** Band-passed noise, wide and short: the backbeat, in the midrange. */
@@ -168,7 +245,21 @@ export class DrumPlayer {
 
   /** Very short high-passed noise. Marks the eighths without masking anything. */
   #hat(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.045, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
+    // Two bursts, and the lower one is the point.
+    //
+    // This was a single 7 kHz burst at 0.4, which is what a hi-hat looks like
+    // on a spectrum and not what one sounds like on a laptop. Small speakers
+    // roll off hard at the top as well as the bottom, so a hat living entirely
+    // above 7 kHz measures present and is heard as a faint shimmer — playtest
+    // feedback was that the drums were "not obvious" and that nothing was
+    // arriving between the beats, when in fact every one of those hits was
+    // being scheduled and sounded.
+    //
+    // The body at 3.2 kHz is what carries it; the bright burst on top is what
+    // still makes it a hat rather than a click. Together they are audible in
+    // the band every speaker actually reproduces.
+    this.#noiseBurst(at, 0.05, velocity * 0.55, { type: "bandpass", frequency: 3200, Q: 0.7 });
+    this.#noiseBurst(at, 0.035, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
   }
 
   /**
@@ -179,7 +270,13 @@ export class DrumPlayer {
    * being clearly a *different* sound — separated by timbre, not volume.
    */
   #sixteenthTick(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.022, velocity * 0.16, { type: "highpass", frequency: 11000, Q: 0.7 });
+    // Centred at 6 kHz rather than high-passed at 11 kHz. The old placement was
+    // above where most laptop and phone speakers reproduce anything at all, so
+    // the sixteenth grid — the one feel a player most needs warning of — was
+    // the least audible thing in the kit. It stays shorter and brighter than
+    // the hat, which is what separates the two by timbre; it is no longer
+    // separated from it by being inaudible.
+    this.#noiseBurst(at, 0.022, velocity * 0.42, { type: "bandpass", frequency: 6000, Q: 0.6 });
   }
 
   /**

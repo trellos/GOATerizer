@@ -1,48 +1,88 @@
 /**
- * One attempt: four measures of one scenario at one difficulty.
+ * One attempt: two passes at one scenario's four-measure phrase, at one
+ * difficulty.
  *
  * This is the join between the systems, and it is where the causal chain the
  * whole game rests on actually happens:
  *
- *     guitar event -> beat -> judgment -> energy -> scenario
+ *     guitar event -> beat -> judgment -> actor
  *
- * It owns the judge, the score, the star meter and the minigame class instance,
- * and it is free of DOM and audio so the entire chain is testable with injected
- * input. The one thing it does *not* do is decide when energy reaches the
- * scenario: the caller delivers that, so the visual streak flying up from the
- * timeline is what triggers the goat rather than a coincidence beside it.
+ * It owns the judge, the score, the star meter, and whatever characters this
+ * scenario puts on the timeline. It is free of DOM and audio, so the entire
+ * chain is testable with injected input.
+ *
+ * The chain used to run `judgment -> energy -> scenario`, with the caller
+ * deciding when energy arrived so a streak flying from the note to the scenario
+ * panel was what triggered the goat. There is no scenario panel to fly to any
+ * more — the actors live on the note bars and the panel is a backdrop
+ * (`docs/game-design/PROPOSED_Timeline_Actors.md`) — so a judgment now moves its
+ * actor directly, on the beat it is judged.
  */
 
-import { ATTEMPT_BEATS, BEATS_PER_MEASURE, REACTION_DELAY_BEATS } from "../config/tuning.js";
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
-import type { RunKey } from "../music/keys.js";
-import type { Judged, Minigame, MinigameModule, Opportunity } from "../minigame/api.js";
-import { requireMinigame } from "../minigame/registry.js";
+import { laneOfMidi, type RunKey } from "../music/keys.js";
+import { RepeatMinigame } from "../scenario/minigames/repeat-minigame.js";
+import { TimelineActor } from "../scenario/minigames/timeline-actor.js";
 import type { ScenarioDefinition, ScenarioLevelData } from "../scenario/types.js";
 import { TargetJudge, type JudgmentEvent } from "./judgment.js";
 import { AttemptScore, type ScoreSnapshot } from "./scoring.js";
 import { StarMeter } from "./stars.js";
 import { resolveTargets, type ResolvedTarget } from "./targets.js";
 
-export type EnergyCause = "perfect" | "good" | "miss" | "wrong";
+/**
+ * Where a `RepeatMinigame` performer stands: the lane the exercise sits on most
+ * often.
+ *
+ * Read from the authored material rather than configured, so a scenario cannot
+ * declare a home pitch its own phrases never visit. REPEAT material is
+ * dominated by one pitch by construction — the class is "do this one thing over
+ * and over" — so the modal lane is the home, and any note off it is the
+ * composer deliberately making the player move.
+ */
+function repeatPerformerLane(targets: readonly ResolvedTarget[]): number {
+  const counts = new Map<number, number>();
+  for (const target of targets) counts.set(target.lane, (counts.get(target.lane) ?? 0) + 1);
+  let best = 0;
+  let bestCount = -1;
+  for (const [lane, count] of counts) {
+    if (count > bestCount) {
+      best = lane;
+      bestCount = count;
+    }
+  }
+  return best;
+}
 
-/** A judged note's energy, on its way from the timeline into the scenario. */
-export type EnergyEvent = {
-  id: number;
-  polarity: "good" | "bad";
-  cause: EnergyCause;
-  /**
-   * Continuous lane coordinate the streak launches from, or null when the
-   * played note fell outside the one-octave span entirely.
-   */
-  lane: number | null;
-  /** Attempt-relative beat the judgment happened on. */
-  beat: number;
-  /** Which note opportunity this resolved. Null for an unmatched wrong note. */
-  opportunityIndex: number | null;
-  /** What the player played. Null for a miss — nothing was played. */
-  playedMidi: number | null;
-};
+/**
+ * Periods a `RepeatMinigame` performer is allowed to swing at, longest first.
+ *
+ * Every one of them divides a beat, and {@link STANDS_BACK_BEATS}' worth of
+ * flight is a whole beat, so a note on the grid arrives at the performer
+ * exactly on one of his swings. Anything not on this list would put the palm
+ * somewhere else when the can got there.
+ */
+const STRIKE_PERIODS = [1, 1 / 2, 1 / 3, 1 / 4] as const;
+
+/**
+ * How often a `RepeatMinigame` performer swings, in beats.
+ *
+ * Read from the authored grid rather than configured: his loop is the tutorial
+ * for the whole mechanic, so it has to run at the rate cans actually arrive.
+ * Quarter-note material gets a swing per beat; a scenario that drops into
+ * sixteenths gets a performer working in sixteenths, which is also the honest
+ * picture of what it is asking of the player.
+ */
+function repeatStrikePeriod(targets: readonly ResolvedTarget[]): number {
+  const beats = targets.map((target) => target.startBeat).sort((a, b) => a - b);
+  let finest: number = STRIKE_PERIODS[0];
+  for (let i = 1; i < beats.length; i += 1) {
+    const gap = (beats[i] ?? 0) - (beats[i - 1] ?? 0);
+    if (gap > 1e-6 && gap < finest) finest = gap;
+  }
+  // The longest allowed period that still fits inside the tightest gap.
+  return STRIKE_PERIODS.find((period) => period <= finest + 1e-6) ?? STRIKE_PERIODS.at(-1) ?? 1;
+}
 
 export type AttemptResult = {
   scenarioId: string;
@@ -53,7 +93,6 @@ export type AttemptResult = {
 
 export type AttemptEvent =
   | { type: "judgment"; judgment: JudgmentEvent }
-  | { type: "energy"; energy: EnergyEvent }
   | { type: "starEarned"; stars: number }
   | { type: "measureComplete"; measureIndex: number }
   | { type: "complete"; result: AttemptResult };
@@ -69,8 +108,6 @@ export type AttemptOptions = {
    * caller. Injected so the whole runtime is testable without a transport.
    */
   toBeat: (contextTime: number) => number;
-  /** Test seam. Defaults to {@link REACTION_DELAY_BEATS}. */
-  reactionDelayBeats?: number;
 };
 
 export class AttemptRuntime {
@@ -83,17 +120,17 @@ export class AttemptRuntime {
   readonly judge: TargetJudge;
   readonly score: AttemptScore;
   readonly starMeter: StarMeter;
-  readonly minigame: Minigame;
+  /** The repeat performer, when this scenario is a `RepeatMinigame`. */
+  readonly repeat: RepeatMinigame | null;
+/**
+   * PROTOTYPE: the actor that lives on the timeline itself
+   * (`docs/game-design/PROPOSED_Timeline_Actors.md`). Every scenario has one;
+   * a `RepeatMinigame` draws its performer instead, from `repeat` below.
+   */
+  readonly actor = new TimelineActor();
 
-  readonly #module: MinigameModule;
-  readonly #reactionDelayBeats: number;
   readonly #toBeat: (contextTime: number) => number;
   readonly #listeners: ((event: AttemptEvent) => void)[] = [];
-  #nextEnergyId = 1;
-  /** Latest attempt-relative beat seen by {@link AttemptRuntime.update}. */
-  #beat = 0;
-  /** Judged notes waiting out the reaction delay. */
-  #pending: { judged: Judged; atBeat: number }[] = [];
   #measuresCompleted = 0;
   #complete = false;
   #result: AttemptResult | null = null;
@@ -113,37 +150,20 @@ export class AttemptRuntime {
     this.key = options.key;
     this.startBeat = options.startBeat;
     this.#toBeat = options.toBeat;
-    this.#reactionDelayBeats = options.reactionDelayBeats ?? REACTION_DELAY_BEATS;
 
     this.targets = resolveTargets(level, options.key);
     this.judge = new TargetJudge({ targets: this.targets, key: options.key });
     this.score = new AttemptScore({ streakBonusEligible: level.scoring.streakBonusEligible });
     this.starMeter = new StarMeter(level.stars);
-    const module = requireMinigame(
-      options.scenario.minigameId,
-      `scenario ${options.scenario.id}`
-    );
-    this.#module = module;
-    this.minigame = module.create({
-      config: options.scenario.config,
-      data: level.data,
-      assets: Object.keys(options.scenario.assetUrls),
-      plan: {
-        measures: level.measurePlan.attemptMeasures,
-        beatsPerMeasure: level.measurePlan.beatsPerMeasure,
-        totalBeats: level.measurePlan.attemptMeasures * level.measurePlan.beatsPerMeasure,
-      },
-      opportunities: this.targets.map(
-        (target): Opportunity => ({
-          index: target.opportunityIndex,
-          startBeat: target.startBeat,
-          durationBeats: target.durationBeats,
-          duration: target.duration,
-          lane: target.lane,
-          midi: target.midi,
-        })
-      ),
-    });
+    // One class per scenario, chosen by the scenario's own declaration. The
+    // runtime never guesses: a class whose data is absent is simply not built.
+    this.repeat =
+      options.scenario.assetBindings.kind === "repeat"
+        ? new RepeatMinigame({
+            performerLane: repeatPerformerLane(this.targets),
+            strikePeriodBeats: repeatStrikePeriod(this.targets),
+          })
+        : null;
 
     this.judge.onEvent((judgment) => this.#onJudgment(judgment));
   }
@@ -168,16 +188,6 @@ export class AttemptRuntime {
     return this.startBeat + ATTEMPT_BEATS;
   }
 
-  /**
-   * Developer-panel rows this scenario's minigame wants to show.
-   *
-   * Routed through the module rather than read off the instance, so the app
-   * shell never needs to know what kind of minigame it is looking at.
-   */
-  get debugRows(): Readonly<Record<string, string>> {
-    return this.#module.debug?.(this.minigame) ?? {};
-  }
-
   /** Attempt-relative beat, from an absolute transport beat. */
   toAttemptBeat(absoluteBeat: number): number {
     return absoluteBeat - this.startBeat;
@@ -188,10 +198,14 @@ export class AttemptRuntime {
   /**
    * Normalised guitar input.
    *
-   * Only attacks and revisions reach judgment. Sustain updates carry bend data
-   * that no Rocky Ascent target asks about, and releases matter to duration
-   * grading, which this scenario does not use — both are forwarded to nothing
-   * rather than being turned into extra played notes.
+   * Attacks, revisions and releases reach judgment. Sustain updates carry bend
+   * data that no Rocky Ascent target asks about and are forwarded to nothing.
+   *
+   * Releases used to be dropped here on the grounds that nothing graded note
+   * duration. Something does now — not duration grading, but the backing-track
+   * duck (`game/backing-duck.ts`), which treats letting a note go at the right
+   * moment as evidence that the player is on top of the phrase. A release still
+   * cannot resolve, re-resolve or re-score a target; see `judgment.ts`.
    */
   handleGuitarEvent(event: GuitarInputEvent): void {
     if (this.#complete) return;
@@ -202,6 +216,9 @@ export class AttemptRuntime {
       case "retune":
         this.judge.retune(event.id, event.midi);
         break;
+      case "release":
+        this.judge.release(event.id, this.toAttemptBeat(this.#toBeat(event.contextTime)));
+        break;
       default:
         break;
     }
@@ -210,123 +227,116 @@ export class AttemptRuntime {
   /** Drives expiry, effect decay and completion. Safe to call every frame. */
   update(absoluteBeat: number): void {
     if (this.#complete) {
-      this.#beat = this.toAttemptBeat(absoluteBeat);
-      this.#flushPending(this.#beat);
-      this.minigame.update(this.#beat);
+      this.repeat?.update(this.toAttemptBeat(absoluteBeat));
       return;
     }
 
     const beat = this.toAttemptBeat(absoluteBeat);
-    this.#beat = beat;
     this.judge.tick(beat);
-    this.#flushPending(beat);
-    this.minigame.update(beat);
+    this.repeat?.update(beat);
+    // What the actor should be leaning at. At 60bpm there is most of a second
+    // between quarter notes, and an idle actor there is dead air; aimed at the
+    // next lane it doubles as a pointer at the note that is coming.
+    this.actor.aimAt(this.judge.currentTarget(beat)?.lane ?? null);
 
+    // The plan counts the authored phrase; the attempt plays it more than once.
     const measures = Math.min(
-      this.level.measurePlan.attemptMeasures,
+      this.level.measurePlan.attemptMeasures * ATTEMPT_REPEATS,
       Math.floor(beat / BEATS_PER_MEASURE)
     );
     while (this.#measuresCompleted < measures) {
       const index = this.#measuresCompleted;
       this.#measuresCompleted += 1;
-      this.minigame.onMeasure(index, beat);
       this.#emit({ type: "measureComplete", measureIndex: index });
     }
 
     if (beat >= ATTEMPT_BEATS) this.#finish(beat);
   }
 
-  /**
-   * Hands one energy event to the scenario.
-   *
-   * Called by the presentation layer when the visual streak arrives, so the
-   * player sees their note cause the step rather than merely accompany it. A
-   * headless caller delivers immediately.
-   */
-  deliverEnergy(energy: EnergyEvent, atBeat: number): void {
-    const judged: Judged = {
-      id: energy.id,
-      outcome: energy.cause,
-      opportunityIndex: energy.opportunityIndex,
-      playedMidi: energy.playedMidi,
-      lane: energy.lane,
-      beat: energy.beat,
-    };
-    // Zero is delivered on the spot rather than on the next frame, so the
-    // default really is "the reaction happens when the note is judged" and not
-    // "one frame later, usually".
-    if (this.#reactionDelayBeats <= 0) {
-      this.minigame.onJudged(judged, atBeat);
-      return;
-    }
-    this.#pending.push({ judged, atBeat: atBeat + this.#reactionDelayBeats });
-  }
-
-  /** Hands over any judged note whose reaction delay has elapsed. */
-  #flushPending(beat: number): void {
-    if (this.#pending.length === 0) return;
-    const due = this.#pending.filter((entry) => entry.atBeat <= beat);
-    if (due.length === 0) return;
-    this.#pending = this.#pending.filter((entry) => entry.atBeat > beat);
-    for (const entry of due) this.minigame.onJudged(entry.judged, beat);
-  }
-
   /* ------------------------------------------------------------------ */
 
   #onJudgment(judgment: JudgmentEvent): void {
     this.score.apply(judgment);
+    this.#driveActor(judgment);
+    this.#driveRepeat(judgment);
     this.#emit({ type: "judgment", judgment });
 
     const before = this.starMeter.stars;
-    const after = this.starMeter.update(this.score.judgmentPoints);
-    if (after > before) {
-      this.minigame.onStarEarned(after, this.#beat);
-      this.#emit({ type: "starEarned", stars: after });
-    }
-
-    const energy = this.#energyFor(judgment);
-    if (energy) this.#emit({ type: "energy", energy });
+    const after = this.starMeter.update(this.score.judgmentPoints, this.score.consistencyPoints);
+    if (after > before) this.#emit({ type: "starEarned", stars: after });
   }
 
-  #energyFor(judgment: JudgmentEvent): EnergyEvent | null {
+  /**
+   * Places one can in response to one judgment.
+   *
+   * The mirror image of `#driveActor`: a projectile resolves at the strike line
+   * and leaves no state behind, so it is safe — and diagnostic — to let the
+   * played pitch put it where the player actually played.
+   *
+   * Every judgment produces a can, a miss included. The can was already on
+   * screen riding in on its bar before it was judged, so it has to go
+   * somewhere; a miss is the one outcome where the answer is "nowhere", and
+   * watching it stay down and roll past is the point.
+   */
+  #driveRepeat(judgment: JudgmentEvent): void {
+    const repeat = this.repeat;
+    if (!repeat) return;
     switch (judgment.type) {
       case "PerfectNote":
       case "GoodNote":
-        return this.#energy({
-          polarity: "good",
-          cause: judgment.type === "PerfectNote" ? "perfect" : "good",
-          lane: judgment.target.lane,
-          beat: judgment.target.startBeat,
-          opportunityIndex: judgment.target.opportunityIndex,
-          playedMidi: judgment.playedMidi,
-        });
+      case "WrongNote": {
+        // The PLAYED pitch places the can — that is the whole mechanic. It is
+        // quantised to a lane for placement only; judgment already happened and
+        // is not revisited here.
+        const beat =
+          judgment.type === "WrongNote" ? judgment.atBeat : judgment.target.startBeat;
+        repeat.place(laneOfMidi(judgment.playedMidi, this.key), beat);
+        break;
+      }
       case "MissedNote":
-        return this.#energy({
-          polarity: "bad",
-          cause: "miss",
-          lane: judgment.target.lane,
-          beat: judgment.target.startBeat,
-          opportunityIndex: judgment.target.opportunityIndex,
-          // A miss is a target nothing was played for.
-          playedMidi: null,
-        });
-      case "WrongNote":
-        return this.#energy({
-          polarity: "bad",
-          cause: "wrong",
-          lane: judgment.lanePosition,
-          beat: judgment.atBeat,
-          // A wrong note matched no target, so it resolves no opportunity.
-          opportunityIndex: null,
-          playedMidi: judgment.playedMidi,
-        });
+        // Its own lane, its own beat: the can stays exactly where it already
+        // was and keeps travelling with the bar it arrived in.
+        repeat.miss(judgment.target.lane, judgment.target.startBeat);
+        break;
+      case "NoteReleasedOnTime":
+        // Explicitly nothing. The can for this note was already placed when the
+        // attack was judged, and the crusher gets exactly one swing per note
+        // opportunity; a second event for the same note must not put a second
+        // can on the belt. The release only feeds the backing-track duck.
+        break;
       default:
-        return null;
+        break;
     }
   }
 
-  #energy(fields: Omit<EnergyEvent, "id">): EnergyEvent {
-    return { id: this.#nextEnergyId++, ...fields };
+  /**
+   * Moves the timeline actor in response to one judgment.
+   *
+   * Lands on the *target's* lane, never the played pitch — see
+   * `timeline-actor.ts` for why that distinction is what keeps a single mistake
+   * from ending a run. A wrong note kills the actor without moving it anywhere.
+   */
+  #driveActor(judgment: JudgmentEvent): void {
+    switch (judgment.type) {
+      case "PerfectNote":
+      case "GoodNote":
+        this.actor.land(judgment.target.lane, judgment.target.startBeat);
+        break;
+      case "MissedNote":
+        this.actor.fall(judgment.target.startBeat);
+        break;
+      case "WrongNote":
+        this.actor.fall(judgment.atBeat);
+        break;
+      case "NoteReleasedOnTime":
+        // Explicitly nothing. The actor already landed on this target's lane
+        // when the attack was judged, and it moves once per note opportunity —
+        // a release must not advance the goat a second time, which would let a
+        // sustained note carry it further than the phrase does.
+        break;
+      default:
+        break;
+    }
   }
 
   #finish(beat: number): void {
@@ -335,9 +345,9 @@ export class AttemptRuntime {
     this.judge.tick(beat);
     this.#complete = true;
 
-    const stars = this.starMeter.update(this.score.judgmentPoints);
+    const stars = this.starMeter.update(this.score.judgmentPoints, this.score.consistencyPoints);
     const passed = stars >= 1;
-    this.minigame.onComplete(passed, stars, beat);
+    this.repeat?.complete(passed, beat);
 
     this.#result = {
       scenarioId: this.scenario.id,

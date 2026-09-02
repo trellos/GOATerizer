@@ -28,13 +28,58 @@
           <h1 class="title">GOATerizer</h1>
           <p class="tagline">You really suck and this is your best shot.</p>
           <button class="primary" id="start-play" type="button">Play</button>
+          <button class="secondary" id="start-calibrate" type="button">Timing check</button>
           <p class="hint">
             Plug in or mic a guitar. The browser will ask for the microphone.
           </p>
+          <p class="hint" id="start-calibration-state"></p>
           <div class="high-scores">
             <h2>High scores</h2>
             <ul id="start-high-scores"></ul>
           </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------------- -->
+      <!--
+        The timing check. Deliberately the plainest screen in the game: there is
+        no timeline, no scenario and nothing that moves on the beat, because a
+        visual pulse is something the player would sync to and the whole point
+        is measuring them against the *sound*. The only thing that animates is a
+        bar counter, once per bar, which is far too coarse to play to.
+      -->
+      <section class="screen" id="screen-calibrate">
+        <div class="start-card calibrate-card">
+          <h2 class="bar-title">Timing check</h2>
+          <p class="calibrate-lede" id="calibrate-lede">
+            Play one note on every click. Any note — an open string is fine.
+            Listen to the click; don't watch the screen.
+          </p>
+
+          <p class="calibrate-phase" id="calibrate-phase">Ready when you are.</p>
+          <p class="calibrate-progress" id="calibrate-progress">&nbsp;</p>
+
+          <dl class="calibrate-figures">
+            <div>
+              <dt>Your offset</dt>
+              <dd id="calibrate-offset">—</dd>
+            </div>
+            <div>
+              <dt>Your consistency</dt>
+              <dd id="calibrate-spread">—</dd>
+            </div>
+          </dl>
+          <p class="note" id="calibrate-verdict">
+            The offset is your rig and your feel together. The consistency is
+            just you — it says whether the offset can be trusted.
+          </p>
+
+          <div class="button-row calibrate-actions">
+            <button class="primary" id="calibrate-start" type="button">Start</button>
+            <button class="secondary" id="calibrate-apply" type="button" disabled>Apply</button>
+            <button class="secondary" id="calibrate-back" type="button">Back</button>
+          </div>
+          <p class="hint" id="calibrate-current">—</p>
         </div>
       </section>
 
@@ -60,8 +105,17 @@
           </div>
         </header>
 
-        <div class="stage setup-stage">
-          <div class="setup-row">
+        <div class="timeline-pane">
+          <canvas id="pregame-canvas"></canvas>
+        </div>
+
+        <!--
+          The setup controls sit above and below the lane band, never over it:
+          the timeline you warm up on has to be the same rectangle you play on,
+          so the middle row of this grid is left empty for it.
+        -->
+        <div class="setup-overlay">
+          <div class="setup-row setup-row-top">
             <div class="control-block">
               <h3>Key</h3>
               <button class="secondary" id="pregame-reroll" type="button">
@@ -75,27 +129,60 @@
             </div>
 
             <div class="control-block">
+              <h3>Timeline view</h3>
+              <div class="button-row" id="pregame-views">
+                <button class="chip" type="button" data-view="key" data-selected="true">
+                  Key View
+                </button>
+                <button class="chip" type="button" data-view="tab">Tablature View</button>
+              </div>
+            </div>
+
+            <div class="control-block">
               <h3>Guitar input</h3>
               <p class="readout" id="pregame-input-state">Not started.</p>
               <div class="meter" id="pregame-level"><span></span></div>
             </div>
+
+            <div class="control-block" id="pregame-input-block">
+              <h3>Input level</h3>
+              <p class="readout" id="pregame-input-level">—</p>
+              <p class="readout" id="pregame-input-verdict">
+                Listening from the moment the mic opens. Play a few notes at your
+                normal strength and this sets itself.
+              </p>
+              <div class="button-row">
+                <button class="chip" id="pregame-input-apply" type="button" disabled>
+                  Use my level
+                </button>
+                <button class="chip" id="pregame-input-reset" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div class="control-block" id="pregame-timing-block">
+              <h3>Timing</h3>
+              <p class="readout" id="pregame-latency">—</p>
+              <p class="readout" id="pregame-calibration">
+                Play single notes on the beat to measure your rig.
+              </p>
+              <div class="button-row">
+                <button class="chip" id="pregame-calibrate-apply" type="button" disabled>
+                  Apply
+                </button>
+                <button class="chip" id="pregame-calibrate-reset" type="button">Reset</button>
+              </div>
+            </div>
           </div>
 
-          <div class="control-block fingering-block">
-            <h3>Fingering — where on the neck</h3>
-            <div class="fingering-row" id="pregame-fingerings"></div>
-            <p class="note">
-              One octave, root to root, in one hand position. A physical
-              reference only — Tuninator judges the pitch, not where you fretted
-              it.
-            </p>
+          <div class="setup-band-spacer" aria-hidden="true"></div>
+
+          <div class="setup-row setup-row-bottom">
+            <div class="control-block fingering-block">
+              <h3>Fingering — where on the neck</h3>
+              <div class="fingering-row" id="pregame-fingerings"></div>
+            </div>
+            <button class="primary" id="pregame-play" type="button">Play</button>
           </div>
-
-          <button class="primary" id="pregame-play" type="button">Play</button>
-        </div>
-
-        <div class="timeline-pane">
-          <canvas id="pregame-canvas"></canvas>
         </div>
       </section>
 
@@ -108,11 +195,13 @@
           </div>
           <ol class="history" id="hud-history"></ol>
           <div class="bar-right">
-            <span class="hud-meter" id="hud-meter">☆☆☆</span>
-            <span class="hud-scenario" id="hud-scenario">—</span>
             <span class="hud-score" id="hud-score">0</span>
           </div>
         </header>
+
+        <div class="stage scenario-strip">
+          <canvas id="scenario-canvas"></canvas>
+        </div>
 
         <div class="timeline-pane">
           <canvas id="game-canvas"></canvas>
@@ -173,18 +262,16 @@
         </label>
         <div class="button-row">
           <button class="chip" type="button" id="dev-autoplay-perfect">Autoplay 100%</button>
+          <button class="chip" type="button" id="dev-autoplay-75">Autoplay 75%</button>
           <button class="chip" type="button" id="dev-autoplay-50">Autoplay 50%</button>
           <button class="chip" type="button" id="dev-autoplay-25">Autoplay 25%</button>
           <button class="chip" type="button" id="dev-autoplay-off">Stop autoplay</button>
-        <button class="chip" type="button" id="dev-skins" data-selected="true">
-          Scenario note art
-        </button>
         </div>
       </div>
     </aside>
 
     <template id="tpl-history-slot">
-      <li class="history-slot" data-state="pending"><span class="slot-stars"></span></li>
+      <li class="history-slot" data-state="pending"><span class="slot-trophy"></span></li>
     </template>
 
     <script type="module" src="/src/main.ts"></script>

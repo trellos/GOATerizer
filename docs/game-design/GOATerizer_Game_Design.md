@@ -138,7 +138,8 @@ Target prompts are authored in diatonic / scale-degree terms so the same level c
 
 One play of one minigame.
 
-An attempt is normally four measures of four beats.
+An attempt is normally two passes at a four-measure phrase of four beats —
+eight measures in all. See §8.
 
 ## Run
 
@@ -410,7 +411,7 @@ Slurs and other expressive gestures may also have special notation.
 
 ---
 
-# 6. Energy and Minigame Feedback
+# 6. Energy and Scenario Feedback
 
 Every judged guitar event can create visual energy.
 
@@ -431,48 +432,33 @@ Produced by:
 - wrong played notes,
 - missed target opportunities.
 
-## Where It Happens
+A short visual streak travels from the judged note on the timeline into the scenario.
 
-**At the note.** The timeline is the only surface (§11.2), so the note the player
-hit is the thing that reacts: the can on that bar is crushed, the goat lands on
-that foothold, that fence post falls.
+This is a simple authored visual effect, not a requirement for a general particle system.
 
-There is no streak travelling from the timeline into a separate scenario area,
-because there is no separate area. Cause and effect are already co-located, which
-is a stronger reading of causality than a link between two regions ever was.
+## Scenario Response
 
-A minigame is handed each judged note and decides its own reaction and its own
-timing. It may animate that reaction over a short span — the host ships eased
-motion helpers for exactly this — but the reaction belongs to the note.
-
-## Minigame Response
-
-The current minigame decides what it means to care about good or bad energy.
+The current minigame class decides what it means to care about good or bad energy.
 
 Examples:
 
-- `ClimbMinigame`: good energy advances the climber to the next note; bad energy
-  may simply stall.
-- `PerformMinigame`: good energy improves the act; bad energy can cause
-  embarrassment.
-- `BattleMinigame`: good energy increases dominance; bad energy may benefit the
-  threat.
+- `ClimbMinigame`: good energy advances; bad energy may simply stall.
+- `PerformMinigame`: good energy improves the act; bad energy can cause embarrassment.
+- `BattleMinigame`: good energy increases dominance; bad energy may benefit the threat.
 - `RepeatMinigame`: a miss may simply fail to complete the next repeated action.
 
-The game-level system generates the performance event and the judged note. The
-minigame decides the consequence.
+The game-level system generates the performance event and energy. The class decides the scenario consequence.
 
-The contract it does that through is defined in:
+Detailed class behavior is defined in:
 
-- `GOATerizer_Minigame_Authoring.md`
+- `GOATerizer_Parameterized_Minigame_Behavior_and_Scenario_Bindings.md`
 - `GOATerizer_Scenario_Asset_Slot_Bindings.md`
 
 ---
 
 # 7. Stars and Minigame Progress
 
-Every minigame begins with three empty stars, in the HUD's right column beside
-the score they are denominated against (§11.1).
+Every minigame begins with three empty stars over the scenario.
 
 Scenario level data defines three cumulative performance thresholds:
 
@@ -505,7 +491,9 @@ There is no requirement for special scenario-specific failure artwork. Failing t
 
 # 8. Measure Scope Inside Scenarios
 
-Every normal attempt lasts four measures, but how a scenario uses those four measures belongs to the **scenario/class design**, not the global game loop.
+A scenario authors a **four-measure phrase**, and a normal attempt plays that phrase twice — eight measures in all. One pass at a phrase is a sight-read and nothing else: the player meets the material cold, works out where their hand goes, and the attempt is over. Playing it twice makes the first pass the read and the second the performance, and the attempt is scored as a whole, so getting it right the second time round redeems a bad first read. The repeat count is global (`ATTEMPT_REPEATS`), not a scenario setting.
+
+How a scenario uses its four authored measures still belongs to the **scenario/class design**, not the global game loop.
 
 Examples:
 
@@ -517,7 +505,8 @@ Examples:
 The game-level system only guarantees:
 
 ```text
-AttemptLength = 4 measures
+PhraseLength  = 4 measures   (what a scenario authors)
+AttemptLength = PhraseLength x ATTEMPT_REPEATS = 8 measures
 ```
 
 The scenario's `MeasurePlan` controls:
@@ -600,115 +589,78 @@ transitionSeconds = 60 / BPM
 
 # 11. Main Game Screen
 
-The screen is two things:
+The screen is vertically organized:
 
-1. **Run UI / history bar**
-2. **The timeline**
-
-There is no third region. The timeline is both what the player reads to know what
-to play *and* the stage the minigame happens on.
+1. **Run UI / history**
+2. **Scenario strip**
+3. **Timeline**
 
 ## 11.1 Top UI Bar
 
 ### Left
+
+Show:
+
 - total stars earned in the run,
 - current musical key.
 
 ### Center
-A horizontal history of **16 elements**, one per minigame slot. Each begins
-inactive; after its minigame completes it shows zero to three stars. No numeric
-labels.
+
+Show a horizontal history of **16 elements**, one for each minigame slot.
+
+Each history element begins inactive / greyed out.
+
+After its minigame completes, it displays:
+
+- zero,
+- one,
+- two,
+- or three stars.
+
+No numeric labels are necessary.
 
 ### Right
-- current numeric score,
-- the **current minigame's three-star meter**, filling during the attempt,
-- the current minigame's name and level.
 
-The star meter and the scenario name lived on the scenario strip. With the strip
-gone they belong here, beside the score they are denominated against, rather than
-on the timeline where they would compete with the notes for the player's eye.
+Show:
 
-## 11.2 The Timeline Is the Stage
+- current numeric score.
 
-There is no scenario panel. A minigame owns the timeline's appearance for the
-four measures it is active, and everything it does happens there.
+Do not show high score here.
 
-The player is reading the timeline to know what to play. The minigame is what
-happens on that same surface in response to their playing:
+## 11.2 Scenario Strip
 
-- a goat hops from note bar to note bar as each note is hit,
-- a tin can sits on a bar and is crushed against a forehead when the note lands,
-- a hay bale on a bar is shredded, a fence post knocked flat.
+The scenario area is wider than one scenario panel.
 
-Cause and effect are in one place. The note the player hit *is* the thing that
-reacted, so no visual link between two regions is needed.
+At any time it shows:
 
-## 11.3 Measure Geometry
+- half of the previous scenario on the left,
+- the full current scenario in the center,
+- half of the upcoming scenario on the right.
 
-Time scrolls right to left. A vertical bar marks **current time**; a note crosses
-it exactly when it should be played.
+The next scenario is intentionally visible before the player knows whether they will survive the current one.
 
-**Each measure — four beats — occupies a golden rectangle.** Its width is
-phi ~= 1.618 times the height of the lane band. Two consequences follow and are
-binding:
+Its identity is already known because the full 16-minigame run sequence is generated before play starts.
 
-- **Pixels-per-beat is derived from height, not chosen.** It is
-  `(phi * laneBandHeight) / 4`. The scroll speed is a consequence of the layout,
-  not a separate tuning number.
-- **The lane band's height is bounded by the play width.** At least one full
-  measure must be visible before the current-time bar and at least one after, so
-  the play area must be at least `2*phi ~= 3.236` times as wide as the lane band
-  is tall. The timeline therefore does *not* simply expand to fill the space the
-  scenario strip vacated: past a certain height, fewer than two measures fit.
+The current scenario contains its own:
 
-Measure boundaries are load-bearing, not decoration: they are where one
-minigame's background ends and the next one's begins.
+- background,
+- characters,
+- props,
+- effects,
+- class-controlled behavior,
+- and three-star meter.
 
-The play area may be taller than the lane band. The minigame's background fills
-that full height behind its own measures, which is what gives an actor somewhere
-to stand when it hops onto a bar.
+## 11.3 Scenario Completion Transition
 
-## 11.4 What the Host Owns, Absolutely
-
-- **Note geometry.** Horizontal position from musical time, vertical position
-  from pitch lane, and **width from duration** — a quarter note is four times the
-  width of a sixteenth, and that difference is how the player reads rhythm.
-- the lane grid, the lane labels and the gutter,
-- the current-time bar and the measure boundaries,
-- the played-note row — the player's own performance, which must look identical
-  in every minigame,
-- the bass line,
-- judgment display.
-
-A minigame cannot move a note in time or pitch, resize one, or obscure the
-player's own note. It is handed geometry and decides what is drawn in and around
-it.
-
-## 11.5 What the Minigame Owns
-
-- **The note skin.** What a target note is made of — rock, tin, hay.
-- **The background behind its own measures.** Not the whole timeline: the
-  measures it is active for.
-- **Actors and effects on the timeline**, anchored to the notes they act on or
-  placed freely within its own measures.
-
-## 11.6 Minigame Handover
-
-There is no panel slide. Because each minigame owns the background behind its own
-measures, handover is simply the timeline continuing to scroll: the outgoing
-minigame's measures and background travel off to the left while the incoming
-one's arrive from the right. The boundary between them is a measure line.
-
-Because at least one measure of future is always visible, **the next minigame's
-background and first notes arrive before the player finds out whether they
-survived the current one** — which is what the scenario strip existed to do,
-achieved without a strip.
-
-At the end of the fourth measure:
+After the fourth measure:
 
 1. determine final stars,
 2. fly the earned star(s) into the corresponding history element,
-3. zero stars ends the run.
+3. if zero stars, end the run,
+4. otherwise slide the scenario strip left over exactly one beat,
+5. the previous current scenario becomes the half-visible left panel,
+6. the upcoming scenario becomes current,
+7. a newly upcoming scenario becomes visible on the right.
 
 The beat and bass line continue uninterrupted.
 
@@ -737,24 +689,29 @@ Time scrolls from right to left.
 An incoming target note:
 
 - appears on the right,
-- travels to the center,
+- takes **four beats** to travel to the center,
 - reaches the center exactly when it should be played,
 - continues into history,
-- and leaves at the left edge.
+- reaches the left edge **four beats later**.
 
-A strong vertical marker at the center defines the exact intended performance
-time.
+The visible timeline therefore represents roughly:
 
-**The span is derived, not chosen.** Each measure is a golden rectangle
-(§11.3), so pixels-per-beat falls out of the lane band's height and the visible
-span is whatever the play area's width then allows. At least one full measure is
-visible before the current-time bar and at least one after.
+```text
+4 beats of future
++
+current strike line
++
+4 beats of history
+```
 
-> **Revised twice.** The original two beats each way made a sixteenth-note run
-> arrive too fast to read as pitch. Four beats each way fixed that and was the
-> rule until measures became golden rectangles; the span is now a consequence of
-> the layout rather than a constant, and four beats each way is roughly what the
-> geometry produces at a typical viewport anyway.
+> **Revised from two beats.** At two beats a sixteenth-note run arrives too fast
+> to read as pitch: the note only becomes legible once it is nearly on the strike
+> line, which is too late to be deciding which fret to be on. Four beats trades
+> on-screen note density for reading time. The span is one number in
+> `src/config/tuning.ts` (`TIMELINE_FUTURE_BEATS` / `TIMELINE_HISTORY_BEATS`);
+> the play area is a fixed width, so the span *is* the scroll speed.
+
+A strong vertical marker at the center defines the exact intended performance time.
 
 ## 12.2 Note Duration
 
@@ -793,7 +750,7 @@ The bass line is backing information, not a second target track.
 
 ---
 
-# 13. Timeline — Key View
+# 13. Timeline View A — Key View
 
 Key View prioritizes the relationship of each pitch to the current musical key.
 
@@ -885,24 +842,63 @@ If the player produces a non-diatonic note:
 
 ---
 
-# 14. Fingering Selection
+# 14. Timeline View B — Tablature View
 
-> **Tablature View was removed.** Key View (§13) is the only timeline
-> presentation. Tablature View's string lanes, fret numbers, tab bass rendering
-> and its unresolved wrong-note presentation are all withdrawn with it; see
-> `DECISION_LOG.md` DECISION-021. Fingering selection, specified below, was
-> §14.3 and survives unchanged — it is a pregame practice choice, not a
-> timeline mode.
+Tablature View prioritizes immediate fingering readability.
+
+## 14.1 String Lanes
+
+There are six rows:
+
+```text
+E
+A
+D
+G
+B
+e
+```
+
+## 14.2 Target Notes
+
+Target notes use conventional tablature-like fret numbers and rhythmic notation sufficient to distinguish:
+
+- half notes,
+- quarter notes,
+- eighth notes,
+- sixteenth notes,
+- sustained notes,
+- bends / expressive gestures.
+
+A bend should visibly communicate movement toward the destination pitch rather than looking like two unrelated plucks.
+
+Each string row draws a thin string line; a target or played note is a filled bar spanning that row, from halfway to the string above to halfway to the string below, with the fret number set on the bar itself. This is the same bar geometry Key View uses (§13.1), so the two views differ only in what the vertical axis means.
+
+## 14.3 Fingering Selection
 
 During pregame, the player can choose from several suggested one-octave fingerings for the selected key in different fretboard regions.
 
 Each is shown as a five-fret neck diagram, because the choice being made is *where on the neck to practise this* and that is a picture rather than a sentence. Every offered shape fits inside one five-fret hand position; a shape that would make the hand travel is not offered.
 
-The selected fingering is shown as labels over the pitch lanes in pregame. It does **not** place anything on the timeline: the vertical axis is harmonic role, in every screen and at every moment.
+The selected fingering determines how target pitches are mapped onto strings and frets in Tablature View.
 
 The fingering is a **visual convenience**, not a physical-input requirement.
 
 Tuninator judges the produced pitch / gesture. If the player reaches the correct pitch using another physically valid fingering, it still counts.
+
+## 14.4 Bass Line
+
+The bass line may be shown as darker fret positions without full rhythmic tab notation.
+
+This presentation should be tested for clarity.
+
+## 14.5 Wrong-Note Display
+
+Played notes that do not match the current target must still appear as bad input.
+
+The exact visual representation of a non-diatonic or otherwise unmappable played note in Tablature View is still a UI design detail to resolve.
+
+It must not silently disappear.
 
 ---
 
@@ -953,11 +949,23 @@ Choose:
 
 Changing tempo should update smoothly rather than hard-resetting playback.
 
+### Timeline View
+
+Choose before the run:
+
+- **Key View**
+- **Tablature View**
+
+This selection is fixed for the run in the initial version.
+
 ### Fingering
 
 Choose one suggested one-octave scale fingering from several fretboard regions.
 
-The selection provides the pregame physical reference shown over the pitch lanes. It does not place anything on the timeline.
+The same selection:
+
+- provides the pregame physical reference in Key View,
+- determines target fret/string mapping in Tablature View.
 
 ### Play
 
@@ -1131,11 +1139,7 @@ The detailed content/runtime architecture is defined by:
 
 If this GDD conflicts with those documents on **game-level flow**, this GDD should be treated as the newer authority.
 
-Those companions were written for a scenario panel, which no longer exists. **On
-the playfield surface — what a minigame draws, and where — §11 of this GDD and
-`GOATerizer_Minigame_Authoring.md` are authoritative.** The companions remain
-authoritative for scenario premises, asset inventory and per-family visual
-intent, which the change of surface did not touch.
+For minigame-class visual behavior and scenario asset bindings, the companion specifications remain authoritative.
 
 ---
 
@@ -1232,6 +1236,10 @@ The exact definition of which passages are streak-eligible and whether every str
 
 The harmonic/rhythmic grammar used to generate the persistent four-measure backing line is not yet specified.
 
+## Tablature Wrong-Note Rendering
+
+A bad played pitch that does not map naturally into the selected one-octave fingering must still appear in history. The exact Tablature View presentation remains to be designed.
+
 ---
 
 # 24. Core Game Loop Summary
@@ -1242,6 +1250,7 @@ START
 Pregame
     choose / reroll key + bass line
     choose tempo
+    choose Key View or Tablature View
     choose suggested fingering
     play guitar freely against live bass loop
     ↓
@@ -1252,8 +1261,8 @@ Minigame 1
     4 measures
     play prompted guitar exercise
     Tuninator judges performance
-    each judged note is handed to the minigame
-    the minigame reacts on the timeline
+    timeline emits good/bad energy
+    scenario responds
     earn 0–3 stars
     ↓
 0 stars? ── YES ──→ GAME OVER
@@ -1261,8 +1270,7 @@ Minigame 1
     NO
     ↓
 stars fly to history
-outgoing minigame's measures scroll off left
-incoming minigame's measures scroll in from the right
+scenario strip slides left over 1 beat
 music never stops
     ↓
 next minigame

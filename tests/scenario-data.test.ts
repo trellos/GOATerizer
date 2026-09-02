@@ -9,10 +9,16 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_REPEATS } from "../src/config/tuning.js";
+
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
-import { climbConfig, climbLevelData } from "../src/scenario/minigames/climb-minigame.js";
 import { formatDegreeToken } from "../src/music/degrees.js";
-import type { ScenarioLevelData } from "../src/scenario/types.js";
+import type {
+  ClimbAssetBindings,
+  ClimbClassParameters,
+  RouteData,
+  ScenarioLevelData,
+} from "../src/scenario/types.js";
 
 const LEVELS = [1, 2, 3, 4] as const;
 
@@ -29,34 +35,43 @@ function level(difficulty: number): ScenarioLevelData {
 }
 
 /**
- * Rocky Ascent's climb halves, narrowed once.
- *
- * `config` and `data` are `unknown` on the scenario model: the host carries
- * them and only `ClimbMinigame` knows their shape. A test asserting on a route
- * or an asset slot is a climb test and has to say so.
+ * Rocky Ascent is a `ClimbMinigame`, so every level authors a route. Narrowing
+ * here makes the failure mode "it stopped being a climb scenario" rather than a
+ * wall of non-null assertions.
  */
-const ASCENT = climbConfig(ROCKY_ASCENT.config);
-const climbLevel = (difficulty: number) =>
-  climbLevelData(ROCKY_ASCENT.levels.get(difficulty)!.data);
+function routeOf(difficulty: number): RouteData {
+  const route = level(difficulty).route;
+  if (!route) throw new Error(`Rocky Ascent L${difficulty} must author a route`);
+  return route;
+}
+
+const ASCENT_BINDINGS: ClimbAssetBindings = (() => {
+  const bindings = ROCKY_ASCENT.assetBindings;
+  if (bindings.kind !== "climb") throw new Error("Rocky Ascent must bind ClimbMinigame slots");
+  return bindings;
+})();
+
+const ASCENT_PARAMETERS: ClimbClassParameters = (() => {
+  const parameters = ROCKY_ASCENT.classParameters;
+  if (parameters.kind !== "climb") {
+    throw new Error("Rocky Ascent must carry ClimbMinigame parameters");
+  }
+  return parameters;
+})();
 
 describe("Rocky Ascent scenario", () => {
   it("is a ClimbMinigame supporting exactly L1-L4", () => {
     expect(ROCKY_ASCENT.id).toBe("rocky_ascent");
-    expect(ROCKY_ASCENT.minigameId).toBe("ClimbMinigame");
+    expect(ROCKY_ASCENT.minigameClass).toBe("ClimbMinigame");
     expect(ROCKY_ASCENT.family).toBe("Scale");
     expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...ROCKY_ASCENT.levels.keys()]).toEqual([1, 2, 3, 4]);
   });
 
   it("runs one continuous four-measure visual arc with no measure reset", () => {
-    // Span and reset are per level now: a scenario whose visual cycle changes
-    // with difficulty is exactly what BATTLE needs, and a scenario-wide flag
-    // could not express it.
-    for (const difficulty of LEVELS) {
-      expect(climbLevel(difficulty).visualSpanMeasures).toBe(4);
-      expect(climbLevel(difficulty).resetBetweenMeasures).toBe(false);
-    }
-    expect(ASCENT.badNotePolicy).toBe("Wobble");
+    expect(ASCENT_PARAMETERS.visualSpanMeasures).toBe(4);
+    expect(ASCENT_PARAMETERS.resetBetweenMeasures).toBe(false);
+    expect(ASCENT_PARAMETERS.badNotePolicy).toBe("Wobble");
   });
 
   it.each(LEVELS)("L%i totals exactly 16 beats", (difficulty) => {
@@ -132,28 +147,43 @@ describe("Rocky Ascent scenario", () => {
     }
   });
 
-  /*
-   * The route tests that used to live here are gone with the route.
-   *
-   * A climb authored a start position, a destination and one waypoint per note
-   * opportunity, as coordinates in a scenario panel — and those tests checked
-   * that the waypoints stayed in the frame, ascended, and matched the note
-   * count. There is no panel (GDD §11.2): the note bars are the footholds, so
-   * every one of those properties is now structural rather than authored, and
-   * cannot be got wrong by an edit to a scenario file.
-   *
-   * What is left worth asserting is that the climb still escalates with
-   * difficulty — which it does through the music now, not through geometry.
-   */
-  it.each(LEVELS)("L%i spans all four measures in one continuous arc", (difficulty) => {
-    expect(climbLevel(difficulty).visualSpanMeasures).toBe(4);
-    expect(climbLevel(difficulty).resetBetweenMeasures).toBe(false);
+  it.each(LEVELS)("L%i authors one waypoint per note opportunity", (difficulty) => {
+    const data = level(difficulty);
+    expect(routeOf(difficulty).waypoints).toHaveLength(data.noteOpportunityCount);
   });
 
-  it("escalates with difficulty: more notes to climb, not a bigger drawing", () => {
-    const footholds = (difficulty: number) => level(difficulty).noteOpportunityCount;
-    expect(footholds(4)).toBeGreaterThan(footholds(1));
-    expect(footholds(3)).toBeGreaterThan(footholds(1));
+  it.each(LEVELS)("L%i waypoints stay inside normalised scenario space", (difficulty) => {
+    for (const wp of routeOf(difficulty).waypoints) {
+      expect(wp.x).toBeGreaterThanOrEqual(0);
+      expect(wp.x).toBeLessThanOrEqual(1);
+      expect(wp.y).toBeGreaterThanOrEqual(0);
+      expect(wp.y).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it.each(LEVELS)("L%i climbs: every waypoint is above the previous one", (difficulty) => {
+    const waypoints = routeOf(difficulty).waypoints;
+    for (let i = 1; i < waypoints.length; i += 1) {
+      // y is downwards, so "higher up the mountain" is a smaller y.
+      expect(waypoints[i]!.y).toBeLessThan(waypoints[i - 1]!.y);
+    }
+    expect(waypoints[0]!.y).toBeLessThan(routeOf(difficulty).startPosition.y);
+  });
+
+  it("escalates visually with difficulty", () => {
+    const rise = (difficulty: number) => {
+      const route = routeOf(difficulty);
+      const last = route.waypoints[route.waypoints.length - 1]!;
+      return route.startPosition.y - last.y;
+    };
+    // L4's climb covers more vertical frame than L1's, on twice the steps.
+    expect(rise(4)).toBeGreaterThan(rise(1));
+    expect(rise(3)).toBeGreaterThan(rise(1));
+    // ...and its summit sits nearer the top of the frame.
+    const summitY = (d: number) => routeOf(d).destination.y;
+    expect(summitY(4)).toBeLessThan(summitY(3));
+    expect(summitY(3)).toBeLessThan(summitY(2));
+    expect(summitY(2)).toBeLessThan(summitY(1));
   });
 
   it.each(LEVELS)("L%i star thresholds ascend and three stars means all Perfect", (difficulty) => {
@@ -161,9 +191,20 @@ describe("Rocky Ascent scenario", () => {
     const { passThreshold, star2Threshold, star3Threshold } = data.stars;
     expect(passThreshold).toBeLessThan(star2Threshold);
     expect(star2Threshold).toBeLessThan(star3Threshold);
-    // 10 judgment points per Perfect note -- see src/config/tuning.ts.
-    expect(star3Threshold).toBe(data.noteOpportunityCount * 10);
+    // 10 judgment points per Perfect note -- see src/config/tuning.ts -- across
+    // the whole attempt, which plays the authored phrase ATTEMPT_REPEATS times.
+    expect(star3Threshold).toBe(data.noteOpportunityCount * 10 * ATTEMPT_REPEATS);
     expect(data.stars.provisional).toBe(true);
+  });
+
+  it.each(LEVELS)("L%i pass bar is a single clean pass, not a scaled one", (difficulty) => {
+    // The one threshold the repeat deliberately does NOT scale. Passing is the
+    // gate that ends a run, and leaving it where a four-measure attempt put it
+    // is what lets a good second pass redeem a bad first read.
+    const data = level(difficulty);
+    const onePass = data.noteOpportunityCount * 10;
+    expect(data.stars.passThreshold).toBe(Math.round(onePass * 0.45));
+    expect(data.stars.passThreshold).toBeLessThan(onePass);
   });
 
   it("is eligible for the difficulties it authors and no others", () => {
@@ -179,17 +220,16 @@ describe("Rocky Ascent scenario", () => {
   });
 
   it("binds every class asset slot to a resolvable URL", () => {
-    const bindings = ASCENT.bindings;
+    const bindings = ASCENT_BINDINGS;
     expect(bindings.climberPoses).toHaveLength(4);
     expect(bindings.stepEffects).toHaveLength(2);
     const ids = [
       bindings.background,
       ...bindings.climberPoses,
       bindings.finishPose,
+      ...bindings.waypointVisuals,
       bindings.destinationVisual,
       ...bindings.stepEffects,
-      bindings.footholdArt.body,
-      bindings.footholdArt.crag,
     ];
     for (const id of ids) expect(ROCKY_ASCENT.assetUrls[id]).toMatch(/\.png$/);
   });

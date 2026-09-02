@@ -1,19 +1,16 @@
 /**
  * The scenario library.
  *
- * Adding a scenario means: author a JSON file naming a registered minigame,
- * drop its art in `public/assets/scenarios/<id>/`, and add one entry here. No
- * gameplay code changes — which is the property the minigame API exists to
- * preserve. Adding a whole new *kind* of scenario means one more
- * `registerMinigame` line below and a module implementing `MinigameModule`;
- * nothing in `game/`, `ui/` or the loader learns its name.
+ * Adding another scenario of a class that already exists means: author a JSON
+ * file, drop its art in `public/assets/scenarios/<id>/`, and add one entry here.
+ * No gameplay code changes — which is the property the run shell and the
+ * minigame classes exist to preserve.
  *
  * The vertical slice ships one scenario. The run shell below still models all
  * 16 slots and the real difficulty sequence.
  */
 
-import { registerMinigame } from "../minigame/registry.js";
-import { CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
+import canCrushingJson from "../../docs/scenarios/can-crushing/can_crushing.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
 import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
@@ -30,29 +27,39 @@ const BASE_URL: string = import.meta.env?.BASE_URL ?? "/";
 /**
  * Placeholder art lives in the project's own asset tree, never hotlinked.
  * Provenance for every file is recorded in `docs/assets/ASSET_SOURCES.md`.
- *
- * *Which* ids a scenario needs is the minigame's answer, not this file's — the
- * loader asks the scenario's own module and resolves whatever it names. All
- * this supplies is where a given id lives on disk.
  */
-function urlsIn(scenarioDir: string): (assetId: string) => string {
-  return (assetId) => `${BASE_URL}assets/scenarios/${scenarioDir}/${assetId}.png`;
+function assetUrls(scenarioDir: string, ids: readonly string[]): Record<string, string> {
+  return Object.fromEntries(
+    ids.map((id) => [id, `${BASE_URL}assets/scenarios/${scenarioDir}/${id}.png`])
+  );
 }
 
-/*
- * The composition root for minigames.
- *
- * Registration lives here, with the content, rather than inside
- * `minigame/registry.ts`: the registry must not import a minigame, or the
- * generic half of the game would name a specific one again. This module already
- * knows which scenarios this build ships, so it is the honest place to say
- * which minigames it ships too.
+/**
+ * The ten `ClimbMinigame` asset ids every Rocky-family scenario binds, derived
+ * from the scenario id rather than retyped per scenario: background, four
+ * advance poses, a finish pose, a foothold, a destination, and two effects.
+ * Every Rocky scenario's `assetBindings` follows this exact naming convention,
+ * so generating it once removes a per-scenario chance to typo an id that
+ * `loadScenario` would otherwise only catch at runtime.
  */
-registerMinigame(CLIMB_MINIGAME);
+function climbAssetIds(scenarioId: string): readonly string[] {
+  return [
+    `bg_${scenarioId}`,
+    `goat_${scenarioId}_advance_01`,
+    `goat_${scenarioId}_advance_02`,
+    `goat_${scenarioId}_advance_03`,
+    `goat_${scenarioId}_advance_04`,
+    `goat_${scenarioId}_finish`,
+    `prop_${scenarioId}_step`,
+    `prop_${scenarioId}_goal`,
+    `fx_${scenarioId}_dust`,
+    `fx_${scenarioId}_tick`,
+  ];
+}
 
 export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
   rockyAscentJson,
-  urlsIn("rocky-ascent")
+  assetUrls("rocky-ascent", climbAssetIds("rocky_ascent"))
 );
 
 /**
@@ -62,19 +69,45 @@ export const ROCKY_ASCENT: ScenarioDefinition = loadScenario(
  */
 export const ROCKY_ASCENT_HIGH: ScenarioDefinition = loadScenario(
   rockyAscentHighJson,
-  urlsIn("rocky-ascent-high")
+  assetUrls("rocky-ascent-high", climbAssetIds("rocky_ascent_high"))
 );
 
 /** The same class, descending: every scale fragment falls from b1 toward 1. */
 export const ROCKY_DESCENT: ScenarioDefinition = loadScenario(
   rockyDescentJson,
-  urlsIn("rocky-descent")
+  assetUrls("rocky-descent", climbAssetIds("rocky_descent"))
 );
 
 /** Rocky Descent's higher-register companion, at L3-6. */
 export const ROCKY_DESCENT_HIGH: ScenarioDefinition = loadScenario(
   rockyDescentHighJson,
-  urlsIn("rocky-descent-high")
+  assetUrls("rocky-descent-high", climbAssetIds("rocky_descent_high"))
+);
+
+/**
+ * The `RepeatMinigame` slots, likewise derived rather than retyped. Unlike the
+ * Rocky family these ids are not a function of the scenario id — they follow
+ * the canonical catalogue naming (`hero80_`, `prop_`, `fx_`), so this one is
+ * spelled out rather than templated.
+ */
+const CAN_CRUSHING_ASSET_IDS: readonly string[] = [
+  "bg_can_crushing",
+  "hero80_can_crushing_ready",
+  "hero80_can_crushing_action",
+  "hero80_can_crushing_finish",
+  "prop_can_crushing_intact",
+  "prop_can_crushing_done",
+  "fx_can_crushing_impact",
+];
+
+/**
+ * The one `RepeatMinigame` scenario: a performer who stands still while the
+ * player places cans at him. PROTOTYPE — see
+ * `docs/game-design/PROPOSED_Timeline_Actors.md` §5.
+ */
+export const CAN_CRUSHING: ScenarioDefinition = loadScenario(
+  canCrushingJson,
+  assetUrls("can-crushing", CAN_CRUSHING_ASSET_IDS)
 );
 
 export const SCENARIOS: readonly ScenarioDefinition[] = [
@@ -82,6 +115,7 @@ export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
   ROCKY_DESCENT_HIGH,
+  CAN_CRUSHING,
 ];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {

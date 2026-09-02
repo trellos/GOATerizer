@@ -124,6 +124,87 @@ button.chip[data-selected="true"] {
   padding: 2rem;
 }
 
+#screen-start .start-card > button {
+  margin: 0 0.3rem;
+}
+
+/*
+ * The timing check.
+ *
+ * Nothing here moves on the beat. The phase and progress lines change once per
+ * bar at most, which is deliberate: anything pulsing at the tempo would give
+ * the player a second cue to synchronise with, and what is being measured is
+ * their offset from the *click*. A visual metronome would quietly turn this
+ * into a measurement of how they split the difference between two cues.
+ */
+#screen-calibrate {
+  align-items: center;
+  justify-content: center;
+}
+
+.calibrate-card {
+  max-width: 32rem;
+}
+
+.calibrate-lede {
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin: 0.6rem 0 1.6rem;
+}
+
+.calibrate-phase {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0;
+  min-height: 1.6em;
+}
+
+.calibrate-progress {
+  font-family: var(--mono);
+  color: var(--text-dim);
+  letter-spacing: 0.3em;
+  margin: 0.3rem 0 1.4rem;
+  min-height: 1.4em;
+}
+
+.calibrate-figures {
+  display: flex;
+  justify-content: center;
+  gap: 2.4rem;
+  margin: 0 0 0.6rem;
+}
+
+.calibrate-figures div {
+  text-align: center;
+}
+
+.calibrate-figures dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+}
+
+.calibrate-figures dd {
+  margin: 0.2rem 0 0;
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.calibrate-figures dd[data-state="good"] {
+  color: var(--good);
+}
+
+.calibrate-figures dd[data-state="warn"] {
+  color: var(--perfect);
+}
+
+.calibrate-actions {
+  justify-content: center;
+  margin-top: 1.4rem;
+}
+
 .title {
   font-size: clamp(2.6rem, 8vw, 4.6rem);
   margin: 0;
@@ -198,13 +279,7 @@ button.chip[data-selected="true"] {
  */
 .play-screen[data-active="true"] {
   display: grid;
-  /*
-   * Two rows, not three. The scenario strip is gone (GDD §11.2): the timeline
-   * is the only play surface, so it takes the whole play area on BOTH screens —
-   * which is also what keeps it pixel-identical between pregame and the run.
-   * The pregame's setup block overlays it rather than displacing it.
-   */
-  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-height) minmax(0, 58fr) minmax(0, 42fr);
   position: relative;
   gap: 0.5rem;
   padding: 0.6rem;
@@ -265,19 +340,37 @@ button.chip[data-selected="true"] {
 }
 
 .stage {
-  /* Overlays the timeline in pregame; nothing uses it in the run. */
-  grid-row: 2;
-  grid-column: 1;
-  z-index: 1;
   min-height: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
 }
 
-.timeline-pane {
+/*
+ * EXPERIMENT — the overlaid timeline.
+ *
+ * The player has to watch the timeline to know what note is coming, so in the
+ * two-pane layout their eyes never reach the scenario and the whole payoff goes
+ * unseen. Here the scenario fills the play area and the timeline is drawn over
+ * it on a transparent canvas, lanes centred vertically, so one gaze covers both.
+ */
+#screen-game[data-overlay="true"] {
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+}
+
+#screen-game[data-overlay="true"] .stage,
+#screen-game[data-overlay="true"] .timeline-pane {
   grid-row: 2;
   grid-column: 1;
+}
+
+#screen-game[data-overlay="true"] .timeline-pane {
+  background: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
+.timeline-pane {
   position: relative;
   min-height: 0;
   background: var(--panel);
@@ -294,45 +387,77 @@ button.chip[data-selected="true"] {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pregame setup — lives in the stage, where the scenario goes                 */
+/* Pregame setup — arranged around the lane band, never over it                */
 /* -------------------------------------------------------------------------- */
 
 /*
- * The pregame controls float OVER the timeline, they do not replace it.
- *
- * Both play screens share one grid so the timeline is pixel-identical between
- * pregame and the run (see the .play-screen comment above), which means this
- * block now sits on top of the live timeline rather than in a band of its own.
- * An opaque background here hides the very thing the copy invites the player to
- * noodle at. The control blocks carry their own `--panel` fill, so they read as
- * panels over a working timeline; `align-content: start` keeps the block from
- * stretching over the lanes it does not need.
+ * Pregame has no scenario, so it shows the timeline alone in exactly the
+ * rectangle the run will use, and puts the setup controls in the space above
+ * and below the lane band. The middle grid row is `--timeline-band`, set from
+ * `OVERLAY_BAND_FRACTION` in TypeScript so the canvas and the stylesheet cannot
+ * disagree about where the lanes are.
  */
-.setup-stage {
-  display: flex;
-  flex-direction: column;
-  align-content: start;
-  gap: 0.6rem;
-  padding: 0.7rem;
-  overflow-y: auto;
-  background: transparent;
+#screen-pregame[data-overlay="true"] {
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
+}
+
+#screen-pregame[data-overlay="true"] .timeline-pane,
+#screen-pregame[data-overlay="true"] .setup-overlay {
+  grid-row: 2;
+  grid-column: 1;
+}
+
+/*
+ * Positioned, and above the timeline pane. `.timeline-pane` is itself
+ * positioned, and a positioned element paints over a static one whatever the
+ * DOM order — without this the canvas sits on top of the controls and swallows
+ * every click.
+ */
+.setup-overlay {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 1fr var(--timeline-band, 50%) 1fr;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  min-height: 0;
+}
+
+/* The timeline is never interactive; it must not intercept a control's click. */
+#screen-pregame[data-overlay="true"] .timeline-pane {
   pointer-events: none;
 }
 
-.setup-stage > * {
-  pointer-events: auto;
-  flex: 0 0 auto;
+.setup-band-spacer {
+  pointer-events: none;
 }
 
 .setup-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.5rem;
+  min-height: 0;
 }
 
-.setup-stage .primary {
+.setup-row-top {
+  align-content: start;
+}
+
+.setup-row-bottom {
+  align-content: end;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.setup-row-bottom .primary {
+  min-width: 10rem;
   align-self: center;
-  min-width: 12rem;
+}
+
+.setup-overlay .control-block {
+  background: rgba(15, 20, 26, 0.92);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .control-block {
@@ -465,10 +590,19 @@ button.chip[data-selected="true"] {
   background: #0b0f14;
   display: grid;
   place-items: center;
-  font-size: 0.5rem;
   color: var(--perfect);
-  letter-spacing: -0.08em;
   overflow: hidden;
+}
+
+/**
+ * The trophy fills its slot. It is drawn in `currentColor`, so the slot states
+ * below recolour it without knowing what shape it is.
+ */
+.slot-trophy {
+  display: block;
+  width: 1.15rem;
+  height: 1.15rem;
+  line-height: 0;
 }
 
 .history-slot[data-state="current"] {
@@ -588,12 +722,22 @@ button.chip[data-selected="true"] {
 /* Dev panel                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * The developer panel.
+ *
+ * Capped well short of the viewport, not at `100vh - 1rem`. It is a fixed
+ * overlay on the right-hand edge, and both play screens put a primary button
+ * (Play) in the bottom-right — so a panel tall enough to reach the bottom of
+ * the window swallows the click that starts the run. It grew past that once
+ * enough readouts were added, which is exactly the kind of thing nobody
+ * notices until the button stops working. It scrolls, so nothing is lost.
+ */
 #dev-panel {
   position: fixed;
   top: 0.5rem;
   right: 0.5rem;
   width: 21rem;
-  max-height: calc(100vh - 1rem);
+  max-height: 70vh;
   overflow-y: auto;
   background: rgba(8, 11, 15, 0.96);
   border: 1px solid var(--accent);
@@ -678,33 +822,4 @@ button.chip[data-selected="true"] {
   .bar-hint {
     display: none;
   }
-}
-
-/* -------------------------------------------------------------------------- */
-/* Top-bar readouts re-homed from the scenario strip (GDD §11.1)               */
-/* -------------------------------------------------------------------------- */
-
-/*
- * The three-star meter and the scenario name were drawn on the scenario panel.
- * With one surface they belong beside the score they are denominated against,
- * rather than on the timeline where they would compete with the notes.
- */
-.bar-right {
-  display: flex;
-  gap: 0.9rem;
-  align-items: baseline;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.hud-meter {
-  color: #ffd34d;
-  letter-spacing: 0.08em;
-}
-
-.hud-scenario {
-  color: var(--text-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
 }

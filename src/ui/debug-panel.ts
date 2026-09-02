@@ -16,8 +16,6 @@ export type DebugHandlers = {
   onSourceChange: (source: "tuninator" | "synth" | "test") => void;
   onLatencyChange: (milliseconds: number) => void;
   onAutoplay: (mode: AutoplayMode) => void;
-  /** Turns per-minigame timeline art off, back to the host's default notes. */
-  onSkinsToggle: (enabled: boolean) => void;
 };
 
 export class DebugPanel {
@@ -55,18 +53,6 @@ export class DebugPanel {
         ?.addEventListener("click", () => handlers.onAutoplay(mode));
     }
 
-    // A skin is the one place a minigame can hurt readability, so there is a
-    // one-click way to see the same phrase with the host's default notes and
-    // decide whether the art or the timeline is at fault.
-    const skins = root.querySelector("#dev-skins");
-    if (skins instanceof HTMLElement) {
-      skins.addEventListener("click", () => {
-        const enabled = skins.dataset["selected"] !== "true";
-        skins.dataset["selected"] = String(enabled);
-        handlers.onSkinsToggle(enabled);
-      });
-    }
-
     root.querySelector("#dev-close")?.addEventListener("click", () => this.setEnabled(false));
   }
 
@@ -98,6 +84,16 @@ export class DebugPanel {
   setEnabled(enabled: boolean): void {
     this.#enabled = enabled;
     this.#root.hidden = !enabled;
+  }
+
+  /**
+   * Reflects a trim set somewhere else — the pregame calibration, or a value
+   * remembered from a previous session — back into the panel's own input, so
+   * the two controls cannot disagree about what the compensation currently is.
+   */
+  setLatencyTrim(milliseconds: number): void {
+    const input = this.#root.querySelector("#dev-latency");
+    if (input instanceof HTMLInputElement) input.value = String(Math.round(milliseconds));
   }
 
   /** Called every frame while enabled. Rows are created once and then reused. */

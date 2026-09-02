@@ -1,10 +1,10 @@
 /**
- * What the timeline draws — one model, any presentation.
+ * What the timeline draws — one model, both views.
  *
- * The renderer is a presentation of *this*. It owns no note, judgment or score;
- * it reads from here and decides placement (`AGENTS.md` §12: do not build
- * separate scoring engines for different timeline presentations). A per-minigame
- * skin is a further presentation of the same model, never a second model.
+ * Key View and Tablature View are two presentations of *this*. Neither owns a
+ * note, a judgment or a score; they read from here and place things differently
+ * (`AGENTS.md` §12: do not build separate scoring engines for different
+ * timeline presentations).
  *
  * Every position is in **absolute transport beats**. The renderer turns a beat
  * into an x coordinate; nothing here knows about pixels.
@@ -75,8 +75,6 @@ const HISTORY_BEATS = TIMELINE_HISTORY_BEATS + 2;
 export class TimelineModel {
   #key: RunKey;
   #targets: TargetNote[] = [];
-  /** Absolute beat each attempt's beat 0 lands on. */
-  #attemptStarts = new Map<string, number>();
   #played: PlayedNote[] = [];
   #unreleasedPruned = 0;
   #bass: BassNoteView[] = [];
@@ -112,7 +110,6 @@ export class TimelineModel {
    */
   addTargets(attemptKey: string, targets: readonly ResolvedTarget[], attemptStartBeat: number): void {
     this.removeTargets(attemptKey);
-    this.#attemptStarts.set(attemptKey, attemptStartBeat);
     for (const target of targets) {
       this.#targets.push({
         kind: "target",
@@ -129,44 +126,12 @@ export class TimelineModel {
     }
   }
 
-  /**
-   * Every target of one attempt, on screen or not.
-   *
-   * A minigame's actors are anchored to notes, so they need a coordinate for a
-   * note that has already scrolled off the left edge — a climber does not lose
-   * its footing when the foothold it is standing on leaves the window.
-   */
-  targetsFor(attemptKey: string): readonly TargetNote[] {
-    return this.#targets.filter((target) => target.attemptKey === attemptKey);
-  }
-
-  /** Attempt keys currently holding targets, in insertion order. */
-  get attemptKeys(): readonly string[] {
-    const keys: string[] = [];
-    for (const target of this.#targets) {
-      if (!keys.includes(target.attemptKey)) keys.push(target.attemptKey);
-    }
-    return keys;
-  }
-
   removeTargets(attemptKey: string): void {
     this.#targets = this.#targets.filter((target) => target.attemptKey !== attemptKey);
-    this.#attemptStarts.delete(attemptKey);
   }
 
   clearTargets(): void {
     this.#targets = [];
-    this.#attemptStarts.clear();
-  }
-
-  /**
-   * Absolute beat one attempt's beat 0 lands on.
-   *
-   * A minigame is always given attempt-relative time, so the view needs this to
-   * convert; deriving it from a note would assume the prompt opens on beat 0.
-   */
-  attemptStartBeat(attemptKey: string): number {
-    return this.#attemptStarts.get(attemptKey) ?? 0;
   }
 
   markTargetOutcome(attemptKey: string, opportunityIndex: number, outcome: JudgmentOutcome): void {
@@ -242,28 +207,6 @@ export class TimelineModel {
       if (note.endBeat === null) this.#unreleasedPruned += 1;
       return false;
     });
-
-    /*
-     * Targets age out on the same rule, rather than being dropped the moment
-     * their attempt finishes.
-     *
-     * A minigame is asked to render for exactly as long as it owns targets, so
-     * deleting them at completion made the outgoing scenario's background,
-     * notes and actor vanish in a single frame — and its finish pose, computed
-     * at the end of every passed attempt, was never once seen. Letting the
-     * notes scroll off is what GDD §11.6 describes and what the surface is for.
-     */
-    const before = this.#targets.length;
-    this.#targets = this.#targets.filter(
-      (target) => nowBeat - (target.startBeat + target.durationBeats) < HISTORY_BEATS
-    );
-    if (this.#targets.length !== before) {
-      for (const key of [...this.#attemptStarts.keys()]) {
-        if (!this.#targets.some((target) => target.attemptKey === key)) {
-          this.#attemptStarts.delete(key);
-        }
-      }
-    }
   }
 
   clearPlayed(): void {

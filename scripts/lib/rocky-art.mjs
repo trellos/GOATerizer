@@ -173,62 +173,6 @@ export function goal(C = DEFAULT_PALETTE) {
   return image;
 }
 
-/**
- * The timeline note body: a stone ledge, 8x12.
- *
- * Deliberately banded horizontally and only eight pixels wide, because this one
- * is **stretched to the note's rect** — a quarter note is ~170px wide and a
- * whole note four times that. Horizontal bands stretch by repeating each row,
- * so an 8px slab becomes a 700px ledge with no smearing and no artefacts, while
- * anything with vertical detail would turn to mush.
- */
-export function ledge(C = DEFAULT_PALETTE) {
-  const image = new Pixels(8, 12);
-  image.fillRect(0, 0, 8, 1, C.rockLight);
-  image.fillRect(0, 1, 8, 4, C.rock);
-  image.fillRect(0, 5, 8, 1, C.rockLight);
-  image.fillRect(0, 6, 8, 3, C.rock);
-  image.fillRect(0, 9, 8, 2, C.rockDark);
-  image.fillRect(0, 11, 8, 1, C.rockDark);
-  return image;
-}
-
-/**
- * The crag behind a timeline note, 26x22.
- *
- * Drawn as an `underlay` at a scale taller than a lane, so it deliberately
- * bleeds above and below the note's own rect — the note reads as an outcrop the
- * phrase is climbing rather than a bar on a grid. Nothing here carries
- * information: the rect it sits behind is what says pitch, time and duration,
- * and only the playfield clips this, never the note.
- */
-export function crag(C = DEFAULT_PALETTE) {
-  // Wide and low: an underlay is drawn at its natural proportions, so a tall
-  // narrow shape would sit as a lump in the middle of a long note instead of
-  // reading as ground underneath the whole of it.
-  const image = new Pixels(44, 20);
-  const peaks = [
-    [8, 19, 8, 9],
-    [36, 19, 8, 8],
-    [22, 19, 11, 15],
-  ];
-  for (const [cx, base, halfWidth, height] of peaks) {
-    for (let dy = 0; dy < height; dy += 1) {
-      const y = base - dy;
-      const t = dy / height;
-      const w = Math.max(1, Math.round(halfWidth * (1 - t * t)));
-      image.fillRect(cx - w, y, w * 2, 1, dy > height - 3 ? C.rockLight : C.rockDark);
-    }
-  }
-  // Snow on the tallest peak and moss at the base, so a ridge of these belongs
-  // to the same mountain the scenario panel is drawing.
-  image.fillRect(21, 5, 3, 1, C.snow);
-  image.fillRect(22, 4, 1, 1, C.snow);
-  image.fillEllipse(5, 18, 2, 1, C.rockMoss);
-  image.fillEllipse(39, 18, 2, 1, C.rockMoss);
-  return image;
-}
-
 /** One dust frame. Deliberately a single billboard, not an animation. */
 export function dust(C = DEFAULT_PALETTE, seed = 0x5eed) {
   const image = new Pixels(20, 12);

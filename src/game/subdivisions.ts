@@ -1,19 +1,17 @@
 /**
  * Which rhythmic grid an authored phrase actually sits on.
  *
- * The drums use this to tell the player what is coming: a quarter-note pulse is
- * enough to find beat 1, but it says nothing about whether the next four
- * measures are eighths, sixteenths or triplets — and by the time the first
- * sixteenth arrives it is far too late to start counting. Signalling the grid
- * one attempt ahead is what turns "surprise, sixteenths" into "here comes the
- * sixteenth feel, get ready".
+ * The drums use this to state the feel of the minigame the player is in: a
+ * quarter-note pulse is enough to find beat 1, but it says nothing about whether
+ * the eight measures ahead are eighths, sixteenths or triplets — and by the time
+ * the first sixteenth arrives it is far too late to start counting. What comes
+ * out of here picks the rhythm variant of the beat (`audio/drum-pattern.ts`), so
+ * the whole kit subdivides the way the exercise does for as long as it lasts.
  *
- * Read primarily off the note *positions*, not the duration names: a phrase can
- * be written in eighths and still land on the sixteenth grid (a dotted figure),
- * so position is the description that stays true for any phrase anyone writes.
- * The names are consulted only where a position cannot speak — a note long
- * enough to be the whole grid it implies, or a triplet whose other two thirds
- * are rests.
+ * Read off the note *positions*, not the duration names. A phrase can be
+ * written in eighths and still land on the sixteenth grid (a dotted figure), and
+ * a triplet has no `NoteDuration` of its own in this content model at all — so
+ * position is the only description that stays true for any phrase anyone writes.
  *
  * Pure, and independent of the drum kit: this describes the music, and
  * `drum-pattern.ts` decides what to hit.
@@ -25,8 +23,6 @@ import { DURATION_BEATS, type PromptEvent } from "../scenario/types.js";
 export type Subdivision = "eighth" | "sixteenth" | "triplet";
 
 export type SubdivisionSet = ReadonlySet<Subdivision>;
-
-export const NO_SUBDIVISIONS: SubdivisionSet = new Set<Subdivision>();
 
 /**
  * How far off a grid position a note may sit and still count as on it.
@@ -60,11 +56,8 @@ export function subdivisionsOf(prompt: readonly PromptEvent[]): SubdivisionSet {
     if (event.type !== "note") continue;
 
     // A note's own length puts the grid on the map even when it happens to
-    // start on a beat: four sixteenths from beat 1 are still sixteenths, and a
-    // lone triplet eighth on the beat is still the triplet feel — its
-    // neighbours at 1/3 and 2/3 may both be rests, leaving no position to read.
+    // start on a beat: four sixteenths from beat 1 are still sixteenths.
     if (event.durationBeats <= DURATION_BEATS.sixteenth + EPSILON) found.add("sixteenth");
-    if (event.duration === "eighthTriplet") found.add("triplet");
 
     const offset = event.startBeat - Math.floor(event.startBeat);
     if (isNear(offset, SIXTEENTH_OFFSETS)) found.add("sixteenth");
@@ -74,16 +67,4 @@ export function subdivisionsOf(prompt: readonly PromptEvent[]): SubdivisionSet {
 
   if (found.has("sixteenth")) found.add("eighth");
   return found;
-}
-
-/** The grids of several phrases at once — what the drums should be marking. */
-export function unionSubdivisions(...sets: readonly SubdivisionSet[]): SubdivisionSet {
-  const union = new Set<Subdivision>();
-  for (const set of sets) for (const entry of set) union.add(entry);
-  return union;
-}
-
-/** Stable id for a set, so a caller can tell "changed" from "same" cheaply. */
-export function subdivisionKey(set: SubdivisionSet): string {
-  return (["eighth", "sixteenth", "triplet"] as const).filter((entry) => set.has(entry)).join("+");
 }

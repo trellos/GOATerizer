@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { JUDGMENT_POINTS, SCORE_VALUES, TIMING_WINDOWS_BEATS } from "../src/config/tuning.js";
+import {
+  GOOD_WINDOW_FLOOR_BEATS,
+  JUDGMENT_POINTS,
+  SCORE_VALUES,
+  TIMING_WINDOWS_BEATS,
+} from "../src/config/tuning.js";
 import { computeWindows, TargetJudge, type JudgmentEvent } from "../src/game/judgment.js";
 import { AttemptScore } from "../src/game/scoring.js";
 import { StarMeter } from "../src/game/stars.js";
@@ -42,33 +47,55 @@ describe("timing windows", () => {
     expect(windows[5]).toEqual(TIMING_WINDOWS_BEATS.quarter);
   });
 
-  it("tightens for eighths so adjacent targets stay distinguishable", () => {
+  it("never lets dense material be judged tighter than an eighth note", () => {
+    // The floor, and why it exists. Eighth material used to be clamped to a
+    // quarter of a beat either side, and at 90bpm that is 167ms — inside the
+    // uncompensated latency of an ordinary rig. See `GOOD_WINDOW_FLOOR_BEATS`.
     const windows = computeWindows(levelTargets(4));
-    expect(windows[3]?.good).toBe(TIMING_WINDOWS_BEATS.eighth.good);
-    expect(windows[3]?.good).toBeLessThan(TIMING_WINDOWS_BEATS.quarter.good);
-    expect(windows[3]?.perfect).toBeLessThan(TIMING_WINDOWS_BEATS.quarter.perfect);
+    for (const window of windows) {
+      expect(window.good).toBeGreaterThanOrEqual(GOOD_WINDOW_FLOOR_BEATS);
+    }
   });
 
-  it("never lets two targets claim the same played note", () => {
+  it("keeps Perfect tight even where Good is floored", () => {
+    // Forgiveness is about what counts as a hit. Widening what counts as
+    // *flawless* would make three stars mean less, so the floor deliberately
+    // does not reach Perfect.
+    const windows = computeWindows(levelTargets(4));
+    expect(windows[3]?.perfect).toBe(TIMING_WINDOWS_BEATS.eighth.perfect);
+    expect(windows[3]?.perfect).toBeLessThan(windows[3]!.good);
+  });
+
+  it("never resolves two targets from one played note", () => {
+    // The invariant the old half-the-gap clamp was written to protect. It is
+    // worth keeping now that windows overlap — but it is a fact about the
+    // *resolver*, not about the arithmetic that sizes windows, so it is
+    // asserted by playing notes rather than by adding two numbers together.
     for (const difficulty of [1, 2, 3, 4]) {
       const targets = levelTargets(difficulty);
-      const windows = computeWindows(targets);
-      for (let i = 1; i < targets.length; i += 1) {
-        const gap = targets[i]!.startBeat - targets[i - 1]!.startBeat;
-        expect(windows[i - 1]!.good + windows[i]!.good).toBeLessThanOrEqual(gap + 1e-9);
+      for (const target of targets.slice(0, 12)) {
+        const harness = makeJudge(targets);
+        harness.play(target.midi, target.startBeat);
+        const resolved = harness.events.filter(
+          (event) => event.type === "PerfectNote" || event.type === "GoodNote"
+        );
+        expect(resolved.length).toBeLessThanOrEqual(1);
       }
     }
   });
 
-  it("clamps a long note's window when a short one follows closely", () => {
-    // A quarter on beat 0 followed by an eighth on beat 0.5: the quarter's
-    // authored +-0.5 would swallow the eighth, so it is halved.
+  it("still clamps a long note toward a close neighbour, under the floor", () => {
+    // A quarter on beat 0 followed by an eighth on beat 0.5. The clamp still
+    // runs and still halves the quarter's authored window — the floor then
+    // lifts the result back to half a beat, which is what the player is judged
+    // on. Both are asserted so a change to either is visible.
     const targets: ResolvedTarget[] = [
-      { opportunityIndex: 0, promptIndex: 0, startBeat: 0, durationBeats: 1, duration: "quarter", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
-      { opportunityIndex: 1, promptIndex: 1, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
+      { opportunityIndex: 0, promptIndex: 0, pass: 0, startBeat: 0, durationBeats: 1, duration: "quarter", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
+      { opportunityIndex: 1, promptIndex: 1, pass: 0, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
     ];
     const windows = computeWindows(targets);
-    expect(windows[0]?.good).toBe(0.25);
+    expect(windows[0]?.good).toBe(GOOD_WINDOW_FLOOR_BEATS);
+    // Perfect is still cut by the neighbour, because it is not floored.
     expect(windows[0]?.perfect).toBeLessThanOrEqual(0.25);
   });
 });
@@ -238,13 +265,132 @@ describe("wrong notes", () => {
   });
 });
 
+/**
+ * Note endings.
+ *
+ * The judge reports a release that lands near where the target ends, and does
+ * nothing else with it. These tests are as much about what a release must *not*
+ * do — resolve, re-resolve or re-score anything — as about when it fires, since
+ * that is the property the score and the star thresholds depend on.
+ */
+describe("releases", () => {
+  // L1 is quarter notes: duration 1 beat, Good window +-0.5 either side of the
+  // target's start, and therefore also of its end.
+  const end = (target: ResolvedTarget) => target.startBeat + target.durationBeats;
+
+  it("reports a note let go where the target ends", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target));
+
+    expect(harness.types()).toEqual(["PerfectNote", "TargetResolved", "NoteReleasedOnTime"]);
+    const released = harness.events[2];
+    expect(released?.type === "NoteReleasedOnTime" && released.beatDelta).toBe(0);
+    expect(released?.type === "NoteReleasedOnTime" && released.target.opportunityIndex).toBe(2);
+  });
+
+  it("signs the delta so an early release is negative", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target) - 0.3);
+    const released = harness.events.find((event) => event.type === "NoteReleasedOnTime");
+    expect(released?.type === "NoteReleasedOnTime" && released.beatDelta).toBeCloseTo(-0.3, 9);
+  });
+
+  it("accepts anything inside the target's own Good window of the end", () => {
+    const targets = levelTargets(1);
+    for (const offset of [-0.45, -0.2, 0, 0.2, 0.45]) {
+      const target = targets[2]!;
+      const harness = makeJudge(levelTargets(1));
+      const id = harness.play(target.midi, target.startBeat);
+      harness.judge.release(id, end(target) + offset);
+      expect(harness.types()).toContain("NoteReleasedOnTime");
+    }
+  });
+
+  it("says nothing about a note dropped or held far past the end", () => {
+    const targets = levelTargets(1);
+    for (const offset of [-0.75, 0.75]) {
+      const target = targets[2]!;
+      const harness = makeJudge(levelTargets(1));
+      const id = harness.play(target.midi, target.startBeat);
+      harness.judge.release(id, end(target) + offset);
+      expect(harness.types()).not.toContain("NoteReleasedOnTime");
+    }
+  });
+
+  it("says nothing about letting go of a wrong note", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    // A semitone off: judged wrong, resolves nothing, so there is no target
+    // whose end it could be released on time against.
+    const id = harness.play(target.midi + 1, target.startBeat);
+    harness.judge.release(id, end(target));
+    expect(harness.types()).toEqual(["WrongNote"]);
+  });
+
+  it("says nothing about a release for a note it never saw attacked", () => {
+    const harness = makeJudge(levelTargets(1));
+    harness.judge.release("never-attacked", 1);
+    expect(harness.types()).toEqual([]);
+  });
+
+  it("reports at most one release per played note", () => {
+    const target = levelTargets(1)[2]!;
+    const harness = makeJudge(levelTargets(1));
+    const id = harness.play(target.midi, target.startBeat);
+    harness.judge.release(id, end(target));
+    harness.judge.release(id, end(target));
+    harness.judge.release(id, end(target) + 5); // and not by taking another branch
+    expect(harness.events.filter((event) => event.type === "NoteReleasedOnTime")).toHaveLength(1);
+  });
+
+  it("never resolves, re-resolves or reopens a target", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[2]!;
+    const id = harness.play(target.midi, target.startBeat);
+    const openBefore = harness.judge.openTargetCount;
+
+    harness.judge.release(id, end(target));
+
+    expect(harness.judge.openTargetCount).toBe(openBefore);
+    expect(harness.judge.outcomes[2]).toBe("perfect");
+    expect(harness.events.filter((event) => event.type === "TargetResolved")).toHaveLength(1);
+  });
+
+  it("cannot be earned by letting go of a note whose target was missed", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[2]!;
+    // Right pitch, far too late: judged a wrong note, and its target expires.
+    harness.judge.tick(target.startBeat + 0.6);
+    const id = harness.play(target.midi, target.startBeat + 0.7);
+    harness.judge.release(id, end(target));
+    expect(harness.types()).not.toContain("NoteReleasedOnTime");
+  });
+
+  it("scores nothing", () => {
+    const target = levelTargets(1)[2]!;
+    const score = new AttemptScore({ streakBonusEligible: true });
+    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 });
+    const before = score.snapshot;
+
+    score.apply({ type: "NoteReleasedOnTime", target, attackId: "a", beatDelta: 0 });
+    expect(score.snapshot).toEqual(before);
+    expect(score.judgmentPoints).toBe(before.judgmentPoints);
+  });
+});
+
 describe("dense subdivisions stay unambiguous", () => {
   it("assigns each eighth-note attack to its own target at L4", () => {
     const targets = levelTargets(4);
     const harness = makeJudge(targets);
     for (const target of targets) harness.play(target.midi, target.startBeat);
 
-    expect(harness.events.filter((e) => e.type === "PerfectNote")).toHaveLength(30);
+    expect(harness.events.filter((e) => e.type === "PerfectNote")).toHaveLength(targets.length);
     expect(harness.events.filter((e) => e.type === "WrongNote")).toHaveLength(0);
     expect(harness.judge.openTargetCount).toBe(0);
   });
@@ -259,12 +405,41 @@ describe("dense subdivisions stay unambiguous", () => {
     expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(6);
   });
 
-  it("does not let an eighth-note attack reach a target 0.5 beats away", () => {
+  it("lets an eighth-note attack reach a target half a beat away", () => {
+    // This reverses deliberately. Playing target 7's pitch at target 6's time
+    // used to be a wrong note; it is now a Good one, because half a beat is
+    // exactly the tolerance the floor buys (`GOOD_WINDOW_FLOOR_BEATS`).
+    //
+    // The case that made this necessary is not a player fumbling one note — it
+    // is a player whose whole performance is shifted by their rig's latency,
+    // for whom *every* note landed on the neighbouring target's time and was
+    // called a wrong note. Target 6 is still there to be hit, so this is
+    // forgiveness rather than a free pass.
     const targets = levelTargets(4);
     const harness = makeJudge(targets);
-    // Play target 7's pitch at target 6's time. Too far for target 7's window.
     harness.play(targets[7]!.midi, targets[6]!.startBeat);
-    expect(harness.types()).toEqual(["WrongNote"]);
+
+    const good = harness.events.find((e) => e.type === "GoodNote");
+    expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(7);
+  });
+
+  it("still refuses a note further out than the floor", () => {
+    // The floor is a floor, not the removal of a limit: half a beat is what it
+    // buys, and beyond that a note is still wrong.
+    //
+    // Asserted against a two-target fixture rather than authored material,
+    // because scale material reuses pitches — the first attempt at this hunted
+    // for a "far" target by index and found one whose pitch a *near* target
+    // also had, so the note was correctly matched to the near one and the test
+    // failed for a reason that had nothing to do with distance.
+    const targets: ResolvedTarget[] = [
+      { opportunityIndex: 0, promptIndex: 0, pass: 0, startBeat: 0, durationBeats: 0.5, duration: "eighth", degree: { degree: 1, octaveBand: 0 }, lane: 0, midi: 43 },
+      { opportunityIndex: 1, promptIndex: 1, pass: 0, startBeat: 0.5, durationBeats: 0.5, duration: "eighth", degree: { degree: 2, octaveBand: 0 }, lane: 1, midi: 45 },
+    ];
+    const harness = makeJudge(targets);
+    // Target 1's pitch, a beat and a half before it: well past the floor.
+    harness.play(45, -1);
+    expect(harness.types()).toContain("WrongNote");
   });
 
   it("reports the target the player should be aiming at", () => {

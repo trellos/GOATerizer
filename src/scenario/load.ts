@@ -5,28 +5,68 @@
  * repair it, infer missing content, or generate exercises. It throws, loudly,
  * on anything it cannot map, so a bad edit fails a test rather than transposing
  * a note in a run.
- *
- * It validates only what the *host* owns: identity, the prompt, the measure
- * length, star thresholds and scoring flags. Everything that varies by minigame
- * — asset slots, class parameters, routes, rows, arenas — is handed to that
- * minigame's own parsers, because only it knows the shape. That dispatch is
- * what lets a scenario define whatever data its minigame wants while keeping
- * this file free of any minigame's vocabulary.
  */
 
-import { requireMinigame } from "../minigame/registry.js";
 import { parseDegreeToken } from "../music/degrees.js";
-import { arr, bool, num, obj, ScenarioDataError, str } from "./parse.js";
 import type {
+  ClimbAssetBindings,
+  ClimbClassParameters,
   MeasurePlan,
+  MinigameClassId,
+  NoteDuration,
   PromptEvent,
+  RepeatAssetBindings,
+  RepeatClassParameters,
+  RouteData,
+  ScenarioAssetBindings,
+  ScenarioClassParameters,
   ScenarioDefinition,
   ScenarioLevelData,
   StarThresholds,
 } from "./types.js";
-import { DURATION_BEATS, type NoteDuration } from "./types.js";
+import { DURATION_BEATS } from "./types.js";
 
-export { ScenarioDataError } from "./parse.js";
+export class ScenarioDataError extends Error {
+  constructor(where: string, reason: string) {
+    super(`Invalid scenario data at ${where}: ${reason}`);
+    this.name = "ScenarioDataError";
+  }
+}
+
+type Json = Record<string, unknown>;
+
+function obj(value: unknown, where: string): Json {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new ScenarioDataError(where, "expected an object");
+  }
+  return value as Json;
+}
+
+function arr(value: unknown, where: string): unknown[] {
+  if (!Array.isArray(value)) throw new ScenarioDataError(where, "expected an array");
+  return value;
+}
+
+function str(value: unknown, where: string): string {
+  if (typeof value !== "string") throw new ScenarioDataError(where, "expected a string");
+  return value;
+}
+
+function num(value: unknown, where: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new ScenarioDataError(where, "expected a finite number");
+  }
+  return value;
+}
+
+function bool(value: unknown, where: string): boolean {
+  if (typeof value !== "boolean") throw new ScenarioDataError(where, "expected a boolean");
+  return value;
+}
+
+function strings(value: unknown, where: string): string[] {
+  return arr(value, where).map((entry, i) => str(entry, `${where}[${i}]`));
+}
 
 function duration(value: unknown, where: string): NoteDuration {
   const name = str(value, where);
@@ -36,75 +76,10 @@ function duration(value: unknown, where: string): NoteDuration {
   return name as NoteDuration;
 }
 
-/**
- * The rhythmic grid every authored position is snapped to, in ticks per beat.
- *
- * Twelve, because it is the smallest number divisible by both the binary
- * subdivisions (a sixteenth is 3 ticks) and the triplet one (an eighth triplet
- * is 4). Positions accumulate as integers on this grid and are converted to
- * beats once, at the end, which is the only way `1/3 + 1/3 + 1/3` reaches beat 1
- * rather than 0.9999999999999999 — and the only way the measure a note belongs
- * to stays an integer division instead of a float comparison against a boundary
- * it might sit a machine epsilon below.
- *
- * A duration that does not land on this grid is a content-model error, not an
- * authoring one, so it throws with the duration's name rather than a file
- * location.
- */
-const TICKS_PER_BEAT = 12;
-
-function ticksOf(name: NoteDuration): number {
-  const beats = DURATION_BEATS[name];
-  const ticks = Math.round(beats * TICKS_PER_BEAT);
-  if (Math.abs(ticks / TICKS_PER_BEAT - beats) > 1e-12) {
-    throw new Error(
-      `duration ${name} (${beats} beats) is not on the ${TICKS_PER_BEAT}-tick grid`
-    );
-  }
-  return ticks;
-}
-
-/**
- * How far an authored number may sit from the value it asserts.
- *
- * Authored `durationBeats` and `startBeat` are redundant with the duration
- * names: the loader derives both and uses its own answers, and these fields
- * exist so a file that disagrees with itself fails loudly. Verifying them
- * exactly was fine while every duration was a binary fraction, but a third of a
- * beat has no decimal an author can type — `0.333` is not 1/3 and twelve of
- * them are not four beats.
- *
- * 0.01 beats is 4ms at 140bpm and 10ms at 60bpm: far below the tightest Perfect
- * window (0.06 beats), so a slip this small cannot change how a note is judged,
- * and far below the distance between any two written durations, so it cannot
- * let one pass for another. It is a tolerance on *transcription*, not on
- * rhythm.
- */
-const AUTHORING_TOLERANCE_BEATS = 0.01;
-
 /* -------------------------------------------------------------------------- */
 
-/**
- * The prompt: what the player is asked to play, in order.
- *
- * The **duration names are the authority**. A note's length and its position
- * are both derived here — length from the duration table, position from the
- * running sum of the lengths before it — and the numbers the file states for
- * them are checked against those and then discarded. That is what keeps the
- * runtime model exact: the sum runs on an integer tick grid, so a phrase of
- * triplets lands on beat 1 and on the measure boundary rather than a hair
- * below either.
- *
- * The authored numbers are not redundant clutter. `startBeat` in the file is
- * what catches a dropped rest — the very error a derived position would
- * silently absorb — and it stays required for exactly that reason.
- */
 function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEvent[] {
-  const ticksPerMeasure = Math.round(plan.beatsPerMeasure * TICKS_PER_BEAT);
-  const events: PromptEvent[] = [];
-  let ticks = 0;
-
-  arr(raw, where).forEach((entry, i) => {
+  const events = arr(raw, where).map((entry, i): PromptEvent => {
     const at = `${where}[${i}]`;
     const event = obj(entry, at);
     const type = str(event["type"], `${at}.type`);
@@ -113,24 +88,15 @@ function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEven
     }
 
     const dur = duration(event["duration"], `${at}.duration`);
-    const durationBeats = DURATION_BEATS[dur];
-    const statedDuration = num(event["durationBeats"], `${at}.durationBeats`);
-    if (Math.abs(statedDuration - durationBeats) > AUTHORING_TOLERANCE_BEATS) {
+    const durationBeats = num(event["durationBeats"], `${at}.durationBeats`);
+    if (durationBeats !== DURATION_BEATS[dur]) {
       throw new ScenarioDataError(
         `${at}.durationBeats`,
-        `${statedDuration} does not match ${dur} (${durationBeats})`
+        `${durationBeats} does not match ${dur} (${DURATION_BEATS[dur]})`
       );
     }
 
-    const startBeat = ticks / TICKS_PER_BEAT;
-    const statedStart = num(event["startBeat"], `${at}.startBeat`);
-    if (Math.abs(statedStart - startBeat) > AUTHORING_TOLERANCE_BEATS) {
-      throw new ScenarioDataError(
-        `${at}.startBeat`,
-        `${statedStart} but the preceding durations total ${startBeat}`
-      );
-    }
-
+    const startBeat = num(event["startBeat"], `${at}.startBeat`);
     const rawDegree = event["scaleDegree"];
     if (type === "note" && typeof rawDegree !== "string") {
       throw new ScenarioDataError(`${at}.scaleDegree`, "a note must carry a scale degree");
@@ -139,26 +105,34 @@ function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEven
       throw new ScenarioDataError(`${at}.scaleDegree`, "a rest must not carry a scale degree");
     }
 
-    events.push({
+    return {
       index: i,
       type,
       duration: dur,
       durationBeats,
       startBeat,
-      measureIndex: Math.floor(ticks / ticksPerMeasure),
-      beatWithinMeasure: (ticks % ticksPerMeasure) / TICKS_PER_BEAT,
+      measureIndex: Math.floor(startBeat / plan.beatsPerMeasure),
+      beatWithinMeasure: startBeat % plan.beatsPerMeasure,
       degree: type === "note" ? parseDegreeToken(rawDegree as string) : null,
-    });
-
-    ticks += ticksOf(dur);
+    };
   });
 
-  const attemptTicks = plan.attemptMeasures * ticksPerMeasure;
-  if (ticks !== attemptTicks) {
-    throw new ScenarioDataError(
-      where,
-      `durations total ${ticks / TICKS_PER_BEAT} beats, expected ${attemptTicks / TICKS_PER_BEAT}`
-    );
+  // The authored file states `startBeat` explicitly; check it is actually the
+  // running sum of the durations rather than trusting two fields to agree.
+  let expected = 0;
+  for (const event of events) {
+    if (Math.abs(event.startBeat - expected) > 1e-9) {
+      throw new ScenarioDataError(
+        `${where}[${event.index}].startBeat`,
+        `${event.startBeat} but the preceding durations total ${expected}`
+      );
+    }
+    expected += event.durationBeats;
+  }
+
+  const attemptBeats = plan.attemptMeasures * plan.beatsPerMeasure;
+  if (Math.abs(expected - attemptBeats) > 1e-9) {
+    throw new ScenarioDataError(where, `durations total ${expected} beats, expected ${attemptBeats}`);
   }
   return events;
 }
@@ -168,6 +142,8 @@ function parseMeasurePlan(raw: unknown, where: string): MeasurePlan {
   return {
     attemptMeasures: num(plan["attemptMeasures"], `${where}.attemptMeasures`),
     beatsPerMeasure: num(plan["beatsPerMeasure"], `${where}.beatsPerMeasure`),
+    visualSpanMeasures: num(plan["visualSpanMeasures"], `${where}.visualSpanMeasures`),
+    resetBetweenMeasures: bool(plan["resetBetweenMeasures"], `${where}.resetBetweenMeasures`),
   };
 }
 
@@ -188,11 +164,40 @@ function parseStars(raw: unknown, where: string): StarThresholds {
   };
 }
 
-function parseLevel(
-  raw: unknown,
-  where: string,
-  parseMinigameData: (visual: unknown, shape: { noteOpportunityCount: number; measures: number }) => unknown
-): ScenarioLevelData {
+function parseRoute(raw: unknown, where: string, expectedWaypoints: number): RouteData {
+  const route = obj(raw, where);
+  const point = (value: unknown, at: string) => {
+    const p = obj(value, at);
+    return { x: num(p["x"], `${at}.x`), y: num(p["y"], `${at}.y`) };
+  };
+
+  const waypoints = arr(route["waypoints"], `${where}.waypoints`).map((entry, i) => {
+    const at = `${where}.waypoints[${i}]`;
+    const wp = obj(entry, at);
+    return {
+      ...point(wp, at),
+      scale: num(wp["scale"], `${at}.scale`),
+      rotationDeg: num(wp["rotationDeg"], `${at}.rotationDeg`),
+    };
+  });
+
+  if (waypoints.length !== expectedWaypoints) {
+    throw new ScenarioDataError(
+      `${where}.waypoints`,
+      `${waypoints.length} waypoints for ${expectedWaypoints} note opportunities — ` +
+        "one successful note must advance exactly one waypoint"
+    );
+  }
+
+  return {
+    character: str(route["character"], `${where}.character`),
+    startPosition: point(route["startPosition"], `${where}.startPosition`),
+    destination: point(route["destination"], `${where}.destination`),
+    waypoints,
+  };
+}
+
+function parseLevel(raw: unknown, where: string, needsRoute: boolean): ScenarioLevelData {
   const level = obj(raw, where);
   const measurePlan = parseMeasurePlan(level["measurePlan"], `${where}.measurePlan`);
   const prompt = parsePrompt(level["prompt"], `${where}.prompt`, measurePlan);
@@ -206,6 +211,7 @@ function parseLevel(
     );
   }
 
+  const visual = obj(level["visual"], `${where}.visual`);
   const scoring = obj(level["scoring"], `${where}.scoring`);
 
   return {
@@ -216,36 +222,148 @@ function parseLevel(
     measurePlan,
     stars: parseStars(level["stars"], `${where}.stars`),
     scoring: { streakBonusEligible: bool(scoring["streakBonusEligible"], `${where}.scoring.streakBonusEligible`) },
-    data: parseMinigameData(level["visual"], {
-      noteOpportunityCount: noteCount,
-      measures: measurePlan.attemptMeasures,
-    }),
+    // A route is required of route-having classes and refused from the rest —
+    // a `RepeatMinigame` performer stands still, so authoring a path for one
+    // would be authoring data that means nothing. Nothing draws a route any
+    // more (see `ScenarioLevelData.route`), but the one-waypoint-per-note check
+    // it carries is a musical-content invariant worth keeping.
+    route: needsRoute ? parseRoute(visual["route"], `${where}.visual.route`, noteCount) : null,
+    visual,
+  };
+}
+
+/** Slot readers shared by every class's bindings parser. */
+function bindingReaders(raw: unknown, where: string) {
+  const bindings = obj(raw, where);
+  const one = (slot: string): string => {
+    const values = strings(bindings[slot], `${where}.${slot}`);
+    const first = values[0];
+    if (values.length !== 1 || first === undefined) {
+      throw new ScenarioDataError(`${where}.${slot}`, "expected exactly one asset id");
+    }
+    return first;
+  };
+  const many = (slot: string, min: number): string[] => {
+    const values = strings(bindings[slot], `${where}.${slot}`);
+    if (values.length < min) {
+      throw new ScenarioDataError(`${where}.${slot}`, `expected at least ${min} asset ids`);
+    }
+    return values;
+  };
+  return { one, many };
+}
+
+function parseClimbBindings(raw: unknown, where: string): ClimbAssetBindings {
+  const { one, many } = bindingReaders(raw, where);
+  return {
+    background: one("background"),
+    climberPoses: many("climberPoses", 1),
+    finishPose: one("finishPose"),
+    waypointVisuals: many("waypointVisuals", 1),
+    destinationVisual: one("destinationVisual"),
+    stepEffects: many("stepEffects", 2),
+  };
+}
+
+function parseRepeatBindings(raw: unknown, where: string): RepeatAssetBindings {
+  const { one, many } = bindingReaders(raw, where);
+  return {
+    background: one("background"),
+    performerNeutral: one("performerNeutral"),
+    performerAction: one("performerAction"),
+    performerFinish: one("performerFinish"),
+    repeatTarget: one("repeatTarget"),
+    targetCompletedState: one("targetCompletedState"),
+    impactEffects: many("impactEffects", 1),
+  };
+}
+
+/** Every asset id a set of bindings refers to, whatever the class. */
+function boundAssetIds(bindings: ScenarioAssetBindings): string[] {
+  if (bindings.kind === "climb") {
+    return [
+      bindings.background,
+      ...bindings.climberPoses,
+      bindings.finishPose,
+      ...bindings.waypointVisuals,
+      bindings.destinationVisual,
+      ...bindings.stepEffects,
+    ];
+  }
+  return [
+    bindings.background,
+    bindings.performerNeutral,
+    bindings.performerAction,
+    bindings.performerFinish,
+    bindings.repeatTarget,
+    bindings.targetCompletedState,
+    ...bindings.impactEffects,
+  ];
+}
+
+function parseClimbParameters(raw: unknown, where: string, plan: MeasurePlan): ClimbClassParameters {
+  const params = obj(raw, where);
+  const policy = str(params["badNotePolicy"], `${where}.badNotePolicy`);
+  if (policy !== "Wobble" && policy !== "Stall") {
+    throw new ScenarioDataError(`${where}.badNotePolicy`, 'expected "Wobble" or "Stall"');
+  }
+  return {
+    visualSpanMeasures: num(params["visualSpanMeasures"], `${where}.visualSpanMeasures`),
+    resetBetweenMeasures: plan.resetBetweenMeasures,
+    badNotePolicy: policy,
+    showDestinationFromStart: bool(
+      params["showDestinationFromStart"],
+      `${where}.showDestinationFromStart`
+    ),
+  };
+}
+
+function parseRepeatParameters(
+  raw: unknown,
+  where: string,
+  plan: MeasurePlan
+): RepeatClassParameters {
+  const params = obj(raw, where);
+  const mode = str(params["repeatMode"], `${where}.repeatMode`);
+  if (mode !== "sequence" && mode !== "accumulate") {
+    throw new ScenarioDataError(`${where}.repeatMode`, 'expected "sequence" or "accumulate"');
+  }
+  return {
+    visualSpanMeasures: num(params["visualSpanMeasures"], `${where}.visualSpanMeasures`),
+    resetBetweenMeasures: plan.resetBetweenMeasures,
+    repeatMode: mode,
+    performerMovesBetweenMeasures: bool(
+      params["performerMovesBetweenMeasures"],
+      `${where}.performerMovesBetweenMeasures`
+    ),
   };
 }
 
 /* -------------------------------------------------------------------------- */
 
+const KNOWN_CLASSES: ReadonlySet<string> = new Set<MinigameClassId>([
+  "ClimbMinigame",
+  "PerformMinigame",
+  "TraverseMinigame",
+  "ThreeStepMinigame",
+  "RepeatMinigame",
+  "BattleMinigame",
+]);
+
 /**
- * @param urlFor asset id -> resolvable URL. Supplied by the caller so the
- * scenario file stays free of build-tool paths and never hotlinks anything, and
- * so the *minigame* decides which ids exist rather than the host guessing them
- * from a naming convention.
+ * @param assetUrls asset id -> resolvable URL. Supplied by the caller so the
+ * scenario file stays free of build-tool paths and never hotlinks anything.
  */
 export function loadScenario(
   raw: unknown,
-  urlFor: (assetId: string) => string
+  assetUrls: Readonly<Record<string, string>>
 ): ScenarioDefinition {
   const root = obj(raw, "scenario");
   const id = str(root["id"], "scenario.id");
-  const minigameId = str(root["minigameClass"], "scenario.minigameClass");
-  const minigame = requireMinigame(minigameId, `scenario ${id}`);
-
-  // The minigame validates its own half. A scenario is free to carry whatever
-  // shape its minigame asks for; this loader never looks inside either blob.
-  const config = minigame.parseConfig({
-    classParameters: root["classParameters"],
-    assetBindings: root["assetBindings"],
-  });
+  const minigameClass = str(root["minigameClass"], "scenario.minigameClass");
+  if (!KNOWN_CLASSES.has(minigameClass)) {
+    throw new ScenarioDataError("scenario.minigameClass", `unknown class ${minigameClass}`);
+  }
 
   const supportedLevels = arr(root["supportedLevels"], "scenario.supportedLevels").map((entry, i) =>
     num(entry, `scenario.supportedLevels[${i}]`)
@@ -258,32 +376,61 @@ export function loadScenario(
     if (entry === undefined) {
       throw new ScenarioDataError("scenario.levels", `level ${level} is supported but absent`);
     }
-    const parsed = parseLevel(entry, `scenario.levels.${level}`, (visual, shape) =>
-      minigame.parseLevel(visual, shape)
-    );
+    const parsed = parseLevel(entry, `scenario.levels.${level}`, minigameClass === "ClimbMinigame");
     if (parsed.difficulty !== level) {
-      throw new ScenarioDataError(`scenario.levels.${level}.difficulty`, `is ${parsed.difficulty}`);
+      throw new ScenarioDataError(
+        `scenario.levels.${level}.difficulty`,
+        `is ${parsed.difficulty}`
+      );
     }
     levels.set(level, parsed);
   }
 
-  if (levels.size === 0) throw new ScenarioDataError("scenario.levels", "no supported levels");
+  const firstLevel = levels.values().next().value;
+  if (!firstLevel) throw new ScenarioDataError("scenario.levels", "no supported levels");
 
-  const assetUrls: Record<string, string> = {};
-  for (const assetId of minigame.assetIds(config, [...levels.values()].map((l) => l.data))) {
-    assetUrls[assetId] = urlFor(assetId);
+  // One decision — the declared class — picks both the binding shape and the
+  // parameter shape, so a scenario can never end up with one class's slots and
+  // another's parameters.
+  const isRepeat = minigameClass === "RepeatMinigame";
+  const bindings: ScenarioAssetBindings = isRepeat
+    ? { kind: "repeat", ...parseRepeatBindings(root["assetBindings"], "scenario.assetBindings") }
+    : { kind: "climb", ...parseClimbBindings(root["assetBindings"], "scenario.assetBindings") };
+  const parameters: ScenarioClassParameters = isRepeat
+    ? {
+        kind: "repeat",
+        ...parseRepeatParameters(
+          root["classParameters"],
+          "scenario.classParameters",
+          firstLevel.measurePlan
+        ),
+      }
+    : {
+        kind: "climb",
+        ...parseClimbParameters(
+          root["classParameters"],
+          "scenario.classParameters",
+          firstLevel.measurePlan
+        ),
+      };
+
+  for (const assetId of boundAssetIds(bindings)) {
+    if (assetUrls[assetId] === undefined) {
+      throw new ScenarioDataError("scenario.assetBindings", `no URL supplied for ${assetId}`);
+    }
   }
 
   return {
     id,
     displayName: str(root["displayName"], "scenario.displayName"),
     theme: str(root["theme"], "scenario.theme"),
-    minigameId,
+    minigameClass: minigameClass as MinigameClassId,
     family: str(root["family"], "scenario.family"),
     visualVerb: str(root["visualVerb"], "scenario.visualVerb"),
     supportedLevels,
     premise: str(root["scenarioPremise"], "scenario.scenarioPremise"),
-    config,
+    classParameters: parameters,
+    assetBindings: bindings,
     assetUrls,
     levels,
   };

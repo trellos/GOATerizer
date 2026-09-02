@@ -21,7 +21,7 @@
 
 import { degreeToMidi, type RunKey } from "../music/keys.js";
 import type { Degree } from "../music/degrees.js";
-import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
+import { BEATS_PER_MEASURE } from "../config/tuning.js";
 
 export type BassNote = {
   /** Beats from the start of the four-measure loop, 0..15. */
@@ -111,5 +111,9 @@ export function generateBassLine(key: RunKey, random: () => number = Math.random
     }
   }
 
-  return { progression, notes, loopBeats: ATTEMPT_BEATS };
+  // The loop is as long as the progression, not as long as an attempt. They
+  // used to be the same number and no longer are: an attempt plays its phrase
+  // twice, and the bass should turn round with it rather than leave the second
+  // half in silence.
+  return { progression, notes, loopBeats: progression.length * BEATS_PER_MEASURE };
 }

@@ -10,18 +10,30 @@
  *                                   └── TuninatorGuitarInputProvider
  *                                            │ normalised guitar events
  *                                            ▼
- *                                   AttemptRuntime (judge, score, stars, minigame)
- *                                            │ judgment + energy
+ *                              AttemptRuntime (judge, score, stars, actors)
+ *                                            │ judgment
  *                        ┌───────────────────┼───────────────────┐
  *                        ▼                   ▼                   ▼
- *                  TimelineModel        EnergyLayer        ScenarioStripView
+ *                  TimelineModel        TimelineView      ScenarioBackdropView
+ *                                     (notes + actors)      (background only)
+ *
+ * `EnergyLayer` hangs off the run rather than the attempt: it flies a trophy
+ * from the scenario to the shelf when an attempt ends, and nothing else.
  */
 
 import { AudioEngine } from "../audio/audio-engine.js";
 import { generateBassLine, type BassLine } from "../audio/bass-line.js";
 import { BassPlayer } from "../audio/bass-player.js";
-import { drumPatternFor } from "../audio/drum-pattern.js";
+import { BACKBEAT_PATTERN, drumPatternForAttempt } from "../audio/drum-pattern.js";
 import { DrumPlayer } from "../audio/drum-player.js";
+import { BackingDuck } from "../game/backing-duck.js";
+import {
+  gateChangesAnything,
+  InputGateMeasurement,
+  inputGateVerdict,
+  shouldAutoApply,
+} from "../game/input-gate.js";
+import { readInputRmsGate, writeInputRmsGate } from "../persistence/input-gate.js";
 import { Transport } from "../audio/transport.js";
 import {
   planAutoPerformance,
@@ -46,36 +58,61 @@ import {
   AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS,
   AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS,
   AUTOPLAY_SCHEDULE_LEAD_SECONDS,
+  BEATS_PER_MEASURE,
   EXTRA_INPUT_LATENCY_MS,
   RUN_LEAD_IN_BEATS,
   TRANSITION_BEATS,
 } from "../config/tuning.js";
-import { AttemptRuntime, type AttemptEvent, type EnergyEvent } from "../game/attempt.js";
+import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
 import { RunState, type RunSlot } from "../game/run.js";
-import { subdivisionKey, subdivisionsOf, unionSubdivisions } from "../game/subdivisions.js";
-import { TimingDeltaLog } from "../game/timing-log.js";
+import {
+  CALIBRATION_BPM,
+  CalibrationSession,
+  COUNT_IN_BARS,
+  MAX_USABLE_SPREAD_MS,
+  MIN_SAMPLES,
+  TOTAL_BARS,
+  type CalibrationState,
+} from "../game/calibration.js";
+import { offBeatMs, TimingDeltaLog } from "../game/timing-log.js";
 import type { GuitarInputEvent, GuitarInputProvider, GuitarInputStatus } from "../input/guitar-input.js";
 import { TestGuitarInputProvider } from "../input/test-provider.js";
 import { TuninatorGuitarInputProvider } from "../input/tuninator-provider.js";
-import { LANE_COUNT } from "../music/degrees.js";
 import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingering.js";
 import { keyDisplayName, keyShortName, parseKeyName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
-import { SCENARIOS } from "../scenario/registry.js";
+import {
+  MAX_LATENCY_TRIM_MS,
+  readLatencyTrimMs,
+  writeLatencyTrimMs,
+} from "../persistence/latency.js";
+import { SCENARIOS, scenarioById } from "../scenario/registry.js";
+import type { ScenarioDefinition } from "../scenario/types.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
+import { FrameMeter } from "../ui/frame-meter.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
+import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
+import { trophyLabel, trophySvg } from "../ui/trophy.js";
+import type { ActorSprites } from "../ui/timeline/actor-layer.js";
+import { NO_REPEAT_SPRITES, type RepeatSprites } from "../ui/timeline/repeat-layer.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import { TimelineView, type StageSource } from "../ui/timeline/timeline-view.js";
+import {
+  OVERLAY_BAND_FRACTION,
+  TimelineView,
+  type TimelineViewMode,
+} from "../ui/timeline/timeline-view.js";
 
+const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
-type Screen = "start" | "pregame" | "game" | "results";
+type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
 
 type Setup = {
   key: RunKey;
   tempoId: TempoId;
+  viewMode: TimelineViewMode;
   fingeringId: string;
 };
 
@@ -87,6 +124,67 @@ type ActiveAttempt = {
   attemptIndex: number;
   runtime: AttemptRuntime;
 };
+
+/**
+ * Puts one slot's trophy on the shelf. `null` clears it — an unplayed slot.
+ *
+ * `innerHTML` with a string this module built from a number: no user or asset
+ * content reaches it, and the alternative is hand-building eight SVG nodes.
+ */
+function setTrophy(slot: HTMLElement, stars: number | null): void {
+  const label = slot.querySelector(".slot-trophy");
+  if (!(label instanceof HTMLElement)) return;
+  label.innerHTML = stars === null ? "" : trophySvg(stars);
+  if (stars === null) slot.removeAttribute("aria-label");
+  else slot.setAttribute("aria-label", trophyLabel(stars));
+}
+
+/** A scenario with no climber art — pregame, and every non-climb class. */
+const EMPTY_SPRITES: ActorSprites = { poses: [] };
+
+/**
+ * What the timing check says about what it found.
+ *
+ * The two numbers answer different questions and the copy has to keep them
+ * apart, because the player's real question — "is that me or is that the
+ * game?" — is exactly the confusion this screen exists to resolve. The offset
+ * is their rig and their feel together; the spread is only them, and it is what
+ * decides whether the offset can be trusted at all.
+ */
+function calibrationVerdict(state: CalibrationState): string {
+  if (state.phase !== "done") {
+    return "The offset is your rig and your feel together. The consistency is just you — it says whether the offset can be trusted.";
+  }
+  if (state.samples < MIN_SAMPLES) {
+    return `Only ${state.samples} notes came through. Play one on every click — and check the guitar is actually being heard.`;
+  }
+  if (!state.usable) {
+    return `Your notes were spread ±${Math.round(state.spreadMs ?? 0)} ms, which is too loose for the middle of them to mean anything yet. Nothing is wrong with your playing — this needs an even run to measure against, so try once more and aim for steady rather than right.`;
+  }
+  if (!state.worthApplying) {
+    return "You are already inside 10 ms of the beat. Nothing to change — if the game still feels off, it is not this.";
+  }
+  const late = (state.offsetMs ?? 0) >= 0;
+  return (
+    `You play ${Math.abs(Math.round(state.offsetMs ?? 0))} ms ${late ? "after" : "before"} the click, ` +
+    `steadily to within ±${Math.round(state.spreadMs ?? 0)} ms. Applying it moves judgment ` +
+    `${late ? "later" : "earlier"} by that much, so the notes you feel are on time are scored that way.`
+  );
+}
+
+/**
+ * Writes text only when it changed.
+ *
+ * The check's readouts are repainted every frame while its screen is up, and
+ * almost every frame they are identical. Assigning `textContent` regardless
+ * dirties the node and buys a style recalculation for nothing.
+ */
+function setText(id: string, value: string): void {
+  const element = document.getElementById(id);
+  if (element instanceof HTMLElement && element.textContent !== value) {
+    element.textContent = value;
+  }
+}
 
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
@@ -101,10 +199,32 @@ export class GameApp {
   readonly #audio = new AudioEngine();
   readonly #transport = new Transport(() => this.#audio.now());
   #bass: BassPlayer | null = null;
+  /**
+   * How far the backing has stepped out of the player's way. See
+   * `game/backing-duck.ts`: it is reset per attempt, so one object outlives
+   * every attempt rather than being rebuilt with each.
+   */
+  readonly #duck = new BackingDuck();
+  /**
+   * What the player's rig actually sounds like. Fed from every pitch frame,
+   * including the ones Tuninator gated — which is the whole point, because a
+   * player whose notes are all being rejected is exactly who needs this.
+   */
+  readonly #inputGate = new InputGateMeasurement();
+  #inputRmsGate: number | null = readInputRmsGate();
+  /**
+   * Whether automatic calibration has had its go this session.
+   *
+   * Set by the automatic pass itself and by either button, so a player who
+   * takes the wheel keeps it. See `#maybeAutoCalibrateInput`.
+   */
+  #autoGateDone = false;
+  /** The gate this session set on its own, for the readout to own up to. */
+  #autoGateApplied: number | null = null;
   #drums: DrumPlayer | null = null;
   #bassLine: BassLine | null = null;
-  /** Which subdivision grid the kit is currently marking. See `#refreshDrumGrid`. */
-  #drumGridKey = "";
+  /** Which beat the kit is currently playing. See `#refreshDrumBeat`. */
+  #drumPatternId = "";
 
   /* Input ------------------------------------------------------------ */
   #provider: GuitarInputProvider | null = null;
@@ -134,16 +254,26 @@ export class GameApp {
    * pointing at a disposed recognizer, with `#micMocked` set by whichever lost.
    */
   #providerSwitch: Promise<void> = Promise.resolve();
+  /** How many recognizers this session has stood up. See `#switchProvider`. */
+  #providerBuilds = 0;
   #unsubscribeInput: (() => void)[] = [];
   #inputStatus: GuitarInputStatus | null = null;
-  #latencyTrimMs = EXTRA_INPUT_LATENCY_MS;
+  /**
+   * The player's own latency compensation, on top of what the browser reports.
+   * Seeded from a previous session's calibration; `EXTRA_INPUT_LATENCY_MS` is
+   * the default for a rig that has never been measured.
+   */
+  #latencyTrimMs = readLatencyTrimMs() ?? EXTRA_INPUT_LATENCY_MS;
   readonly #timing = new TimingDeltaLog();
+  /** The timing check in progress, or null when that screen is idle. */
+  #calibration: CalibrationSession | null = null;
 
   /* Game state ------------------------------------------------------- */
   #screen: Screen = "start";
   #setup: Setup = {
     key: pickWeightedKey(),
     tempoId: DEFAULT_TEMPO_ID,
+    viewMode: "key",
     fingeringId: "",
   };
   #fingerings: Fingering[] = [];
@@ -151,12 +281,12 @@ export class GameApp {
   #current: ActiveAttempt | null = null;
   #next: ActiveAttempt | null = null;
   /**
-   * The attempt that just finished.
-   *
-   * Kept so the outgoing minigame keeps drawing its own measures as they scroll
-   * off to the left — the payoff has to stay readable on its way out.
+   * The attempt that just finished. Kept so the outgoing panel still shows its
+   * goat at the summit (or frozen at the foothold it reached) while the strip
+   * slides — the payoff has to stay readable through the transition.
    */
   #previous: ActiveAttempt | null = null;
+  #slideStartBeat: number | null = null;
   #attemptCounter = 0;
 
   /* Views ------------------------------------------------------------ */
@@ -164,9 +294,13 @@ export class GameApp {
   readonly #timeline = new TimelineModel(this.#setup.key);
   #pregameView: TimelineView | null = null;
   #gameView: TimelineView | null = null;
+  #strip: ScenarioBackdropView | null = null;
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
+  readonly #frameMeter = new FrameMeter();
   #devMode = false;
+  /** EXPERIMENT: draw the run's timeline over the scenario. */
+  #overlayTimeline = true;
   /**
    * Dev-only: forces every slot to one difficulty level. `?dev=1&level=4`.
    *
@@ -174,7 +308,23 @@ export class GameApp {
    * picks — with more than one Rocky-family scenario authoring the same level,
    * that is no longer always Rocky Ascent.
    */
+  #actorSpriteCache: { id: string; sprites: ActorSprites } | null = null;
+  #repeatSpriteCache: { id: string; sprites: RepeatSprites } | null = null;
   #devLevel: number | null = null;
+  #devScenarioId: string | null = null;
+  /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
+  #devCalibrateOffsetMs: number | null = null;
+  /**
+   * `?dev=1&playOffsetMs=N`: autoplay plays the whole run N ms out of time.
+   *
+   * A player whose rig is uncompensated is off by the *same* amount on every
+   * note, and to them they are dead on the beat. That is a completely different
+   * input from the autoplay tiers, which model a player who is on time and
+   * fumbles a share of their notes — and it is the input nothing in this
+   * repository could produce, which is why judgment collapsing under a
+   * systematic offset (DECISION-038) shipped without a single test going red.
+   */
+  #devPlayOffsetMs = 0;
   #autoplay: AutoplayMode = "off";
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
@@ -195,10 +345,15 @@ export class GameApp {
   async start(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
     this.#devMode = params.get("dev") === "1";
+    // The timeline is drawn over the scenario rather than beside it.
+    // `?overlay=0` gives the two-pane layout back, which is what the A/B was
+    // run on before the overlay became the default.
+    this.#overlayTimeline = params.get("overlay") !== "0";
     this.#applySetupParams(params);
 
     this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
     this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
+    this.#strip = new ScenarioBackdropView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
     // Every registered scenario, not just one: a run can draw any of them into
@@ -209,9 +364,22 @@ export class GameApp {
       console.warn("[goaterizer] assets failed to load:", this.#assets.failed);
     }
 
-    // Only the run timeline is skinnable. The pregame one has no attempt, so
-    // there is no scenario whose look it could belong to.
-    this.#gameView.setStageSource(this.#assets, this.#stageFor);
+    // Both play screens take the overlay geometry, so the lane band is in the
+    // identical rectangle while warming up and while playing. Pregame has no
+    // scenario behind it — its controls take the space above and below the
+    // band instead.
+    for (const id of ["screen-game", "screen-pregame"]) {
+      const screen = document.getElementById(id);
+      if (screen instanceof HTMLElement) screen.dataset["overlay"] = String(this.#overlayTimeline);
+    }
+    // One source of truth for the band's height: the canvas lays the lanes out
+    // from the constant, the stylesheet keeps the controls clear of it.
+    document.documentElement.style.setProperty(
+      "--timeline-band",
+      `${OVERLAY_BAND_FRACTION * 100}%`
+    );
+    this.#gameView?.setOverlay(this.#overlayTimeline);
+    this.#pregameView?.setOverlay(this.#overlayTimeline);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -230,7 +398,7 @@ export class GameApp {
 
   #showScreen(screen: Screen): void {
     this.#screen = screen;
-    for (const id of ["start", "pregame", "game", "results"] as const) {
+    for (const id of ["start", "calibrate", "pregame", "game", "results"] as const) {
       const element = document.getElementById(`screen-${id}`);
       if (element) element.dataset["active"] = String(id === screen);
     }
@@ -248,6 +416,18 @@ export class GameApp {
       value.textContent = String(scores[tempo.id] ?? 0);
       item.append(name, value);
       list.append(item);
+    }
+
+    // A nudge, not a gate. A player whose rig is fine should not be made to sit
+    // through a check to reach the game, but a player whose rig is 200ms out
+    // will otherwise spend a run blaming their hands.
+    const state = document.getElementById("start-calibration-state");
+    if (state instanceof HTMLElement) {
+      const stored = readLatencyTrimMs();
+      state.textContent =
+        stored === null
+          ? "Timing not measured yet — the check takes about 20 seconds."
+          : `Timing measured: ${stored >= 0 ? "+" : "−"}${Math.abs(stored)} ms of your own.`;
     }
   }
 
@@ -340,13 +520,57 @@ export class GameApp {
     must("start-play", HTMLButtonElement).addEventListener("click", () => {
       void this.#enterPregame();
     });
+    must("start-calibrate", HTMLButtonElement).addEventListener("click", () => {
+      void this.#enterCalibration();
+    });
+    must("calibrate-start", HTMLButtonElement).addEventListener("click", () =>
+      this.#startCalibrationRun()
+    );
+    must("calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
+      this.#applyCalibrationResult()
+    );
+    must("calibrate-back", HTMLButtonElement).addEventListener("click", () =>
+      this.#leaveCalibration()
+    );
     must("pregame-reroll", HTMLButtonElement).addEventListener("click", () => this.#reroll());
+    // Both handlers end automatic calibration for the session: once the player
+    // has said what they want, this stops having opinions.
+    must("pregame-input-apply", HTMLButtonElement).addEventListener("click", () => {
+      const recommended = this.#inputGate.state.recommended;
+      if (recommended === null) return;
+      this.#autoGateDone = true;
+      this.#autoGateApplied = null;
+      this.#applyInputGate(recommended);
+    });
+    must("pregame-input-reset", HTMLButtonElement).addEventListener("click", () => {
+      this.#autoGateDone = true;
+      this.#autoGateApplied = null;
+      this.#applyInputGate(null);
+    });
+    must("pregame-calibrate-apply", HTMLButtonElement).addEventListener("click", () =>
+      this.#applyCalibration()
+    );
+    must("pregame-calibrate-reset", HTMLButtonElement).addEventListener("click", () =>
+      this.#resetCalibration()
+    );
     must("pregame-play", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-replay", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-new", HTMLButtonElement).addEventListener("click", () => {
       this.#reroll();
       this.#showScreen("pregame");
     });
+
+    for (const button of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
+      button.addEventListener("click", () => {
+        const mode = button.dataset["view"] === "tab" ? "tab" : "key";
+        this.#setup.viewMode = mode;
+        this.#pregameView?.setMode(mode);
+        this.#applyGameViewMode();
+        for (const other of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
+          other.dataset["selected"] = String(other.dataset["view"] === mode);
+        }
+      });
+    }
   }
 
   /**
@@ -395,23 +619,15 @@ export class GameApp {
       onSourceChange: (source) => {
         void this.#queueProviderSwitch(source);
       },
-      onLatencyChange: (ms) => {
-        this.#latencyTrimMs = ms;
-        // Samples taken under the old trim describe a different rig. Keeping
-        // them would average the change away and make the trim look ineffective.
-        this.#timing.clear();
-        // The compensation is baked in at schedule time, so anything already
-        // queued describes the old trim too.
-        this.#cancelAutoplay();
-      },
+      onLatencyChange: (ms) => this.#setLatencyTrim(ms),
       onAutoplay: (mode) => {
         void this.#setAutoplayMode(mode);
       },
-      onSkinsToggle: (enabled) => {
-        this.#gameView?.setStageSource(this.#assets, enabled ? this.#stageFor : null);
-      },
     });
     this.#debug.setEnabled(this.#devMode);
+    // A trim remembered from a previous session has to show in the panel, or
+    // the input reads 0 while a real compensation is being applied.
+    this.#debug.setLatencyTrim(this.#latencyTrimMs);
 
     // `?input=test` and `?input=synth` are dev-only on purpose. `test` is the
     // only way to make the deterministic provider drive scoring, and it is
@@ -422,6 +638,33 @@ export class GameApp {
     const level = Number(params.get("level"));
     if (this.#devMode && Number.isInteger(level) && level >= 1 && level <= 7) {
       this.#devLevel = level;
+    }
+
+    // `?calibrateOffsetMs=N` fakes a player N ms off the click on the timing
+    // check. Dev-only, and separate from the autoplay tiers on purpose — see
+    // `#scheduleCalibrationAutoplay`.
+    const calibrateOffset = Number(params.get("calibrateOffsetMs"));
+    if (this.#devMode && params.has("calibrateOffsetMs") && Number.isFinite(calibrateOffset)) {
+      this.#devCalibrateOffsetMs = calibrateOffset;
+    }
+
+    // `?playOffsetMs=N` shifts every autoplayed note by N ms, so a rig with
+    // uncompensated latency can be played back without a rig. Positive is late.
+    const playOffset = Number(params.get("playOffsetMs"));
+    if (this.#devMode && params.has("playOffsetMs") && Number.isFinite(playOffset)) {
+      this.#devPlayOffsetMs = playOffset;
+    }
+
+    // `?scenario=<id>` pins every slot that scenario authors to it. Dev-only,
+    // and it must name a real scenario: silently ignoring a typo would look
+    // like the pin working and selection disagreeing with it.
+    const scenarioId = params.get("scenario");
+    if (this.#devMode && scenarioId) {
+      if (!scenarioById(scenarioId)) {
+        console.warn(`[goaterizer] ?scenario=${scenarioId} is not a registered scenario id`);
+      } else {
+        this.#devScenarioId = scenarioId;
+      }
     }
 
     const requestedInput = params.get("input");
@@ -471,6 +714,15 @@ export class GameApp {
       return;
     }
 
+    // First thing after the unlock, because it is the only thing here the
+    // player is actually waiting on. Opening the mic means `getUserMedia` and
+    // then fetching a worklet, and nothing can be measured about their level
+    // until frames start arriving — so it is started now and awaited at the
+    // end, overlapping with building the backing rather than queueing behind
+    // it. This is the earliest a browser will let a microphone open at all:
+    // everything before it is the same user gesture.
+    const inputReady = this.#queueProviderSwitch(this.#initialInputKind);
+
     if (!this.#transport.running) this.#transport.start(tempoById(this.#setup.tempoId).bpm);
 
     const context = this.#audio.context;
@@ -483,15 +735,23 @@ export class GameApp {
     if (context && master && !this.#drums) {
       this.#drums = new DrumPlayer(context, this.#transport, master);
     }
+    // Pregame has no attempt, so this lands on the bare pulse — which is what a
+    // fresh `DrumPlayer` plays anyway. Stated rather than left implicit so the
+    // recorded pattern id matches what is actually sounding: the id is the
+    // guard `#refreshDrumBeat` uses, and one that disagrees with the kit would
+    // skip the first real beat change of a run.
+    this.#refreshDrumBeat();
     this.#regenerateBass();
     this.#bass?.start();
     this.#drums?.start();
 
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
+    this.#pregameView?.setMode(this.#setup.viewMode);
+    this.#applyGameViewMode();
     this.#updateKeyReadouts();
 
-    await this.#queueProviderSwitch(this.#initialInputKind);
+    await inputReady;
   }
 
   /** New key and new bass line. Deliberately does NOT touch the transport. */
@@ -516,21 +776,44 @@ export class GameApp {
     for (const button of document.querySelectorAll<HTMLElement>("#pregame-tempos button")) {
       button.dataset["selected"] = String(button.dataset["tempo"] === tempoId);
     }
-    if (this.#transport.running) {
-      // Phase-preserving: the loop keeps its place, only the rate changes.
-      this.#transport.setBpm(tempoById(tempoId).bpm);
-      this.#bass?.retime();
-      this.#drums?.retime();
-      // `setBpm` re-anchors the transport, so every already-computed audio-clock
-      // time for a queued gesture now points at the wrong beat.
-      this.#cancelAutoplay();
-    }
+    if (this.#transport.running) this.#setBpm(tempoById(tempoId).bpm);
+  }
+
+  /**
+   * Changes tempo without stopping the beat.
+   *
+   * Phase-preserving: the loop keeps its place, only the rate changes — and
+   * everything already queued against the old rate has to be dealt with. The
+   * players re-time their tails; autoplay's gestures cannot be re-timed at all,
+   * because `setBpm` re-anchors the transport and every audio-clock time they
+   * were given now points at the wrong beat, so they are dropped and replanned.
+   *
+   * One place, because forgetting any of the three is a bug you hear rather
+   * than see.
+   */
+  #setBpm(bpm: number): void {
+    this.#transport.setBpm(bpm);
+    this.#bass?.retime();
+    this.#drums?.retime();
+    this.#cancelAutoplay();
   }
 
   /**
    * The key, twice: the chart-style short name to read at a glance, and the
    * long name on the tooltip for anyone who wants it spelled out.
    */
+  /**
+   * The run screen's view mode.
+   *
+   * The overlay is Key View only: tablature's six string rows carry no pitch
+   * contour, so laid over a scenario they read as a grille rather than as a
+   * melody. Pregame still offers both, and turning the overlay off
+   * (`?overlay=0`) restores the choice in the run too.
+   */
+  #applyGameViewMode(): void {
+    this.#gameView?.setMode(this.#overlayTimeline ? "key" : this.#setup.viewMode);
+  }
+
   #updateKeyReadouts(): void {
     const short = keyShortName(this.#setup.key);
     const long = keyDisplayName(this.#setup.key);
@@ -552,12 +835,26 @@ export class GameApp {
    * directly: two overlapping switches can interleave a `dispose()` with a
    * `start()` and leave the app holding a disposed recognizer.
    */
-  #queueProviderSwitch(kind: "tuninator" | "test" | "synth"): Promise<void> {
-    this.#providerSwitch = this.#providerSwitch.then(() => this.#switchProvider(kind));
+  #queueProviderSwitch(
+    kind: "tuninator" | "test" | "synth",
+    options: { force?: boolean } = {}
+  ): Promise<void> {
+    this.#providerSwitch = this.#providerSwitch.then(() =>
+      this.#switchProvider(kind, options.force ?? false)
+    );
     return this.#providerSwitch;
   }
 
-  async #switchProvider(kind: "tuninator" | "test" | "synth"): Promise<void> {
+  /**
+   * `force` rebuilds a recognizer that is already the right kind and healthy.
+   *
+   * Only one caller needs it, and it is the reason this parameter exists: the
+   * amplitude gate is a *construction-time* option, so changing it means
+   * standing a new recognizer up. Without this the guard below saw "already on
+   * tuninator, still listening" and returned, and a measured gate was stored,
+   * displayed, and never handed to Tuninator until the next page load.
+   */
+  async #switchProvider(kind: "tuninator" | "test" | "synth", force = false): Promise<void> {
     if (kind !== "tuninator" && !this.#devMode) {
       // Belt and braces: neither dev source must be reachable in normal play,
       // whatever calls this.
@@ -567,12 +864,22 @@ export class GameApp {
 
     // Already on it and working: do not tear down a healthy recognizer just to
     // build the same one again. A provider that errored is retried.
-    if (kind === this.#sourceKind && this.#provider && this.#provider.getStatus().state !== "error") {
+    if (
+      !force &&
+      kind === this.#sourceKind &&
+      this.#provider &&
+      this.#provider.getStatus().state !== "error"
+    ) {
       return;
     }
 
     // Anything queued was timed against the provider that is about to go away.
     this.#cancelAutoplay();
+    // Levels measured through one source say nothing about another: a dev sine
+    // and a real guitar must never end up averaged into the same rig. A forced
+    // rebuild of the *same* source keeps its measurement, because it is still
+    // the same input — `#applyInputGate` clears it deliberately instead.
+    if (kind !== this.#sourceKind) this.#inputGate.reset();
 
     for (const off of this.#unsubscribeInput) off();
     this.#unsubscribeInput = [];
@@ -600,10 +907,23 @@ export class GameApp {
     // as TuninatorGuitarInputProvider or Tuninator can tell, "synth" and
     // "tuninator" are the same input.
     this.#providerKind = kind === "test" ? "test" : "tuninator";
+    // Counted because a rebuild is otherwise invisible: on a second open the
+    // mic permission and the worklet module are both already cached, so the
+    // recognizer can go from `starting` back to `listening` inside a single
+    // animation frame and no readout ever shows the transition. A gate only
+    // takes effect by construction, so "did it get built again" is the
+    // question, and a transient state is the wrong place to ask it.
+    this.#providerBuilds += 1;
     this.#provider =
       kind === "test"
         ? new TestGuitarInputProvider()
-        : new TuninatorGuitarInputProvider({ audioContext: context as AudioContext });
+        : new TuninatorGuitarInputProvider({
+            audioContext: context as AudioContext,
+            workletUrl: WORKLET_URL,
+            // Undefined unless the player has measured their rig, in which case
+            // Tuninator's own default stands.
+            ...(this.#inputRmsGate !== null ? { rmsGate: this.#inputRmsGate } : {}),
+          });
 
     this.#unsubscribeInput.push(
       this.#provider.onEvent((event) => this.#onGuitarEvent(event)),
@@ -628,6 +948,7 @@ export class GameApp {
 
   #onInputStatus(status: GuitarInputStatus): void {
     this.#inputStatus = status;
+    if (status.frame) this.#inputGate.observe(status.frame.rms);
     // `status.kind` cannot see the mocked mic -- as far as the provider is
     // concerned it opened a real one -- so the synthetic case is read from
     // `#micMocked`, tracked at the one place that actually knows. A real error
@@ -668,17 +989,51 @@ export class GameApp {
     element.textContent = message;
   }
 
+  /**
+   * Total latency compensation, in seconds: what the browser reports plus the
+   * player's own calibration trim.
+   */
+  get #latencySeconds(): number {
+    return this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
+  }
+
   /** Audio-clock seconds -> absolute transport beats, latency-compensated. */
   #toBeat = (contextTime: number): number => {
-    const latency = this.#audio.outputLatencySeconds + this.#latencyTrimMs / 1000;
-    return this.#transport.beatAt(contextTime - latency);
+    return this.#transport.beatAt(contextTime - this.#latencySeconds);
   };
+
+  /**
+   * **The beat the player is hearing right now**, and the clock everything
+   * downstream of the speakers runs on.
+   *
+   * `Transport.beat` is the beat being *scheduled*: audio written at context
+   * time `t` reaches the player's ears at `t + outputLatency`, so the raw
+   * transport clock runs that far ahead of the room. Drawing the timeline on it
+   * put the note bar across the strike line before the drum hit arrived, by the
+   * whole output latency — a few milliseconds on a wired output, but a third of
+   * a beat at 90bpm on Bluetooth headphones, which is exactly the "the beat
+   * feels laggy" complaint.
+   *
+   * It also quietly broke judgment. Played notes are timestamped in this
+   * compensated space (`#toBeat`) while the judge was *ticked* in raw transport
+   * time, so its windows closed a full latency early and a note played on the
+   * beat could be marked missed before its own attack was delivered.
+   *
+   * One clock, then: scheduling audio stays in raw transport time — that is
+   * what `contextTimeAt` is for — and everything the player sees or is judged
+   * on runs here.
+   */
+  get #heardBeat(): number {
+    return this.#toBeat(this.#audio.now());
+  }
 
   #onGuitarEvent(event: GuitarInputEvent): void {
     const beat = this.#toBeat(event.contextTime);
     switch (event.type) {
       case "attack":
         this.#timeline.addPlayed(event.id, event.midi, beat);
+        if (this.#screen === "pregame") this.#recordCalibrationSample(beat);
+        else if (this.#screen === "calibrate") this.#calibration?.note(beat);
         break;
       case "retune":
         this.#timeline.revisePlayed(event.id, event.midi);
@@ -695,6 +1050,260 @@ export class GameApp {
   }
 
   /* ------------------------------------------------------------------ */
+  /* The timing check                                                    */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Opens the timing check: audio, a click, a microphone, and nothing else.
+   *
+   * Deliberately *not* the pregame calibration's environment. Pregame has a
+   * bass loop over the click and tells the player to noodle, so a note played
+   * there is as likely to be aimed at the music as at the beat. Here the
+   * backing is the bare quarter pulse — the same accented pulse a run plays
+   * over, so what is calibrated is what will be played against — and the only
+   * instruction is one note per click.
+   */
+  async #enterCalibration(): Promise<void> {
+    this.#showScreen("calibrate");
+    const unlocked = await this.#audio.unlock();
+    if (!unlocked) {
+      this.#setCalibrationPhase(this.#audio.failure ?? "Audio could not start.");
+      return;
+    }
+
+    // The check pins its own tempo, whatever the player picked for their run:
+    // a fixed reference keeps the number comparable between sessions, and the
+    // fold-over headroom becomes a known quantity rather than a setting.
+    if (!this.#transport.running) this.#transport.start(CALIBRATION_BPM);
+    else this.#setBpm(CALIBRATION_BPM);
+
+    const context = this.#audio.context;
+    const master = this.#audio.master;
+    if (context && master && !this.#drums) {
+      this.#drums = new DrumPlayer(context, this.#transport, master);
+    }
+    // No bass. It is a musical loop, and a player will phrase against it.
+    this.#bass?.stop();
+    this.#refreshDrumBeat();
+    this.#drums?.start();
+
+    this.#calibration = null;
+    this.#renderCalibration();
+    // Through the queue, like every other caller: the switch disposes and
+    // reopens the recognizer, and the check is now a third way to reach it.
+    await this.#queueProviderSwitch(this.#initialInputKind);
+  }
+
+  /** Leaves the check and restores the tempo the player actually chose. */
+  #leaveCalibration(): void {
+    this.#calibration = null;
+    if (this.#transport.running) this.#setBpm(tempoById(this.#setup.tempoId).bpm);
+    this.#showScreen("start");
+    this.#buildStartScreen();
+  }
+
+  /** Begins a run of the check on the next bar line, so the count-in counts. */
+  #startCalibrationRun(): void {
+    if (!this.#transport.running) return;
+    const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat);
+    this.#calibration = new CalibrationSession(startBeat, this.#transport.secondsPerBeat);
+    this.#scheduleCalibrationAutoplay(startBeat);
+    this.#renderCalibration();
+  }
+
+  /**
+   * Dev-only: plays the check for you, one note per beat, a known amount off.
+   *
+   * `?dev=1&calibrateOffsetMs=N` simulates a player whose notes land N ms from
+   * the click. It deliberately does **not** reuse the autoplay tiers: those
+   * describe what share of the *targets* a fake guitarist takes, and the check
+   * has no targets — it has a beat grid and a question about timing. Reading
+   * "25%" as "12ms late" would be inventing a meaning the mode does not have.
+   *
+   * This is how the check is testable at all without a guitar in the room, and
+   * it makes the round trip assertable in both directions: at an offset of 0
+   * the check must find nothing to change, and at 40 it must find 40. If it
+   * reported something else for a player who is off by construction, the
+   * measurement is wrong.
+   */
+  #scheduleCalibrationAutoplay(startBeat: number): void {
+    const offsetMs = this.#devCalibrateOffsetMs;
+    if (offsetMs === null) return;
+    const testProvider =
+      this.#provider instanceof TestGuitarInputProvider ? this.#provider : null;
+    const synth = this.#micMocked ? this.#synth : null;
+    if (!testProvider && !synth) return;
+
+    const secondsPerBeat = this.#transport.secondsPerBeat;
+    // The same quantity `#toBeat` subtracts from a detected event, added back,
+    // so an offset of zero really is a player who is dead on.
+    const latency = this.#latencySeconds;
+    const sounding = Math.max(0.12, secondsPerBeat * 0.6);
+    const midi = 40; // Open low E: one string, no left hand, like the instructions.
+
+    for (
+      let beat = COUNT_IN_BARS * BEATS_PER_MEASURE;
+      beat < TOTAL_BARS * BEATS_PER_MEASURE;
+      beat += 1
+    ) {
+      const at =
+        this.#transport.contextTimeAt(startBeat + beat) + offsetMs / 1000 + latency;
+      if (testProvider) {
+        // With a release, like every other injected note: without one the bar
+        // grows from its attack to the playhead until it prunes.
+        const id = `cal-${beat}`;
+        testProvider.schedule([
+          { at, kind: "attack", midi, id },
+          { at: at + sounding, kind: "release", id },
+        ]);
+      } else {
+        synth?.pluck(midi, at, sounding);
+      }
+    }
+  }
+
+  /** Adopts the measured offset. The check itself never applies silently. */
+  #applyCalibrationResult(): void {
+    const state = this.#calibration?.state;
+    if (!state?.usable || state.offsetMs === null) return;
+    const next = this.#latencyTrimMs + state.offsetMs;
+    this.#setLatencyTrim(Math.max(-MAX_LATENCY_TRIM_MS, Math.min(MAX_LATENCY_TRIM_MS, next)));
+    // The session described the rig as it was before this change, so it is now
+    // stale by exactly the amount just applied. Clearing it makes "Start" mean
+    // "measure again against the new setting", which is the verification pass.
+    this.#calibration = null;
+    this.#renderCalibration();
+  }
+
+  #setCalibrationPhase(text: string): void {
+    setText("calibrate-phase", text);
+  }
+
+  /**
+   * Paints the check.
+   *
+   * Everything here changes at most once per bar. Nothing on this screen may
+   * move on the beat: a visual pulse is a second cue, and a player given two
+   * cues splits the difference between them — which would make the measurement
+   * a blend of their audio offset and their visual one rather than the audio
+   * offset the judge actually compensates.
+   */
+  #renderCalibration(): void {
+    const state = this.#calibration?.state ?? null;
+    const offset = document.getElementById("calibrate-offset");
+    const spread = document.getElementById("calibrate-spread");
+    const apply = document.getElementById("calibrate-apply");
+    const start = document.getElementById("calibrate-start");
+
+    const reported = Math.round(this.#audio.outputLatencySeconds * 1000);
+    setText(
+      "calibrate-current",
+      `Currently compensating ${reported + this.#latencyTrimMs} ms ` +
+        `(${reported} reported by the browser, ${this.#latencyTrimMs} yours).`
+    );
+
+    if (!state) {
+      this.#setCalibrationPhase("Ready when you are.");
+      setText("calibrate-progress", "\u00a0");
+      setText("calibrate-offset", "—");
+      setText("calibrate-spread", "—");
+      if (apply instanceof HTMLButtonElement) apply.disabled = true;
+      if (start instanceof HTMLButtonElement) start.textContent = "Start";
+      return;
+    }
+
+    // Bars as dots: one glyph per bar, filled as it passes. It updates once
+    // every 2.7 seconds, which is far too coarse to play to.
+    setText(
+      "calibrate-progress",
+      "●".repeat(state.bar) + "○".repeat(Math.max(0, TOTAL_BARS - state.bar))
+    );
+
+    switch (state.phase) {
+      case "countIn":
+        this.#setCalibrationPhase("Listen…");
+        break;
+      case "warmUp":
+        this.#setCalibrationPhase("Play along — this bar is a warm-up");
+        break;
+      case "measuring":
+        this.#setCalibrationPhase(`Keep going — ${state.samples} notes`);
+        break;
+      case "done":
+        this.#setCalibrationPhase(state.usable ? "Done" : "Not enough to go on");
+        break;
+    }
+
+    setText(
+      "calibrate-offset",
+      state.offsetMs === null
+        ? "—"
+        : `${state.offsetMs >= 0 ? "+" : "−"}${Math.abs(Math.round(state.offsetMs))} ms`
+    );
+    setText(
+      "calibrate-spread",
+      state.spreadMs === null ? "—" : `±${Math.round(state.spreadMs)} ms`
+    );
+    if (offset instanceof HTMLElement) offset.dataset["state"] = state.usable ? "good" : "";
+    if (spread instanceof HTMLElement) {
+      spread.dataset["state"] = state.spreadMs === null ? "" : state.usable ? "good" : "warn";
+    }
+
+    setText("calibrate-verdict", calibrationVerdict(state));
+    if (apply instanceof HTMLButtonElement) {
+      apply.disabled = !(state.phase === "done" && state.worthApplying);
+    }
+    if (start instanceof HTMLButtonElement) {
+      start.textContent = state.phase === "done" ? "Again" : "Restart";
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Latency calibration                                                 */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * One note of the pregame calibration: how far off the nearest beat it was.
+   *
+   * Pregame has no targets, so the reference is the beat grid itself — the
+   * drums the player is hearing. The measurement therefore only works while
+   * they are playing *on* beats, and it can only see an offset up to half a
+   * beat: past that, `Math.round` picks the next beat instead and the error
+   * folds over. At 90bpm that is ±333ms, which covers every rig short of a
+   * badly-paired Bluetooth speaker; at the slowest tempo it is ±500ms.
+   *
+   * The sign convention is the log's: positive is late. `beat` is already
+   * latency-compensated, so what is measured is the residual the current
+   * compensation does *not* explain — exactly the thing the trim exists for.
+   */
+  #recordCalibrationSample(beat: number): void {
+    if (!this.#transport.running) return;
+    this.#timing.record(offBeatMs(beat, this.#transport.secondsPerBeat));
+  }
+
+  /** Adopts the measured bias, remembers it, and starts measuring again. */
+  #applyCalibration(): void {
+    const suggested = this.#timing.suggestedTrimMs(this.#latencyTrimMs);
+    if (suggested === null) return;
+    this.#setLatencyTrim(Math.max(-MAX_LATENCY_TRIM_MS, Math.min(MAX_LATENCY_TRIM_MS, suggested)));
+  }
+
+  /** Forgets the calibration; the browser's own reported latency stands alone. */
+  #resetCalibration(): void {
+    this.#setLatencyTrim(EXTRA_INPUT_LATENCY_MS);
+    writeLatencyTrimMs(null);
+  }
+
+  #setLatencyTrim(milliseconds: number): void {
+    this.#latencyTrimMs = Math.round(milliseconds);
+    // Samples taken under the old trim describe a rig that no longer exists;
+    // averaging them with the new ones hides the very change being tested.
+    this.#timing.clear();
+    writeLatencyTrimMs(this.#latencyTrimMs);
+    this.#debug?.setLatencyTrim(this.#latencyTrimMs);
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Run                                                                 */
   /* ------------------------------------------------------------------ */
 
@@ -704,14 +1313,17 @@ export class GameApp {
     this.#run = new RunState({
       key: this.#setup.key,
       bpm: tempoById(this.#setup.tempoId).bpm,
-      // Dev-only. Normal play always uses the design's fixed difficulty curve.
+      // Dev-only. Normal play always uses the design's fixed difficulty curve
+      // and random scenario selection.
       ...(this.#devLevel !== null
         ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
         : {}),
+      ...(this.#devScenarioId !== null ? { pinnedScenarioId: this.#devScenarioId } : {}),
     });
     this.#current = null;
     this.#next = null;
     this.#previous = null;
+    this.#slideStartBeat = null;
     this.#timeline.clearTargets();
     this.#timeline.clearPlayed();
     this.#energy?.clear();
@@ -723,15 +1335,18 @@ export class GameApp {
     for (const container of ["hud-history", "results-history"]) {
       for (const slot of document.querySelectorAll<HTMLElement>(`#${container} .history-slot`)) {
         slot.dataset["state"] = "pending";
-        const stars = slot.querySelector(".slot-stars");
-        if (stars) stars.textContent = "";
+        setTrophy(slot, null);
       }
     }
 
     // Start on the next measure boundary plus a lead-in, so the first target
-    // arrives in time rather than instantly. The beat never stops.
-    const startBeat = this.#transport.nextMeasureBoundary() + RUN_LEAD_IN_BEATS;
+    // arrives in time rather than instantly. The beat never stops. Measured
+    // from the beat the player is *hearing*, so the lead-in they actually get
+    // is the one the constant names however much latency their rig has.
+    const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
+    this.#resetDuck();
+    this.#refreshDrumBeat();
     this.#queueNextAttempt();
     this.#updateHud();
     this.#showScreen("game");
@@ -765,41 +1380,50 @@ export class GameApp {
     const current = this.#current;
     if (!run || !current) {
       this.#next = null;
-      this.#refreshDrumGrid();
       return;
     }
     this.#next = this.#createAttempt(run.nextSlot, current.runtime.endBeat + TRANSITION_BEATS);
-    this.#refreshDrumGrid();
   }
 
   /**
-   * Points the kit at the rhythmic grid of what is being played *and* what is
-   * coming next.
+   * Points the kit at the beat of the minigame being played.
    *
-   * The union of the two is what makes the signal useful: a sixteenth run
-   * announces itself during the attempt before it, and — because that attempt
-   * then becomes the current one — the marking carries on underneath it rather
-   * than stopping at the moment it is needed most.
+   * One beat per minigame, chosen from its difficulty and the feel of its own
+   * notes (`audio/drum-pattern.ts`). Deliberately *only* the current attempt:
+   * this used to mark the union of the current and next attempt's grids so a
+   * sixteenth run announced itself a minigame early, and that look-ahead is
+   * gone — the beat now describes the exercise in hand rather than trailing the
+   * next one, which is also why this is called where `#current` changes and no
+   * longer from `#queueNextAttempt`.
    *
-   * Guarded on the resulting key: `setPattern` re-schedules the queued tail, so
-   * calling it when nothing changed would restate the kit every transition.
+   * With no attempt — pregame, the timing check, the end of a run — the bare
+   * pulse plays, which is the same four-beat skeleton every rung is built on.
+   *
+   * Guarded on the pattern's id: `setPattern` throws away and re-schedules the
+   * queued tail, so calling it when the beat has not actually changed would
+   * restate the kit at every transition.
    */
-  #refreshDrumGrid(): void {
-    const grids = [this.#current, this.#next]
-      .filter((attempt): attempt is ActiveAttempt => attempt !== null)
-      .map((attempt) => subdivisionsOf(attempt.runtime.level.prompt));
-    const combined = unionSubdivisions(...grids);
-    const key = subdivisionKey(combined);
-    if (key === this.#drumGridKey) return;
+  #refreshDrumBeat(): void {
+    const attempt = this.#current;
+    const pattern = attempt
+      ? drumPatternForAttempt(attempt.runtime.difficulty, attempt.runtime.level.prompt)
+      : BACKBEAT_PATTERN;
+    if (pattern.id === this.#drumPatternId) return;
 
-    this.#drumGridKey = key;
-    this.#drums?.setPattern(drumPatternFor(combined));
+    this.#drumPatternId = pattern.id;
+    this.#drums?.setPattern(pattern);
   }
 
   #onAttemptEvent(attempt: ActiveAttempt, event: AttemptEvent): void {
     switch (event.type) {
       case "judgment": {
         const judgment = event.judgment;
+        // The backing bass steps back when the player is missing and comes
+        // back as they recover. Applied for every judgment rather than only
+        // the ones that move the ladder: `apply` returns the gain in force
+        // either way, and `setDuck` ignores a value it is already at, so this
+        // needs no branching and cannot drift out of step with the ladder.
+        this.#bass?.setDuck(this.#duck.apply(judgment));
         if (judgment.type === "PerfectNote" || judgment.type === "GoodNote") {
           // Calibration samples come from a human and a real guitar only.
           // Autoplay -- discrete or synthetic -- schedules its attacks at the
@@ -833,9 +1457,6 @@ export class GameApp {
         this.#updateHud();
         break;
       }
-      case "energy":
-        this.#launchEnergy(attempt, event.energy);
-        break;
       case "starEarned":
         this.#updateHud();
         break;
@@ -846,38 +1467,6 @@ export class GameApp {
         break;
     }
   }
-
-  /**
-   * Hands a judged note to the minigame, at the note.
-   *
-   * There used to be a streak here: a short flight from the judged note on the
-   * timeline into a separate scenario panel, whose *arrival* triggered the
-   * reaction so the player read cause and effect rather than coincidence. With
-   * one surface (GDD §6) there is nothing to fly between — the note the player
-   * hit is the thing that reacts — so the energy is delivered where and when it
-   * happened, and the minigame animates its own reaction from there.
-   */
-  #launchEnergy(attempt: ActiveAttempt, energy: EnergyEvent): void {
-    attempt.runtime.deliverEnergy(
-      energy,
-      attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
-    );
-  }
-
-  /**
-   * Routes each attempt's stretch of timeline to the minigame that owns it.
-   *
-   * Two minigames share the surface around a handover, so this is keyed by
-   * attempt rather than "the current scenario": the outgoing one keeps drawing
-   * its own measures all the way off the left edge while the incoming one's
-   * arrive from the right.
-   */
-  readonly #stageFor: StageSource = (attemptKey, view) => {
-    const attempt = [this.#current, this.#next, this.#previous].find(
-      (entry) => entry?.timelineKey === attemptKey
-    );
-    return attempt?.runtime.minigame.render(view) ?? null;
-  };
 
   /** Canvas-local point -> the energy overlay's coordinate space. */
   #toOverlay(canvasId: string, point: { x: number; y: number }): { x: number; y: number } | null {
@@ -905,14 +1494,18 @@ export class GameApp {
       return;
     }
 
-    // Promote immediately so judgment never has a gap. The outgoing attempt's
-    // targets are deliberately NOT removed here: it keeps owning its stretch of
-    // timeline, so its background and its goat at the summit scroll off to the
-    // left rather than blinking out (GDD §11.6). They age out in
-    // `TimelineModel.prune` once they are past the window.
+    // Promote immediately so judgment never has a gap; the strip takes exactly
+    // one beat to slide, and the beat does not stop.
+    this.#slideStartBeat = this.#heardBeat;
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
+    // A new minigame starts on a full band. Carrying the previous attempt's
+    // duck across would tell the player something untrue about the notes in
+    // front of them.
+    this.#resetDuck();
+    this.#refreshDrumBeat();
+    this.#timeline.removeTargets(attempt.timelineKey);
     if (!this.#current) {
       this.#finishRun("content-limit");
       return;
@@ -920,37 +1513,42 @@ export class GameApp {
     this.#queueNextAttempt();
   }
 
+  /** Full band again: the ladder and the gain it drives, together. */
+  #resetDuck(): void {
+    this.#duck.reset();
+    this.#bass?.setDuck(1);
+  }
+
   #flyStarsToHistory(ordinal: number, stars: number): void {
     const slot = document.querySelector<HTMLElement>(
       `#hud-history .history-slot[data-ordinal="${ordinal}"]`
     );
     const layer = this.#energy;
-    const view = this.#gameView;
-    const setStars = (count: number) => {
-      const label = slot?.querySelector(".slot-stars");
-      if (label) label.textContent = "★".repeat(count);
+    const strip = this.#strip;
+    /**
+     * Each star that lands upgrades the trophy it lands on: bare at one, horns
+     * at two, a crown at three. The ornament arriving with the star is the
+     * whole "goats lead to stars, stars lead to the trophy" chain shown rather
+     * than explained.
+     */
+    const setTrophyTier = (count: number) => {
+      if (slot) setTrophy(slot, count);
     };
 
     // The slot's *state* flips now, so a finished minigame never looks unplayed
-    // while its stars are still in the air. Only the glyphs arrive with them.
+    // while its trophy is still in the air. Only the trophy arrives with them.
     if (slot) slot.dataset["state"] = stars > 0 ? "done" : "failed";
 
-    if (!slot || !layer || !view || stars === 0) {
-      setStars(stars);
+    if (!slot || !layer || !strip || stars === 0) {
+      setTrophyTier(stars);
       return;
     }
 
-    // The stars leave from the current-time bar, where the run was just played.
-    // This is the one flight left: it genuinely crosses regions, from the
-    // timeline up into the history bar.
-    const from = this.#toOverlay(
-      "game-canvas",
-      view.pointFor((LANE_COUNT - 1) / 2, this.#transport.beat, this.#transport.beat)
-    );
+    const from = this.#toOverlay("scenario-canvas", strip.currentPanelTarget);
     const rect = slot.getBoundingClientRect();
     const overlay = document.getElementById("energy-canvas");
     if (!from || !(overlay instanceof HTMLCanvasElement)) {
-      setStars(stars);
+      setTrophyTier(stars);
       return;
     }
     const overlayRect = overlay.getBoundingClientRect();
@@ -959,7 +1557,7 @@ export class GameApp {
       y: rect.top - overlayRect.top + rect.height / 2,
     };
 
-    const nowBeat = this.#transport.beat;
+    const nowBeat = this.#heardBeat;
     for (let i = 0; i < stars; i += 1) {
       layer.spawn({
         from,
@@ -967,7 +1565,7 @@ export class GameApp {
         polarity: "good",
         strong: true,
         bornBeat: nowBeat + i * 0.08,
-        onArrive: () => setStars(i + 1),
+        onArrive: () => setTrophyTier(i + 1),
       });
     }
   }
@@ -978,13 +1576,12 @@ export class GameApp {
 
     this.#current = null;
     this.#next = null;
-    this.#previous = null;
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
     // never be judged, and would play over the results screen.
     this.#cancelAutoplay();
     // Back to the bare pulse: there is no upcoming phrase to warn about.
-    this.#refreshDrumGrid();
+    this.#refreshDrumBeat();
 
     const summary = run.summary;
     const tempo = tempoById(this.#setup.tempoId);
@@ -1010,8 +1607,7 @@ export class GameApp {
       const entry = run.slots[ordinal];
       const stars = entry?.result?.stars ?? 0;
       slot.dataset["state"] = entry?.result ? (stars > 0 ? "done" : "failed") : "pending";
-      const label = slot.querySelector(".slot-stars");
-      if (label) label.textContent = entry?.result ? "★".repeat(stars) : "";
+      setTrophy(slot, entry?.result ? stars : null);
     }
 
     this.#buildStartScreen();
@@ -1022,18 +1618,36 @@ export class GameApp {
   /* Frame                                                               */
   /* ------------------------------------------------------------------ */
 
+  /**
+   * One frame, on `requestAnimationFrame` and nothing else.
+   *
+   * Uncapped on purpose: rAF fires at the display's refresh rate, so a 120Hz or
+   * 144Hz panel gets 120 or 144 frames a second rather than a self-imposed 60.
+   * Nothing here throttles, and nothing may — a rhythm game's read-ahead is a
+   * moving object, and the smoothness of that motion is what the player judges
+   * their own timing against.
+   *
+   * The frame is also free to be *skipped*: every position is derived from the
+   * transport (`#heardBeat`), never accumulated, so a dropped frame moves
+   * nothing and a slow machine plays the same game more coarsely rather than a
+   * different one.
+   */
   #frame(): void {
+    this.#frameMeter.begin(performance.now());
     try {
       this.#tick();
     } catch (error) {
       console.error("[goaterizer] frame failed", error);
     }
+    this.#frameMeter.end(performance.now());
     requestAnimationFrame(() => this.#frame());
   }
 
   #tick(): void {
     if (!this.#transport.running) return;
-    const beat = this.#transport.beat;
+    // Everything below runs on the beat the player is hearing, never the beat
+    // being scheduled. See `#heardBeat`.
+    const beat = this.#heardBeat;
 
     // The test provider fires its queue against the audio clock; the synthetic
     // mic has no queue to pump, because its plucks are real scheduled audio.
@@ -1049,15 +1663,103 @@ export class GameApp {
     this.#timeline.prune(beat);
     this.#energy?.update(beat);
 
-    if (this.#screen === "pregame") {
+    if (this.#screen === "calibrate") {
+      this.#calibration?.update(beat);
+      this.#renderCalibration();
+    } else if (this.#screen === "pregame") {
       this.#pregameView?.render(this.#timeline, beat);
       this.#updatePregameReadouts();
     } else if (this.#screen === "game") {
+      // PROTOTYPE: the actor belongs to the attempt being played, and its beat
+      // is that attempt's, so its hop arc is in the phrase's own time.
+      const attempt = this.#current?.runtime;
+      this.#gameView?.setActor(
+        attempt ? attempt.actor.state : null,
+        attempt ? attempt.toAttemptBeat(beat) : 0
+      );
+      this.#gameView?.setActorSprites(this.#actorSpritesFor(attempt?.scenario ?? null));
+      this.#gameView?.setRepeatSprites(this.#repeatSpritesFor(attempt?.scenario ?? null));
+      // A repeat scenario puts its own performer on the bars instead.
+      this.#gameView?.setRepeat(attempt?.repeat ? attempt.repeat.state : null);
       this.#gameView?.render(this.#timeline, beat);
+      this.#renderStrip(beat);
       this.#energy?.render(beat);
     }
 
     this.#updateDebug(beat);
+  }
+
+  /**
+   * The climber art for a scenario, resolved through the asset store.
+   *
+   * Cached on the scenario id: this runs every frame, and rebuilding an array
+   * of four image lookups sixty times a second to hand the same four images to
+   * the same view is work for nothing.
+   */
+  #actorSpritesFor(scenario: ScenarioDefinition | null): ActorSprites {
+    if (!scenario) return EMPTY_SPRITES;
+    if (this.#actorSpriteCache?.id === scenario.id) return this.#actorSpriteCache.sprites;
+    const bindings = scenario.assetBindings;
+    const poses =
+      bindings.kind === "climb"
+        ? bindings.climberPoses
+            .map((id) => this.#assets.get(id))
+            .filter((image): image is HTMLImageElement => image !== null)
+        : [];
+    const sprites: ActorSprites = { poses };
+    this.#actorSpriteCache = { id: scenario.id, sprites };
+    return sprites;
+  }
+
+  /**
+   * The can art for a repeat scenario, resolved through the asset store.
+   *
+   * Cached on the scenario id for the same reason the climber art is: this runs
+   * every frame and the answer only changes when the scenario does.
+   */
+  #repeatSpritesFor(scenario: ScenarioDefinition | null): RepeatSprites {
+    if (!scenario || scenario.assetBindings.kind !== "repeat") return NO_REPEAT_SPRITES;
+    if (this.#repeatSpriteCache?.id === scenario.id) return this.#repeatSpriteCache.sprites;
+    const sprites: RepeatSprites = {
+      can: this.#assets.get(scenario.assetBindings.repeatTarget),
+      crushed: this.#assets.get(scenario.assetBindings.targetCompletedState),
+    };
+    this.#repeatSpriteCache = { id: scenario.id, sprites };
+    return sprites;
+  }
+
+  #renderStrip(beat: number): void {
+    const run = this.#run;
+    const strip = this.#strip;
+    if (!run || !strip) return;
+
+    const slide =
+      this.#slideStartBeat === null
+        ? 0
+        : Math.min(1, (beat - this.#slideStartBeat) / TRANSITION_BEATS) - 1;
+    if (slide >= 0) this.#slideStartBeat = null;
+
+    const panelFor = (slot: RunSlot | null, attempt: ActiveAttempt | null): BackdropPanel | null => {
+      if (!slot) return null;
+      // Only the attempt that actually belongs to this slot may drive its meter.
+      const runtime = attempt?.slotOrdinal === slot.ordinal ? attempt.runtime : null;
+      return {
+        scenario: slot.scenario,
+        stars: runtime ? runtime.starMeter.stars : slot.result?.stars ?? 0,
+        starProgress: runtime ? runtime.starMeter.progressToNextStar : 0,
+        difficulty: slot.difficulty,
+        label: slot.scenario
+          ? `${slot.scenario.displayName} · L${slot.difficulty}`
+          : `L${slot.difficulty}`,
+      };
+    };
+
+    strip.render({
+      previous: panelFor(run.previousSlot, this.#previous),
+      current: panelFor(run.currentSlot, this.#current),
+      next: panelFor(run.nextSlot, this.#next),
+      slide: Math.min(0, slide),
+    });
   }
 
   #updateHud(): void {
@@ -1066,16 +1768,6 @@ export class GameApp {
     const attemptScore = this.#current?.runtime.score.score ?? 0;
     must("hud-score", HTMLElement).textContent = String(run.totalScore + attemptScore);
     must("hud-stars", HTMLElement).textContent = `★ ${run.totalStars}`;
-
-    // Re-homed from the scenario panel (GDD §11.1): the meter and the name now
-    // sit beside the score, not on the timeline where they would compete with
-    // the notes for the player's eye.
-    const attempt = this.#current?.runtime;
-    const earned = attempt?.starMeter.stars ?? 0;
-    must("hud-meter", HTMLElement).textContent = "★".repeat(earned) + "☆".repeat(3 - earned);
-    must("hud-scenario", HTMLElement).textContent = attempt
-      ? `${attempt.scenario.displayName} · L${attempt.difficulty}`
-      : "—";
 
     for (const slot of document.querySelectorAll<HTMLElement>("#hud-history .history-slot")) {
       const ordinal = Number(slot.dataset["ordinal"] ?? -1);
@@ -1088,6 +1780,9 @@ export class GameApp {
   }
 
   #updatePregameReadouts(): void {
+    // Before the readout, so the frame that decides also shows the decision.
+    this.#maybeAutoCalibrateInput();
+    this.#updateInputLevelReadouts();
     const frame = this.#inputStatus?.frame;
     const meter = document.querySelector<HTMLElement>("#pregame-level span");
     if (meter) {
@@ -1103,6 +1798,146 @@ export class GameApp {
             )} · conf ${frame.confidence.toFixed(2)}`
           : "—";
     }
+    this.#updateCalibrationReadouts();
+  }
+
+  /**
+   * The two halves of the compensation, and what the player's own playing says
+   * about whether it is right.
+   *
+   * Both are shown because they answer different questions. The reported figure
+   * is what the browser knows about its own audio path, and a large one is a
+   * fact about the rig rather than a problem to fix. The measured figure is the
+   * part nothing reported — and it is the only one that can say "you are still
+   * playing 40ms late after all of that".
+   */
+  /**
+   * What the rig sounds like, and whether the detector is listening below it.
+   *
+   * Levels are shown as a *ratio* rather than as raw RMS, because the ratio is
+   * the thing that decides whether a note can be found and the raw number means
+   * nothing to a guitarist. The channel line only appears when there is more
+   * than one, and it is there because an instrument in input 2 lands entirely
+   * on channel 1 — a case that otherwise looks exactly like a dead detector.
+   */
+  #updateInputLevelReadouts(): void {
+    const state = this.#inputGate.state;
+    // Against the gate actually in force, not against Tuninator's default:
+    // after a gate has been applied, `worthApplying` stays true forever and
+    // would leave the button offering to set the value it already set.
+    const changes = gateChangesAnything(state.recommended, this.#inputRmsGate);
+
+    const level = document.getElementById("pregame-input-level");
+    if (level instanceof HTMLElement) {
+      const frame = this.#inputStatus?.frame;
+      const channels =
+        frame?.channelRms && frame.channelRms.length > 1
+          ? ` — channels ${frame.channelRms.map((v) => v.toFixed(3)).join(" / ")}` +
+            `, reading ${frame.selectedChannel === null || frame.selectedChannel === undefined ? "both" : frame.selectedChannel + 1}`
+          : "";
+      level.textContent =
+        state.playingLevel === null
+          ? `Listening — ${state.floorFrames} frames of your input so far${channels}`
+          : state.headroom === null
+            ? `Well clear of a silent input${channels}`
+            : `${Math.round(state.headroom)}x your background noise${channels}`;
+    }
+
+    const verdict = document.getElementById("pregame-input-verdict");
+    if (verdict instanceof HTMLElement) {
+      // A gate that is in force and that this measurement does not want to move
+      // is a settled state, and saying what it is beats re-running the advice
+      // that produced it. Otherwise the measurement speaks for itself.
+      verdict.textContent =
+        this.#inputRmsGate !== null && !changes
+          ? this.#autoGateApplied !== null
+            ? `Set to your playing automatically — the detector now listens down to ${this.#inputRmsGate.toFixed(4)}. Reset puts it back.`
+            : `Using your measured level (${this.#inputRmsGate.toFixed(4)}).`
+          : inputGateVerdict(state);
+    }
+
+    const apply = document.getElementById("pregame-input-apply");
+    if (apply instanceof HTMLButtonElement) apply.disabled = !changes;
+  }
+
+  /** Stores a measured gate and restarts the recognizer so it takes effect. */
+  #applyInputGate(gate: number | null): void {
+    this.#inputRmsGate = gate;
+    writeInputRmsGate(gate);
+    // The old numbers were measured through the old gate. They are still true
+    // about the rig, but the readout beside them is about to describe a
+    // different recognizer, so the honest thing is to measure again.
+    this.#inputGate.reset();
+    this.#updateInputLevelReadouts();
+    // The gate is a construction-time option, so the recognizer has to be
+    // rebuilt. Routed through the same switch the dev panel uses, which already
+    // knows how to tear one down and stand another up without stopping the beat
+    // — forced, because it is the same source and the guard would otherwise
+    // keep the recognizer that still has the old gate. `#sourceKind`, not
+    // `#providerKind`: the latter reports "tuninator" for the synthetic mic and
+    // would silently swap a dev source for a real one.
+    this.#queueProviderSwitch(this.#sourceKind, { force: true });
+  }
+
+  /**
+   * Sets the gate from the player's own playing, without being asked once.
+   *
+   * The request was for the level to calibrate itself, so a button the player
+   * has to find is a fallback rather than the feature. This runs on the pregame
+   * frame — the only screen where rebuilding the recognizer costs nothing,
+   * because no attempt is in flight — and at most once per session.
+   *
+   * Any manual use of either button ends it for the session. That is what makes
+   * Reset mean something: without it, putting the gate back would be undone by
+   * this on the very next frame.
+   */
+  #maybeAutoCalibrateInput(): void {
+    if (this.#autoGateDone || this.#inputRmsGate !== null) return;
+    const state = this.#inputGate.state;
+    if (!shouldAutoApply(state) || state.recommended === null) return;
+    this.#autoGateDone = true;
+    this.#autoGateApplied = state.recommended;
+    this.#applyInputGate(state.recommended);
+  }
+
+  #updateCalibrationReadouts(): void {
+    const reportedMs = Math.round(this.#audio.outputLatencySeconds * 1000);
+    const latency = document.getElementById("pregame-latency");
+    if (latency instanceof HTMLElement) {
+      latency.textContent =
+        `${reportedMs + this.#latencyTrimMs} ms total — ` +
+        `${reportedMs} reported by the browser, ${this.#latencyTrimMs} yours`;
+    }
+
+    const state = document.getElementById("pregame-calibration");
+    const apply = document.getElementById("pregame-calibrate-apply");
+    const median = this.#timing.median;
+    const spread = this.#timing.spread;
+    // Enough notes to have a median worth trusting, and a cluster tight enough
+    // that it describes a rig rather than a player still warming up.
+    //
+    // The threshold is absolute, not a ratio against the offset: "spread
+    // smaller than the offset" sounds reasonable and is wrong at the one place
+    // it matters, because a perfectly compensated rig has an offset near zero
+    // and would be told to keep playing forever.
+    const usable =
+      this.#timing.count >= MIN_SAMPLES &&
+      median !== null &&
+      spread !== null &&
+      spread <= MAX_USABLE_SPREAD_MS;
+
+    if (state instanceof HTMLElement) {
+      if (median === null) {
+        state.textContent = "Play single notes on the beat to measure your rig.";
+      } else {
+        const direction = median >= 0 ? "late" : "early";
+        state.textContent =
+          `${Math.abs(Math.round(median))} ms ${direction} ` +
+          `(±${Math.round(spread ?? 0)}, ${this.#timing.count} notes)` +
+          (usable ? "" : " — keep playing");
+      }
+    }
+    if (apply instanceof HTMLButtonElement) apply.disabled = !usable;
   }
 
   #updateDebug(beat: number): void {
@@ -1130,8 +1965,30 @@ export class GameApp {
       "input error": this.#inputStatus?.errorCode ?? "—",
       "detected Hz": this.#inputStatus?.frame?.frequencyHz?.toFixed(1) ?? "—",
       "detected conf": this.#inputStatus?.frame?.confidence.toFixed(2) ?? "—",
+      // The player's own rig, in the numbers that decide whether a note can be
+      // found at all: their noise, their notes, and where the gate sits.
+      "input floor/level": (() => {
+        const g = this.#inputGate.state;
+        return g.playingLevel === null
+          ? `${g.noiseFloor?.toFixed(5) ?? "—"} / —`
+          : `${g.noiseFloor!.toFixed(5)} / ${g.playingLevel.toFixed(5)} (${g.headroom === null ? "clean" : Math.round(g.headroom) + "x"})`;
+      })(),
+      "input gate": `${this.#inputRmsGate?.toFixed(5) ?? "default"}${
+        this.#inputGate.state.recommended !== null
+          ? ` → ${this.#inputGate.state.recommended.toFixed(5)}`
+          : ""
+      }${this.#autoGateApplied !== null ? " (auto)" : ""}`,
+      // Total frames, not the window's occupancy: this is the row that answers
+      // "has it been listening since the mic opened", which is a different
+      // question from "what is it measuring right now".
+      "input frames": String(this.#inputGate.frames),
+      "input builds": String(this.#providerBuilds),
       "channel rms": this.#inputStatus?.frame?.channelRms?.map((v) => v.toFixed(3)).join(" ") ?? "—",
       "selected channel": String(this.#inputStatus?.frame?.selectedChannel ?? "—"),
+      // Split, because "the browser says 180ms" and "you are 40ms late on top
+      // of that" are different findings with different fixes.
+      "latency reported ms": (this.#audio.outputLatencySeconds * 1000).toFixed(1),
+      "latency trim ms": String(this.#latencyTrimMs),
       "latency comp ms": (
         this.#audio.outputLatencySeconds * 1000 +
         this.#latencyTrimMs
@@ -1146,7 +2003,6 @@ export class GameApp {
       "good window": target
         ? (attempt?.judge.windowsFor(target.opportunityIndex)?.good.toFixed(3) ?? "—")
         : "—",
-      "note opportunities": attempt ? String(attempt.targets.length) : "—",
       "open targets": attempt ? String(attempt.judge.openTargetCount) : "—",
       "perfect/good/miss": score ? `${score.perfect}/${score.good}/${score.missed}` : "—",
       "wrong notes": score ? String(score.wrongNotes) : "—",
@@ -1154,11 +2010,30 @@ export class GameApp {
       "attempt score": score ? String(score.score) : "—",
       "judgment points": score ? String(score.judgmentPoints) : "—",
       stars: attempt ? String(attempt.starMeter.stars) : "—",
-      // Whatever this scenario's minigame wants shown. The shell does not know
-      // what kind of minigame it is looking at, so it does not know these rows'
-      // names either -- CLIMB contributes a waypoint counter, REPEAT would
-      // contribute something else entirely.
-      ...(attempt?.debugRows ?? {}),
+      // One readout per class, so the panel says "—" for the one this scenario
+      // is not rather than quietly reporting a zero that means nothing.
+      // Which beat is playing and how far the bass has stepped back: both are
+      // things you can hear but not see, so the panel is where you check that
+      // what you are hearing is what the code thinks it is playing.
+      "drum beat": this.#drumPatternId || "—",
+      "bass duck": `${this.#duck.gain.toFixed(2)} (${this.#duck.misses} missed)`,
+      "cans crushed/missed": attempt?.repeat
+        ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.uncrushed}`
+        : "—",
+      "actor lane/streak": attempt
+        ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`
+        : "—",
+      // How heavy the actor currently is. `streak` alone does not answer that:
+      // size is its square root against a cap, so the first few notes move it
+      // far more than the last few, and it is size that drives how the landing
+      // reads (`ui/timeline/actor-layer.ts`).
+      "actor size": attempt ? attempt.actor.state.size.toFixed(2) : "—",
+      // Frame rate and *our share of it*, separately: a low rate beside a tiny
+      // work figure is the paint, not the JavaScript, and they are fixed in
+      // different places. See `ui/frame-meter.ts`.
+      fps: this.#frameMeter.fps?.toFixed(0) ?? "—",
+      "frame work ms": this.#frameMeter.workMs?.toFixed(2) ?? "—",
+      "worst frame ms": this.#frameMeter.worstIntervalMs?.toFixed(1) ?? "—",
       "energy in flight": String(this.#energy?.activeCount ?? 0),
       autoplay: this.#autoplay === "off" ? "off" : `${this.#autoplay} seed ${this.#autoplaySeed}`,
       // What the fake guitarist *intended*. On the synthetic path the
@@ -1307,7 +2182,9 @@ export class GameApp {
 
     performance.gestures.forEach((gesture: AutoGesture, index: number) => {
       const attackTime =
-        this.#transport.contextTimeAt(attempt.runtime.startBeat + gesture.beat) + latency;
+        this.#transport.contextTimeAt(attempt.runtime.startBeat + gesture.beat) +
+        latency +
+        this.#devPlayOffsetMs / 1000;
       // Already past: `osc.start()` would clamp to now and compress the
       // envelope, and the test provider's queue would fire it out of order.
       if (attackTime <= earliest) return;

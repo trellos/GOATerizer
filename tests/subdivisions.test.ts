@@ -1,19 +1,16 @@
 /**
- * Reading a phrase's rhythmic grid, which is what the drums signal.
+ * Reading a phrase's rhythmic grid, which is what picks the drums' feel.
  *
- * The assertions that matter here are about *timing*, not taste: the kit has to
- * start marking a grid before the phrase that needs it arrives, and has to be
- * still marking it while that phrase is played.
+ * The assertions that matter here are about the *reading*, not about taste: what
+ * this returns chooses the rhythm variant of a whole minigame's beat
+ * (`tests/drum-intensity.test.ts` covers that half), so mistaking a dotted
+ * eighth figure for a straight one puts the kit in the wrong feel for eight
+ * measures.
  */
 
 import { describe, expect, it } from "vitest";
 
-import {
-  NO_SUBDIVISIONS,
-  subdivisionKey,
-  subdivisionsOf,
-  unionSubdivisions,
-} from "../src/game/subdivisions.js";
+import { subdivisionsOf } from "../src/game/subdivisions.js";
 import { ROCKY_ASCENT, ROCKY_ASCENT_HIGH, SCENARIOS } from "../src/scenario/registry.js";
 import type { NoteDuration, PromptEvent } from "../src/scenario/types.js";
 
@@ -72,16 +69,6 @@ describe("subdivision detection", () => {
     expect(subdivisionsOf(events).size).toBe(0);
   });
 
-  it("unions several phrases, which is what the kit actually marks", () => {
-    const union = unionSubdivisions(new Set(["eighth"]), new Set(["triplet"]), NO_SUBDIVISIONS);
-    expect(union).toEqual(new Set(["eighth", "triplet"]));
-  });
-
-  it("keys a set stably, so 'changed' is cheap to test", () => {
-    expect(subdivisionKey(new Set(["sixteenth", "eighth"]))).toBe("eighth+sixteenth");
-    expect(subdivisionKey(new Set(["eighth", "sixteenth"]))).toBe("eighth+sixteenth");
-    expect(subdivisionKey(NO_SUBDIVISIONS)).toBe("");
-  });
 });
 
 describe("the shipped scenarios' grids", () => {
@@ -92,20 +79,11 @@ describe("the shipped scenarios' grids", () => {
     expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(4)!.prompt)]).toEqual(["eighth"]);
   });
 
-  it("warns an attempt early: L2's kit already marks L3's eighths", () => {
-    // The player is on L2 (quarters) with L3 (eighths) queued. What they hear
-    // is the union, which is the whole point of signalling ahead.
-    const current = subdivisionsOf(ROCKY_ASCENT.levels.get(2)!.prompt);
-    const next = subdivisionsOf(ROCKY_ASCENT.levels.get(3)!.prompt);
-    expect(subdivisionKey(unionSubdivisions(current, next))).toBe("eighth");
-    // ...and once L3 is the current attempt, its own grid keeps it marked.
-    expect(subdivisionKey(unionSubdivisions(next, NO_SUBDIVISIONS))).toBe("eighth");
-  });
-
-  it("authors nothing off the binary grid yet, so the triplet voice stays silent", () => {
-    // Not an assertion that triplets are unsupported — the channel is live and
-    // unit-tested above. This pins that no shipped scenario triggers it, so a
-    // future triplet exercise shows up as a deliberate change here.
+  it("authors nothing off the binary grid yet, so the triplet feel stays unused", () => {
+    // Not an assertion that triplets are unsupported — the variant is live and
+    // unit-tested in `drum-intensity.test.ts`. This pins that no shipped
+    // scenario selects it, so a future triplet exercise shows up as a
+    // deliberate change here.
     for (const scenario of SCENARIOS) {
       for (const [difficulty, level] of scenario.levels) {
         expect(
