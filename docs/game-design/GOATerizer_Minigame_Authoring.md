@@ -228,6 +228,17 @@ Performer near `strikeX`. `audienceStates[]` are not note-anchored — place the
 below the band (`y > 1`) across your own span, and swap state at star
 thresholds. `payoffEffects[]` fire from `onStarEarned(3, …)`.
 
+Built (`src/scenario/minigames/perform-minigame.ts`, Goat Frontman). Two
+things it adds to the canonical slots: `noteArt.body` (what every note is made
+of) and `noteArt.flourish` (an overlay marking a **flourish note**). Flourishes
+are authored per level as `visual.flourishBeats`, the phrase-relative start
+beats of the notes the designer marked `F`; on one the performer strikes a
+`flourishPoses[]` entry for the note's length and summons
+`visual.goatsPerFlourish` crowd members from the wings. Bad notes flinch and
+bore the crowd; nothing earned is taken away. Blues Lick material is written
+in pentatonic degrees (`p1..p6`, `src/music/degrees.ts`) — one octave, root to
+root, the same span the lanes show — resolved to lanes by the run's mode.
+
 ---
 
 ## 6. Scenario data

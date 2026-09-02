@@ -314,6 +314,7 @@ export class GameApp {
    * that is no longer always Rocky Ascent.
    */
   #devLevel: number | null = null;
+  /** `?dev=1&scenario=<id>`: fill every slot that scenario authors with it. */
   #devScenarioId: string | null = null;
   /**
    * The dev panel's minigame table (`src/dev/minigame-families.ts`). All three
