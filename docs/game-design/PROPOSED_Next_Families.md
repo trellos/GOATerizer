@@ -5,6 +5,18 @@
 
 **Date:** 2026-09-02
 
+> **Update, same day: one of the five is built.** `ThreeStepMinigame` ships, and
+> the triplet slot was filled by **Butt-Butt-BONK** — triplets against a wolf, by
+> moonlight — rather than Hop-Hop-LEAP, on the designer's instruction. It uses
+> the same two asset packs entry 2 names below, plus the backdrop from entry 3
+> recoloured to night. See `DECISION-046` and
+> `docs/scenarios/butt-butt-bonk/`. The four entries below that are not built
+> stand as written.
+>
+> Worth recording, because it changes entry 1's cost: **alizard's wolf sheet has
+> an opaque teal background, not alpha.** It needs the same keying step the birds
+> in entry 4 do. One import pass, now written and verified.
+
 Four of the six permanent minigame families have no scenario and no code:
 
 | Family | Musical family | Built? | Where |

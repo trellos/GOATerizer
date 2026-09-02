@@ -41,6 +41,8 @@ describe("minigame family table", () => {
     expect(familyHasLevel("Scale", 1)).toBe(true);
     expect(familyHasLevel("Scale", 7)).toBe(false); // Rocky's highest is L6.
     expect(familyHasLevel("Straight Sixteenths", 1)).toBe(true);
+    expect(familyHasLevel("Triplets", 1)).toBe(true); // Butt-Butt-BONK.
+    expect(familyHasLevel("Triplets", 7)).toBe(false); // Its catalogue range is L1-6.
     expect(familyHasLevel("Blues Lick", 1)).toBe(false); // No scenario yet.
   });
 });
@@ -87,7 +89,9 @@ describe("resolveMinigameOverride", () => {
     const state: MinigameOverrideState = {
       ...NO_OVERRIDE,
       targetDifficulty: 1,
-      disabledCells: new Set([cellKey("Scale", 1), cellKey("Straight Sixteenths", 1)]),
+      // Every family, derived — naming two by hand silently stopped meaning
+      // "all of them" the moment a third family shipped content at L1.
+      disabledCells: new Set(MINIGAME_FAMILIES.map((entry) => cellKey(entry.family, 1))),
     };
     const resolution = resolveMinigameOverride(slot, state, () => 0);
     expect(resolution?.scenario).toBeNull();

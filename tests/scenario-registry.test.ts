@@ -20,6 +20,7 @@ import { describe, expect, it } from "vitest";
 import { ATTEMPT_REPEATS, JUDGMENT_POINTS } from "../src/config/tuning.js";
 import { formatDegreeToken, laneIndexOf, LANE_COUNT } from "../src/music/degrees.js";
 import {
+  BUTT_BUTT_BONK,
   CAN_CRUSHING,
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
@@ -31,14 +32,16 @@ import {
 } from "../src/scenario/registry.js";
 
 describe("scenario registry", () => {
-  it("holds the four Rocky-family climbs and the one repeat scenario", () => {
-    expect(SCENARIOS).toHaveLength(5);
+  it("holds the four Rocky-family climbs, one repeat and one three-step scenario", () => {
+    expect(SCENARIOS).toHaveLength(6);
     for (const scenario of SCENARIOS) {
-      if (scenario === CAN_CRUSHING) continue;
+      if (scenario === CAN_CRUSHING || scenario === BUTT_BUTT_BONK) continue;
       expect(scenario.minigameId).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
     expect(CAN_CRUSHING.minigameId).toBe("RepeatMinigame");
+    expect(BUTT_BUTT_BONK.minigameId).toBe("ThreeStepMinigame");
+    expect(BUTT_BUTT_BONK.family).toBe("Triplets");
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
       new Set([
         "rocky_ascent",
@@ -46,7 +49,16 @@ describe("scenario registry", () => {
         "rocky_descent",
         "rocky_descent_high",
         "can_crushing",
+        "butt_butt_bonk",
       ])
+    );
+  });
+
+  it("covers three of the six families, and names the three still empty", () => {
+    // The registry is the honest answer to "which families does this build
+    // ship". Three remain: PERFORM, TRAVERSE and BATTLE.
+    expect(new Set(SCENARIOS.map((s) => s.minigameId))).toEqual(
+      new Set(["ClimbMinigame", "RepeatMinigame", "ThreeStepMinigame"])
     );
   });
 

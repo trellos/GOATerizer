@@ -30,7 +30,7 @@ does not come back round as a new one.
 These are all cases where the machinery exists, is tested, and has nothing to
 run on. They are cheap to close and each one lights up something already built.
 
-### Nothing selects the sixteenth or triplet drum variant
+### Nothing selects the sixteenth drum variant
 
 Each rung now has four feels — quarters, eighth, sixteenth, triplet — chosen
 from the authored notes (DECISION-031, revised by DECISION-033). Current
@@ -38,6 +38,13 @@ material only ever produces the first two, because it tops out at eighths. The
 sixteenth and triplet patterns are built, tested and unheard; one scenario
 authored in each would light them up. Note the content rule the loader test
 enforces: a level must not test both.
+
+**Half closed, 2026-09-02 (DECISION-046).** Butt-Butt-BONK authors triplets at
+L1-6, so the triplet variant is now selected by real content and
+`tests/subdivisions.test.ts` asserts it comes from exactly one scenario. The
+**sixteenth** variant is still unheard: nothing authors a sixteenth, and the
+obvious candidate is a `BattleMinigame` scenario, whose whole musical family is
+sixteenth phrases.
 
 ### Nothing authors difficulty 7
 
