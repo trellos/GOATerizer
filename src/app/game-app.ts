@@ -322,7 +322,7 @@ export class GameApp {
    */
   #devDisabledCells = new Set<string>();
   #devTargetDifficulty: number | null = null;
-  #devPendingPin: { family: string; difficulty: number } | null = null;
+  #devPendingPin: { scenarioId: string; difficulty: number } | null = null;
   /**
    * Set the moment a pin lands mid-run: the absolute transport beat at which
    * `#current` gets torn down and replaced by the pinned scenario, so a pin
@@ -656,9 +656,9 @@ export class GameApp {
       onAutoplay: (mode) => {
         void this.#setAutoplayMode(mode);
       },
-      onMinigameCellToggle: (family, level) => this.#onMinigameCellToggle(family, level),
+      onMinigameCellToggle: (scenarioId, level) => this.#onMinigameCellToggle(scenarioId, level),
       onMinigameDifficultySelect: (level) => this.#onMinigameDifficultySelect(level),
-      onMinigameCellPin: (family, level) => this.#onMinigameCellPin(family, level),
+      onMinigameCellPin: (scenarioId, level) => this.#onMinigameCellPin(scenarioId, level),
     });
     this.#debug.setEnabled(this.#devMode);
     // A trim remembered from a previous session has to show in the panel, or
@@ -1368,7 +1368,7 @@ export class GameApp {
     const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     if (this.#devMode) this.#resolveDevMinigameSlot(this.#run.currentSlot);
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
-    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
+    this.#syncMinigameCurrentIndicators();
     this.#resetDuck();
     this.#refreshDrumBeat();
     this.#queueNextAttempt();
@@ -1525,7 +1525,7 @@ export class GameApp {
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
-    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
+    this.#syncMinigameCurrentIndicators();
     // A new minigame starts on a full band. Carrying the previous attempt's
     // duck across would tell the player something untrue about the notes in
     // front of them.
@@ -1603,7 +1603,7 @@ export class GameApp {
     this.#current = null;
     this.#next = null;
     this.#devPinSwapBeat = null;
-    this.#debug?.setMinigameCurrentDifficulty(null);
+    this.#syncMinigameCurrentIndicators();
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
     // never be judged, and would play over the results screen.
@@ -2083,12 +2083,12 @@ export class GameApp {
   /* Dev minigame table                                                  */
   /* ------------------------------------------------------------------ */
 
-  #onMinigameCellToggle(family: string, level: number): void {
-    const key = cellKey(family, level);
+  #onMinigameCellToggle(scenarioId: string, level: number): void {
+    const key = cellKey(scenarioId, level);
     const disabled = !this.#devDisabledCells.has(key);
     if (disabled) this.#devDisabledCells.add(key);
     else this.#devDisabledCells.delete(key);
-    this.#debug?.setMinigameCellDisabled(family, level, disabled);
+    this.#debug?.setMinigameCellDisabled(scenarioId, level, disabled);
   }
 
   /** Clicking the already-selected number clears the override. */
@@ -2107,11 +2107,11 @@ export class GameApp {
    * not actually play until *that* attempt finished too. Scheduling the swap
    * here instead makes the pin take effect on the next bar line.
    */
-  #onMinigameCellPin(family: string, level: number): void {
-    const key = cellKey(family, level);
+  #onMinigameCellPin(scenarioId: string, level: number): void {
+    const key = cellKey(scenarioId, level);
     this.#devDisabledCells.delete(key);
-    this.#devPendingPin = { family, difficulty: level };
-    this.#debug?.setMinigameCellDisabled(family, level, false);
+    this.#devPendingPin = { scenarioId, difficulty: level };
+    this.#debug?.setMinigameCellDisabled(scenarioId, level, false);
     this.#debug?.setMinigamePendingPin(key);
     if (this.#current) this.#devPinSwapBeat = this.#transport.nextMeasureBoundary(this.#heardBeat);
   }
@@ -2161,10 +2161,25 @@ export class GameApp {
       this.#next = null;
     }
     this.#current = replacement;
-    this.#debug?.setMinigameCurrentDifficulty(this.#current.runtime.difficulty);
+    this.#syncMinigameCurrentIndicators();
     this.#resetDuck();
     this.#refreshDrumBeat();
     this.#queueNextAttempt();
+  }
+
+  /**
+   * Keeps the dev panel's two "what is actually playing" markers in sync with
+   * `#current`: the difficulty-column ring (`setMinigameCurrentDifficulty`)
+   * and, now that a family can have more than one scenario on the board at
+   * once (`scenariosForFamily`), the one exact cell that names which of them
+   * it is (`setMinigameCurrentCell`). Called everywhere `#current` changes.
+   */
+  #syncMinigameCurrentIndicators(): void {
+    const attempt = this.#current?.runtime ?? null;
+    this.#debug?.setMinigameCurrentDifficulty(attempt?.difficulty ?? null);
+    this.#debug?.setMinigameCurrentCell(
+      attempt ? cellKey(attempt.scenario.id, attempt.difficulty) : null
+    );
   }
 
   /* ------------------------------------------------------------------ */

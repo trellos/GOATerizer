@@ -11,9 +11,9 @@
 import { AUTOPLAY_MODES, type AutoplayMode } from "../dev/auto-performance.js";
 import {
   cellKey,
-  familyHasLevel,
   MINIGAME_DIFFICULTY_LEVELS,
   MINIGAME_FAMILIES,
+  scenariosForFamily,
 } from "../dev/minigame-families.js";
 
 export type DebugSnapshot = Record<string, string>;
@@ -23,11 +23,11 @@ export type DebugHandlers = {
   onLatencyChange: (milliseconds: number) => void;
   onAutoplay: (mode: AutoplayMode) => void;
   /** A single click on an `o` widget: toggle that cell's availability. */
-  onMinigameCellToggle: (family: string, level: number) => void;
+  onMinigameCellToggle: (scenarioId: string, level: number) => void;
   /** A click on a difficulty-column header. */
   onMinigameDifficultySelect: (level: number) => void;
   /** A double-click on an `o` widget: pin it for the next minigame. */
-  onMinigameCellPin: (family: string, level: number) => void;
+  onMinigameCellPin: (scenarioId: string, level: number) => void;
 };
 
 export class DebugPanel {
@@ -37,6 +37,7 @@ export class DebugPanel {
   readonly #minigameCellButtons = new Map<string, HTMLButtonElement>();
   readonly #minigameDifficultyButtons = new Map<number, HTMLButtonElement>();
   #minigamePulsingCell: string | null = null;
+  #minigameCurrentCell: string | null = null;
   #enabled = false;
 
   constructor(root: HTMLElement, handlers: DebugHandlers) {
@@ -98,9 +99,18 @@ export class DebugPanel {
   }
 
   /**
-   * Builds the family x difficulty table once. Structure (which cells exist
-   * at all) comes from the scenario library and never changes at runtime;
-   * only each cell's disabled/pulsing state does, through the setters below.
+   * Builds the family x difficulty table once. Structure (which rows and
+   * cells exist at all) comes from the scenario library and never changes at
+   * runtime; only each cell's disabled/pulsing/current state does, through
+   * the setters below.
+   *
+   * A family with more than one registered scenario (Rocky Ascent and Rocky
+   * Ascent High both author "Scale") gets one row per scenario rather than
+   * one row per family: two scenarios that both author the same level used
+   * to share that level's single cell, so a toggle or a pin there could not
+   * say which of them it meant. The family name still heads its rows, via
+   * `rowSpan`, so the table still reads as family x difficulty at a glance.
+   * A family nothing authors yet keeps its old blank row.
    *
    * One delegated listener pair per event type rather than one per cell:
    * `click` toggles a cell or selects a difficulty column, `dblclick` pins a
@@ -113,6 +123,7 @@ export class DebugPanel {
     table.className = "mg-table";
 
     const headRow = document.createElement("tr");
+    headRow.appendChild(document.createElement("th"));
     headRow.appendChild(document.createElement("th"));
     for (const level of MINIGAME_DIFFICULTY_LEVELS) {
       const th = document.createElement("th");
@@ -130,28 +141,41 @@ export class DebugPanel {
 
     const tbody = document.createElement("tbody");
     for (const { family } of MINIGAME_FAMILIES) {
-      const row = document.createElement("tr");
-      const label = document.createElement("th");
-      label.scope = "row";
-      label.textContent = family;
-      row.append(label);
+      const variants = scenariosForFamily(family);
+      const rows = variants.length > 0 ? variants : [null];
 
-      for (const level of MINIGAME_DIFFICULTY_LEVELS) {
-        const cell = document.createElement("td");
-        if (familyHasLevel(family, level)) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "mg-cell";
-          button.textContent = "o";
-          button.dataset["family"] = family;
-          button.dataset["level"] = String(level);
-          button.dataset["disabled"] = "false";
-          cell.append(button);
-          this.#minigameCellButtons.set(cellKey(family, level), button);
+      rows.forEach((scenario, index) => {
+        const row = document.createElement("tr");
+        if (index === 0) {
+          const familyLabel = document.createElement("th");
+          familyLabel.scope = "rowgroup";
+          familyLabel.rowSpan = rows.length;
+          familyLabel.textContent = family;
+          row.append(familyLabel);
         }
-        row.append(cell);
-      }
-      tbody.append(row);
+
+        const variantLabel = document.createElement("th");
+        variantLabel.scope = "row";
+        variantLabel.textContent = scenario?.displayName ?? "";
+        row.append(variantLabel);
+
+        for (const level of MINIGAME_DIFFICULTY_LEVELS) {
+          const cell = document.createElement("td");
+          if (scenario?.levels.has(level)) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "mg-cell";
+            button.textContent = "o";
+            button.dataset["scenario"] = scenario.id;
+            button.dataset["level"] = String(level);
+            button.dataset["disabled"] = "false";
+            cell.append(button);
+            this.#minigameCellButtons.set(cellKey(scenario.id, level), button);
+          }
+          row.append(cell);
+        }
+        tbody.append(row);
+      });
     }
     table.append(tbody);
     container.replaceChildren(table);
@@ -161,9 +185,9 @@ export class DebugPanel {
       if (!(button instanceof HTMLButtonElement)) return;
       const level = button.dataset["level"];
       if (level === undefined) return;
-      const family = button.dataset["family"];
-      if (family !== undefined) {
-        handlers.onMinigameCellToggle(family, Number(level));
+      const scenarioId = button.dataset["scenario"];
+      if (scenarioId !== undefined) {
+        handlers.onMinigameCellToggle(scenarioId, Number(level));
       } else {
         handlers.onMinigameDifficultySelect(Number(level));
       }
@@ -172,16 +196,16 @@ export class DebugPanel {
     container.addEventListener("dblclick", (event) => {
       const button = event.target instanceof Element ? event.target.closest("button") : null;
       if (!(button instanceof HTMLButtonElement)) return;
-      const family = button.dataset["family"];
+      const scenarioId = button.dataset["scenario"];
       const level = button.dataset["level"];
-      if (family === undefined || level === undefined) return;
-      handlers.onMinigameCellPin(family, Number(level));
+      if (scenarioId === undefined || level === undefined) return;
+      handlers.onMinigameCellPin(scenarioId, Number(level));
     });
   }
 
   /** Reflects one cell's availability, toggled from the table or forced by a pin. */
-  setMinigameCellDisabled(family: string, level: number, disabled: boolean): void {
-    const button = this.#minigameCellButtons.get(cellKey(family, level));
+  setMinigameCellDisabled(scenarioId: string, level: number, disabled: boolean): void {
+    const button = this.#minigameCellButtons.get(cellKey(scenarioId, level));
     if (button) button.dataset["disabled"] = String(disabled);
   }
 
@@ -212,6 +236,21 @@ export class DebugPanel {
     }
     this.#minigamePulsingCell = key;
     if (key) this.#minigameCellButtons.get(key)?.setAttribute("data-pulsing", "true");
+  }
+
+  /**
+   * Marks the exact scenario+level cell actually playing right now, or none.
+   * Complements `setMinigameCurrentDifficulty`'s column ring: with more than
+   * one scenario able to share a difficulty column (`scenariosForFamily`),
+   * the column alone cannot say *which* row is live — this can, because a
+   * cell now names exactly one scenario.
+   */
+  setMinigameCurrentCell(key: string | null): void {
+    if (this.#minigameCurrentCell) {
+      this.#minigameCellButtons.get(this.#minigameCurrentCell)?.removeAttribute("data-current");
+    }
+    this.#minigameCurrentCell = key;
+    if (key) this.#minigameCellButtons.get(key)?.setAttribute("data-current", "true");
   }
 
   get enabled(): boolean {
