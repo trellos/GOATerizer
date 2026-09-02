@@ -49,11 +49,20 @@ import {
   type Unsubscribe,
 } from "./guitar-input.js";
 
+/**
+ * Where `vite.config.ts`'s copy plugin puts the built worklet asset.
+ *
+ * The filename is a Tuninator implementation detail, so it is named here — in
+ * the one module allowed to know the library exists — rather than in the
+ * application shell. Overridable for a host that serves it from elsewhere.
+ */
+const DEFAULT_WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
+
 export type TuninatorProviderOptions = {
   /** Shared with the transport and the bass. Never closed by the recognizer. */
   audioContext: AudioContext;
-  /** URL of the built worklet asset; vite.config.ts puts it in public/assets. */
-  workletUrl: string;
+  /** Defaults to {@link DEFAULT_WORKLET_URL}. */
+  workletUrl?: string;
   /** `input.channels`, exposed for the debug panel's channel controls. */
   channels?: "auto" | "sum" | number;
 };
@@ -126,7 +135,7 @@ export class TuninatorGuitarInputProvider implements GuitarInputProvider {
 
     const recognizer = createRecognizer({
       audioContext: this.#options.audioContext,
-      workletUrl: this.#options.workletUrl,
+      workletUrl: this.#options.workletUrl ?? DEFAULT_WORKLET_URL,
       input: {
         // Guitar, not speech: the browser's speech processors chew holes in a
         // sustained note. Tuninator defaults these off; being explicit keeps

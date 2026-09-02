@@ -71,7 +71,6 @@ import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import { TimelineView, type TimelineViewMode } from "../ui/timeline/timeline-view.js";
 
-const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
 type Screen = "start" | "pregame" | "game" | "results";
 
@@ -616,10 +615,7 @@ export class GameApp {
     this.#provider =
       kind === "test"
         ? new TestGuitarInputProvider()
-        : new TuninatorGuitarInputProvider({
-            audioContext: context as AudioContext,
-            workletUrl: WORKLET_URL,
-          });
+        : new TuninatorGuitarInputProvider({ audioContext: context as AudioContext });
 
     this.#unsubscribeInput.push(
       this.#provider.onEvent((event) => this.#onGuitarEvent(event)),
