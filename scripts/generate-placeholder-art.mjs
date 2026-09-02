@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Generates placeholder pixel art for the assets that don't yet have real art:
- * the destination cairn, dust and tick effects for the four "Rocky"
- * `ClimbMinigame` scenarios, and everything for the one `RepeatMinigame`
- * scenario, Can Crushing.
+ * Generates placeholder pixel art for the assets that don't yet have real
+ * art: the destination cairn, dust and tick effects for the four "Rocky"
+ * `ClimbMinigame` scenarios; everything for the one `RepeatMinigame`
+ * scenario, Can Crushing; and everything but the crowd goat for the one
+ * `PerformMinigame` scenario, Goat Frontman.
  *
  * ## Why some of this is still generated
  *
@@ -19,7 +20,7 @@
  * rejected on fit — so those three ids per family are still drawn here:
  * original work for this repository, CC0, no third-party rights involved.
  *
- * ## Why one script for five scenarios
+ * ## Why one script for six scenarios
  *
  * Rocky Ascent, Rocky Ascent High, Rocky Descent and Rocky Descent High are the
  * same `ClimbMinigame` shapes — a goat, a foothold, a cairn, dust, a tick, a
@@ -31,16 +32,19 @@
  *
  * Can Crushing shares none of those shapes — it is a different class, a
  * different theme and a different palette — so its drawing functions live in
- * `scripts/lib/crusher-art.mjs` and it gets its own pass below. What it does
- * share is the discipline: original CC0 work, one file per bound slot, seeded
- * so every run produces the same bytes.
+ * `scripts/lib/crusher-art.mjs` and it gets its own pass below. Goat Frontman
+ * is the same story again, in `scripts/lib/frontman-art.mjs`: a stadium stage
+ * under coloured light rather than a beach or an alpine dusk, deliberately
+ * borrowing the Rocky goat body so the frontman is visibly the same animal.
+ * What every family shares is the discipline: original CC0 work, one file per
+ * bound slot, seeded so every run produces the same bytes.
  *
  * ## What the art has to be
  *
  * Readable silhouettes at gameplay speed, and nothing more. Each file is a
  * static billboard the runtime shows, hides, translates, scales and rotates —
- * no frame animation, no skeletal rig. The four `advance` poses are a pose
- * *cycle*, swapped one per successful note, not an animation strip.
+ * no frame animation, no skeletal rig. The four `advance`/`perform` poses are a
+ * pose *cycle*, swapped one per successful note, not an animation strip.
  *
  *   node scripts/generate-placeholder-art.mjs
  */
@@ -59,6 +63,7 @@ import {
   canCrushed,
   crushImpact,
 } from "./lib/crusher-art.mjs";
+import * as frontman from "./lib/frontman-art.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCENARIOS_ROOT = path.resolve(here, "..", "public", "assets", "scenarios");
@@ -123,4 +128,34 @@ writeScenarioAssets("can-crushing", {
   prop_can_crushing_intact: () => can(),
   prop_can_crushing_done: () => canCrushed(),
   fx_can_crushing_impact: () => crushImpact(),
+});
+
+/**
+ * Goat Frontman — the one `PerformMinigame` scenario. A different theme (a
+ * stage under coloured light) with its own drawing functions in
+ * `lib/frontman-art.mjs`, which borrow the Rocky goat body so the frontman is
+ * visibly the same animal. The asset ids are the canonical ones from
+ * `GOATerizer_Scenario_Asset_Slot_Bindings.md` §3 plus the two timeline
+ * note-art pieces the class binds.
+ *
+ * `react_goat_frontman_neutral` and `_impressed` (the crowd goat, both states)
+ * are deliberately absent from this dictionary: they are shipped real art now
+ * (`docs/assets/ASSET_SOURCES.md`), not generated, and this script must not
+ * regenerate over them.
+ */
+writeScenarioAssets("goat-frontman", {
+  bg_goat_frontman: () => frontman.background(),
+  goat_goat_frontman_perform_01: () => frontman.frontmanPose(0),
+  goat_goat_frontman_perform_02: () => frontman.frontmanPose(1),
+  goat_goat_frontman_perform_03: () => frontman.frontmanPose(2),
+  goat_goat_frontman_perform_04: () => frontman.frontmanPose(3),
+  goat_goat_frontman_bend: () => frontman.frontmanFlourish("bend"),
+  goat_goat_frontman_slur: () => frontman.frontmanFlourish("slur"),
+  goat_goat_frontman_finish: () => frontman.frontmanFinish(),
+  prop_goat_frontman_signature: () => frontman.micStand(),
+  fx_goat_frontman_swoosh: () => frontman.swoosh(),
+  fx_goat_frontman_sparkle: () => frontman.sparkle(),
+  fx_goat_frontman_burst: () => frontman.burst(),
+  note_goat_frontman_light: () => frontman.lightBar(),
+  note_goat_frontman_star: () => frontman.flourishStar(),
 });

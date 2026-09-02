@@ -435,8 +435,8 @@ try {
 
   // The main walkthrough pins one scenario rather than taking whatever
   // `scenariosForDifficulty` rolls, so its assertions are about a known
-  // exercise with a known note count. Can Crushing — the other minigame class —
-  // gets its own pinned section further down.
+  // exercise with a known note count. Can Crushing and Goat Frontman — the
+  // other minigame classes — get their own pinned sections further down.
   await page.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent`, { waitUntil: "networkidle" });
   await page.screenshot({ path: path.join(SHOTS, "01-start.png") });
   check("start screen renders", await page.isVisible("#start-play"));
@@ -1321,7 +1321,7 @@ try {
   const tiers = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   const tierErrors = [];
   tiers.on("pageerror", (error) => tierErrors.push(String(error)));
-  await tiers.goto(`${BASE}/?dev=1&input=test&autoplay=25&seed=7&level=3`, {
+  await tiers.goto(`${BASE}/?dev=1&input=test&autoplay=25&seed=7&level=3&scenario=rocky_ascent`, {
     waitUntil: "networkidle",
   });
   await tiers.click("#start-play");
@@ -1422,6 +1422,43 @@ try {
   );
   check("no page errors when switching source mid-run", livePageErrors.length === 0, livePageErrors.join(" | "));
   await livePage.close();
+
+  /* ==================================================================== */
+  /* Part 7 — Goat Frontman: a flourish draws a crowd, and more of one at  */
+  /*          a higher level                                                */
+  /* ==================================================================== */
+
+  const crowdAt = {};
+  for (const [level, file] of [
+    [1, "10-frontman-l1.png"],
+    [4, "11-frontman-l4.png"],
+  ]) {
+    const stage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const stageErrors = [];
+    stage.on("pageerror", (error) => stageErrors.push(String(error)));
+    await stage.goto(`${BASE}/?dev=1&input=test&level=${level}&scenario=goat_frontman`, {
+      waitUntil: "networkidle",
+    });
+    await stage.click("#start-play");
+    await stage.waitForTimeout(1500);
+    await stage.click("#pregame-play");
+    await stage.click("#dev-autoplay-perfect");
+
+    const scenarioName = await waitForDev(stage, "scenario", (value) => /^Goat Frontman L\d$/.test(value ?? ""));
+    check(`L${level} run is Goat Frontman when asked for it`, scenarioName === `Goat Frontman L${level}`, scenarioName ?? "");
+
+    // Two flourishes in: the crowd has started arriving and the phrase is
+    // still ahead of the performer.
+    const crowd = await waitForDev(stage, "crowd", (value) => Number(value ?? 0) >= 2, 30000);
+    crowdAt[level] = Number(crowd ?? 0);
+    check(`L${level}: flourishes draw a crowd`, crowdAt[level] >= 2, `crowd ${crowd}`);
+    await stage.evaluate(() => document.getElementById("dev-panel")?.setAttribute("hidden", ""));
+    await stage.waitForTimeout(150);
+    await stage.screenshot({ path: path.join(SHOTS, file) });
+    check(`no page errors on Goat Frontman L${level}`, stageErrors.length === 0, stageErrors.join(" | "));
+    await stage.close();
+  }
+  note("compare 10-frontman-l1.png and 11-frontman-l4.png: the L4 crowd arrives six goats a flourish");
 } finally {
   await browser.close();
   server.kill();

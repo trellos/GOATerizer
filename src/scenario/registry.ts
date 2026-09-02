@@ -12,8 +12,10 @@
 
 import { registerMinigame } from "../minigame/registry.js";
 import { climbNoteArtIds, CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
+import { PERFORM_MINIGAME } from "./minigames/perform-minigame.js";
 import { REPEAT_MINIGAME } from "./minigames/repeat-module.js";
 import canCrushingJson from "../../docs/scenarios/can-crushing/can_crushing.scenario.json";
+import goatFrontmanJson from "../../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
 import rockyDescentJson from "../../docs/scenarios/rocky-descent/rocky_descent.scenario.json";
@@ -38,6 +40,7 @@ const BASE_URL: string = import.meta.env?.BASE_URL ?? "/";
  */
 registerMinigame(CLIMB_MINIGAME);
 registerMinigame(REPEAT_MINIGAME);
+registerMinigame(PERFORM_MINIGAME);
 
 /**
  * Placeholder art lives in the project's own asset tree, never hotlinked.
@@ -125,12 +128,49 @@ export const CAN_CRUSHING: ScenarioDefinition = loadScenario(
   assetUrls("can-crushing", CAN_CRUSHING_ASSET_IDS)
 );
 
+/**
+ * The `PerformMinigame` slots: the canonical `PerformMinigame` ids from
+ * `GOATerizer_Scenario_Asset_Slot_Bindings.md` §3, plus the two timeline
+ * note-art pieces the class binds (`noteArt.body`, `noteArt.flourish`). Not a
+ * function of the scenario id, like Can Crushing's — Goat Frontman is the one
+ * scenario this class has, and its ids follow the canonical catalogue naming.
+ */
+const GOAT_FRONTMAN_ASSET_IDS: readonly string[] = [
+  "bg_goat_frontman",
+  "goat_goat_frontman_perform_01",
+  "goat_goat_frontman_perform_02",
+  "goat_goat_frontman_perform_03",
+  "goat_goat_frontman_perform_04",
+  "goat_goat_frontman_bend",
+  "goat_goat_frontman_slur",
+  "goat_goat_frontman_finish",
+  "prop_goat_frontman_signature",
+  "react_goat_frontman_neutral",
+  "react_goat_frontman_impressed",
+  "fx_goat_frontman_swoosh",
+  "fx_goat_frontman_sparkle",
+  "fx_goat_frontman_burst",
+  "note_goat_frontman_light",
+  "note_goat_frontman_star",
+];
+
+/**
+ * The one `PerformMinigame` scenario: a goat frontman working a crowd of goats
+ * that grows with every flourish it lands. Authored in pentatonic degrees —
+ * see `scripts/author-goat-frontman.mjs` for the notation.
+ */
+export const GOAT_FRONTMAN: ScenarioDefinition = loadScenario(
+  goatFrontmanJson,
+  assetUrls("goat-frontman", GOAT_FRONTMAN_ASSET_IDS)
+);
+
 export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
   ROCKY_DESCENT,
   ROCKY_DESCENT_HIGH,
   CAN_CRUSHING,
+  GOAT_FRONTMAN,
 ];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {

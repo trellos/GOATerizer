@@ -587,7 +587,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "5"
+          "scaleDegree": "7"
         },
         {
           "index": 4,
@@ -597,7 +597,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "4"
+          "scaleDegree": "6"
         },
         {
           "index": 5,
@@ -607,7 +607,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 6,
@@ -617,7 +617,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "2"
+          "scaleDegree": "6"
         },
         {
           "index": 7,
@@ -627,174 +627,94 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "1"
+          "scaleDegree": "5"
         },
         {
           "index": 8,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
+          "scaleDegree": "4"
         },
         {
           "index": 9,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 8.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "5"
         },
         {
           "index": 10,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 9,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "6"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 11,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 9.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 12,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 10,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 13,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 10.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 14,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 11,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 15,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 11.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 16,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
           "scaleDegree": "4"
         },
         {
-          "index": 17,
+          "index": 13,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 18,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 19,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.5,
           "scaleDegree": "3"
         },
         {
-          "index": 20,
+          "index": 14,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 21,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 22,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15,
-          "startMeasure": 4,
-          "beatWithinMeasure": 4,
           "scaleDegree": "2"
         },
         {
-          "index": 23,
+          "index": 15,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.5,
+          "beatWithinMeasure": 4,
           "scaleDegree": "1"
         }
       ],
-      "noteOpportunityCount": 24,
+      "noteOpportunityCount": 16,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "one clean descent, then the same face taken again in sequenced threes at double speed",
+        "routeCharacter": "one clean sequenced descent broken by rests, mirroring the normal route below",
         "steepness": 0.45,
         "footholdScaleRange": [
           0.9,
@@ -802,7 +722,7 @@
         ],
         "exposure": "moderate",
         "destinationTreatment": "high alpine lower landing marker",
-        "waypointCount": 24,
+        "waypointCount": 16,
         "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_descent_high_step",
         "progressTrigger": "successful_note_judgment",
         "route": {
@@ -813,166 +733,118 @@
             "y": 0.14
           },
           "destination": {
-            "x": 0.82,
-            "y": 0.88
+            "x": 0.846,
+            "y": 0.82
           },
           "waypoints": [
             {
-              "x": 0.2307,
-              "y": 0.1708,
+              "x": 0.2422,
+              "y": 0.177,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.2761,
-              "y": 0.2017,
+              "x": 0.281,
+              "y": 0.2166,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.3123,
-              "y": 0.2325,
+              "x": 0.2948,
+              "y": 0.2573,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.3376,
-              "y": 0.2633,
+              "x": 0.3094,
+              "y": 0.2986,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.3525,
-              "y": 0.2942,
+              "x": 0.3504,
+              "y": 0.3405,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.3597,
-              "y": 0.325,
+              "x": 0.4178,
+              "y": 0.3828,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.3633,
-              "y": 0.3558,
+              "x": 0.4856,
+              "y": 0.4255,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.3681,
-              "y": 0.3867,
+              "x": 0.5276,
+              "y": 0.4684,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.3786,
-              "y": 0.4175,
+              "x": 0.544,
+              "y": 0.5117,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.3978,
-              "y": 0.4483,
+              "x": 0.5606,
+              "y": 0.5551,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.4272,
-              "y": 0.4792,
+              "x": 0.6034,
+              "y": 0.5988,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.466,
-              "y": 0.51,
+              "x": 0.6724,
+              "y": 0.6427,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.5114,
-              "y": 0.5408,
+              "x": 0.7415,
+              "y": 0.6868,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.5595,
-              "y": 0.5717,
+              "x": 0.7849,
+              "y": 0.731,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.6058,
-              "y": 0.6025,
+              "x": 0.8024,
+              "y": 0.7754,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.6464,
-              "y": 0.6333,
+              "x": 0.82,
+              "y": 0.82,
               "scale": 1,
               "rotationDeg": 0
-            },
-            {
-              "x": 0.6785,
-              "y": 0.6642,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.7013,
-              "y": 0.695,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.7158,
-              "y": 0.7258,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.7246,
-              "y": 0.7567,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.7316,
-              "y": 0.7875,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.7409,
-              "y": 0.8183,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.7558,
-              "y": 0.8492,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.7787,
-              "y": 0.88,
-              "scale": 0.88,
-              "rotationDeg": -2
             }
           ],
-          "character": "one clean descent, then the same face taken again in sequenced threes at double speed"
+          "character": "one clean sequenced descent broken by rests, mirroring the normal route below"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 108,
-        "star2Threshold": 384,
-        "star3Threshold": 480,
+        "passThreshold": 72,
+        "star2Threshold": 256,
+        "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 480 points are available. Pass is the 45% of a single pass (240) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 320 points are available. Pass is the 45% of a single pass (160) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1033,13 +905,13 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "7"
+          "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
@@ -1048,80 +920,80 @@
         {
           "index": 5,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 4.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.5,
+          "beatWithinMeasure": 2,
           "scaleDegree": "5"
         },
         {
           "index": 6,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 7,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 8,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
           "scaleDegree": "4"
         },
         {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
           "index": 9,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "5"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
         },
         {
           "index": 10,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "4"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
         },
         {
           "index": 11,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "3"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 8,
-          "startMeasure": 3,
+          "startBeat": 12,
+          "startMeasure": 4,
           "beatWithinMeasure": 1,
           "scaleDegree": "4"
         },
@@ -1130,8 +1002,8 @@
           "type": "note",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 9,
-          "startMeasure": 3,
+          "startBeat": 13,
+          "startMeasure": 4,
           "beatWithinMeasure": 2,
           "scaleDegree": "3"
         },
@@ -1140,8 +1012,8 @@
           "type": "note",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 10,
-          "startMeasure": 3,
+          "startBeat": 14,
+          "startMeasure": 4,
           "beatWithinMeasure": 3,
           "scaleDegree": "2"
         },
@@ -1150,97 +1022,17 @@
           "type": "note",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 11,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "1"
-        },
-        {
-          "index": 16,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
-        },
-        {
-          "index": 17,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "7"
-        },
-        {
-          "index": 18,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 19,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 20,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 21,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 22,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "2"
-        },
-        {
-          "index": 23,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 4.5,
           "scaleDegree": "1"
         }
       ],
-      "noteOpportunityCount": 24,
+      "noteOpportunityCount": 16,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "sequenced descent with gear changes: deliberate footholds, a sprint, then a clean run out",
+        "routeCharacter": "sequenced descent with gear changes down the same exposed face",
         "steepness": 0.7,
         "footholdScaleRange": [
           0.75,
@@ -1248,7 +1040,7 @@
         ],
         "exposure": "high",
         "destinationTreatment": "high alpine lower landing marker",
-        "waypointCount": 24,
+        "waypointCount": 16,
         "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_descent_high_step",
         "progressTrigger": "successful_note_judgment",
         "route": {
@@ -1265,160 +1057,112 @@
           "waypoints": [
             {
               "x": 0.3621,
-              "y": 0.1338,
+              "y": 0.1506,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.3983,
-              "y": 0.1675,
+              "x": 0.3935,
+              "y": 0.2013,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.4245,
-              "y": 0.2013,
+              "x": 0.4096,
+              "y": 0.2519,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.4389,
-              "y": 0.235,
+              "x": 0.415,
+              "y": 0.3025,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.4419,
-              "y": 0.2688,
+              "x": 0.4204,
+              "y": 0.3531,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
               "x": 0.4365,
-              "y": 0.3025,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.4272,
-              "y": 0.3363,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.4192,
-              "y": 0.37,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.4173,
               "y": 0.4038,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.425,
-              "y": 0.4375,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.4439,
-              "y": 0.4713,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.4729,
-              "y": 0.505,
+              "x": 0.4679,
+              "y": 0.4544,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.5092,
-              "y": 0.5387,
+              "x": 0.51,
+              "y": 0.505,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.5484,
-              "y": 0.5725,
+              "x": 0.5521,
+              "y": 0.5556,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.5856,
+              "x": 0.5835,
               "y": 0.6063,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.6166,
-              "y": 0.64,
+              "x": 0.5996,
+              "y": 0.6569,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.6384,
-              "y": 0.6738,
+              "x": 0.605,
+              "y": 0.7075,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.65,
-              "y": 0.7075,
+              "x": 0.6104,
+              "y": 0.7581,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.6526,
-              "y": 0.7412,
+              "x": 0.6265,
+              "y": 0.8088,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.649,
-              "y": 0.775,
+              "x": 0.6579,
+              "y": 0.8594,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.6434,
-              "y": 0.8087,
+              "x": 0.7,
+              "y": 0.91,
               "scale": 1,
               "rotationDeg": 0
-            },
-            {
-              "x": 0.6402,
-              "y": 0.8425,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.6432,
-              "y": 0.8763,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.655,
-              "y": 0.91,
-              "scale": 0.88,
-              "rotationDeg": -2
             }
           ],
-          "character": "sequenced descent with gear changes: deliberate footholds, a sprint, then a clean run out"
+          "character": "sequenced descent with gear changes down the same exposed face"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 108,
-        "star2Threshold": 384,
-        "star3Threshold": 480,
+        "passThreshold": 72,
+        "star2Threshold": 256,
+        "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 480 points are available. Pass is the 45% of a single pass (240) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 320 points are available. Pass is the 45% of a single pass (160) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1469,7 +1213,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "6"
+          "scaleDegree": "b1"
         },
         {
           "index": 3,
@@ -1489,7 +1233,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "6"
+          "scaleDegree": "b1"
         },
         {
           "index": 5,
@@ -1499,7 +1243,7 @@
           "startBeat": 2.5,
           "startMeasure": 1,
           "beatWithinMeasure": 3.5,
-          "scaleDegree": "5"
+          "scaleDegree": "7"
         },
         {
           "index": 6,
@@ -1509,7 +1253,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "6"
+          "scaleDegree": "b1"
         },
         {
           "index": 7,
@@ -1519,254 +1263,134 @@
           "startBeat": 3.5,
           "startMeasure": 1,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "5"
+          "scaleDegree": "7"
         },
         {
           "index": 8,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "4"
+          "scaleDegree": "6"
         },
         {
           "index": 9,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 4.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.5,
+          "beatWithinMeasure": 2,
           "scaleDegree": "5"
         },
         {
           "index": 10,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 11,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 12,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
           "scaleDegree": "4"
         },
         {
+          "index": 11,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "4"
+        },
+        {
           "index": 13,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
           "scaleDegree": "3"
         },
         {
           "index": 14,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "2"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 15,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "1"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 16,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 8,
-          "startMeasure": 3,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "b1"
+          "scaleDegree": "2"
         },
         {
           "index": 17,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 8.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "7"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 18,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 9,
-          "startMeasure": 3,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "6"
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 19,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 9.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "7"
-        },
-        {
-          "index": 20,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 10,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 21,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 10.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 22,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 11,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 23,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 11.5,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 24,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 25,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 26,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 27,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 28,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 29,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 30,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "2"
-        },
-        {
-          "index": 31,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 4.5,
           "scaleDegree": "1"
         }
       ],
-      "noteOpportunityCount": 32,
+      "noteOpportunityCount": 20,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
-        "routeCharacter": "the sequenced descent twice over, at full speed, on tiny footholds",
+        "routeCharacter": "a burst of alternating eighths down the sheer face, then the sequenced descent twice to the bottom",
         "steepness": 0.95,
         "footholdScaleRange": [
           0.6,
@@ -1774,7 +1398,7 @@
         ],
         "exposure": "ridiculous",
         "destinationTreatment": "high alpine lower landing marker",
-        "waypointCount": 32,
+        "waypointCount": 20,
         "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_descent_high_step",
         "progressTrigger": "successful_note_judgment",
         "route": {
@@ -1786,213 +1410,141 @@
           },
           "destination": {
             "x": 0.58,
-            "y": 0.94
+            "y": 0.88
           },
           "waypoints": [
             {
-              "x": 0.5214,
-              "y": 0.0875,
+              "x": 0.53,
+              "y": 0.101,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.5514,
-              "y": 0.115,
+              "x": 0.49,
+              "y": 0.142,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.5625,
-              "y": 0.1425,
+              "x": 0.45,
+              "y": 0.183,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.5529,
-              "y": 0.17,
+              "x": 0.5,
+              "y": 0.224,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.5264,
-              "y": 0.1975,
+              "x": 0.55,
+              "y": 0.265,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.4917,
-              "y": 0.225,
+              "x": 0.51,
+              "y": 0.306,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.4596,
-              "y": 0.2525,
+              "x": 0.47,
+              "y": 0.347,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.44,
-              "y": 0.28,
+              "x": 0.52,
+              "y": 0.388,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.4392,
-              "y": 0.3075,
+              "x": 0.57,
+              "y": 0.429,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.4578,
-              "y": 0.335,
+              "x": 0.53,
+              "y": 0.47,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.4913,
-              "y": 0.3625,
+              "x": 0.49,
+              "y": 0.511,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.5308,
-              "y": 0.39,
+              "x": 0.54,
+              "y": 0.552,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.5659,
-              "y": 0.4175,
+              "x": 0.59,
+              "y": 0.593,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.5877,
-              "y": 0.445,
+              "x": 0.55,
+              "y": 0.634,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.5911,
-              "y": 0.4725,
+              "x": 0.51,
+              "y": 0.675,
               "scale": 0.84,
               "rotationDeg": 5
             },
             {
-              "x": 0.5764,
-              "y": 0.5,
+              "x": 0.56,
+              "y": 0.716,
               "scale": 1,
               "rotationDeg": 0
             },
             {
-              "x": 0.5489,
-              "y": 0.5275,
+              "x": 0.61,
+              "y": 0.757,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.5175,
-              "y": 0.555,
+              "x": 0.57,
+              "y": 0.798,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.4921,
-              "y": 0.5825,
+              "x": 0.53,
+              "y": 0.839,
               "scale": 0.88,
               "rotationDeg": -2
             },
             {
-              "x": 0.4804,
-              "y": 0.61,
+              "x": 0.58,
+              "y": 0.88,
               "scale": 0.84,
               "rotationDeg": 5
-            },
-            {
-              "x": 0.4866,
-              "y": 0.6375,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.5093,
-              "y": 0.665,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.5428,
-              "y": 0.6925,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.5783,
-              "y": 0.72,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.6066,
-              "y": 0.7475,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.6207,
-              "y": 0.775,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.6179,
-              "y": 0.8025,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.6001,
-              "y": 0.83,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.5735,
-              "y": 0.8575,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.5467,
-              "y": 0.885,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.5281,
-              "y": 0.9125,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.5237,
-              "y": 0.94,
-              "scale": 0.96,
-              "rotationDeg": -4
             }
           ],
-          "character": "the sequenced descent twice over, at full speed, on tiny footholds"
+          "character": "a burst of alternating eighths down the sheer face, then the sequenced descent twice to the bottom"
         }
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 144,
-        "star2Threshold": 512,
-        "star3Threshold": 640,
+        "passThreshold": 90,
+        "star2Threshold": 320,
+        "star3Threshold": 400,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 640 points are available. Pass is the 45% of a single pass (320) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 400 points are available. Pass is the 45% of a single pass (200) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",

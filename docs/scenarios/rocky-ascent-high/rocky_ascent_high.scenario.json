@@ -10,11 +10,12 @@
     3,
     4,
     5,
-    6
+    6,
+    7
   ],
   "difficultyOffsetFromNormalVersion": 2,
   "normalVersion": "rocky_ascent",
-  "scenarioPremise": "The harder companion to Rocky Ascent, on the same one-octave route. Where the normal version runs the octave straight, this one sequences it in threes, so the hand has to reset every third note while the beat does not. Authored difficulty labels are two levels above the normal version: L3–6 instead of L1–4.",
+  "scenarioPremise": "The harder companion to Rocky Ascent, on the same one-octave route. Where the normal version runs the octave straight, this one sequences it in threes, so the hand has to reset every third note while the beat does not. Authored difficulty labels run L3–7: L3–4 are newly authored content two levels above the equivalent normal-version tier (L1–2); L5–7 carry forward the original L3, L4 and L6 content (paired with normal L1, L2 and L4 respectively), renumbered up the ladder to make room.",
   "runTransposition": {
     "promptRepresentation": "diatonic_scale_degree",
     "degreeVocabulary": [
@@ -224,6 +225,575 @@
       "supported": true,
       "derivedFromNormalDifficulty": 1,
       "difficultyOffset": 2,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 6,
+          "type": "rest",
+          "duration": "half",
+          "durationBeats": 2,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3
+        },
+        {
+          "index": 7,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 11,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 13,
+          "type": "rest",
+          "duration": "half",
+          "durationBeats": 2,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3
+        }
+      ],
+      "noteOpportunityCount": 12,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeDirection": "ascending",
+        "routeCharacter": "sequenced ascent with long holds: three-note groups broken by rests on the same gentle climb",
+        "steepness": 0.25,
+        "footholdScaleRange": [
+          1,
+          1.15
+        ],
+        "exposure": "low",
+        "destinationTreatment": "high alpine summit marker",
+        "waypointCount": 12,
+        "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_ascent_high_step",
+        "progressTrigger": "successful_note_judgment",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "direction": "ascending",
+          "startPosition": {
+            "x": 0.1,
+            "y": 0.88
+          },
+          "destination": {
+            "x": 0.8,
+            "y": 0.3
+          },
+          "waypoints": [
+            {
+              "x": 0.1886,
+              "y": 0.8317,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.247,
+              "y": 0.7833,
+              "scale": 0.96,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.275,
+              "y": 0.735,
+              "scale": 0.92,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.303,
+              "y": 0.6867,
+              "scale": 0.88,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.3614,
+              "y": 0.6383,
+              "scale": 0.84,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.45,
+              "y": 0.59,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.5386,
+              "y": 0.5417,
+              "scale": 0.96,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.597,
+              "y": 0.4933,
+              "scale": 0.92,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.625,
+              "y": 0.445,
+              "scale": 0.88,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.653,
+              "y": 0.3967,
+              "scale": 0.84,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.7114,
+              "y": 0.3483,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.8,
+              "y": 0.3,
+              "scale": 0.96,
+              "rotationDeg": -4
+            }
+          ],
+          "character": "sequenced ascent with long holds: three-note groups broken by rests on the same gentle climb"
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 54,
+        "star2Threshold": 192,
+        "star3Threshold": 240,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 240 points are available. Pass is the 45% of a single pass (120) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    },
+    "4": {
+      "difficulty": 4,
+      "supported": true,
+      "derivedFromNormalDifficulty": 2,
+      "difficultyOffset": 2,
+      "measurePlan": {
+        "attemptMeasures": 4,
+        "beatsPerMeasure": 4,
+        "visualSpanMeasures": 4,
+        "resetBetweenMeasures": false
+      },
+      "prompt": [
+        {
+          "index": 0,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 0,
+          "startMeasure": 1,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 1,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
+          "startMeasure": 1,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 2,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 3,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 4,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 5,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 6,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 7,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 8,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 9,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 10,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 11,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 12,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "5"
+        },
+        {
+          "index": 13,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "6"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "7"
+        },
+        {
+          "index": 15,
+          "type": "note",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "b1"
+        }
+      ],
+      "noteOpportunityCount": 13,
+      "authoredBeatCount": 16,
+      "visual": {
+        "routeDirection": "ascending",
+        "routeCharacter": "sequenced ascent with a mid-route pause before a brisk push to the top",
+        "steepness": 0.45,
+        "footholdScaleRange": [
+          0.9,
+          1.1
+        ],
+        "exposure": "moderate",
+        "destinationTreatment": "high alpine summit marker",
+        "waypointCount": 13,
+        "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_ascent_high_step",
+        "progressTrigger": "successful_note_judgment",
+        "route": {
+          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+          "direction": "ascending",
+          "startPosition": {
+            "x": 0.1,
+            "y": 0.92
+          },
+          "destination": {
+            "x": 0.82,
+            "y": 0.2
+          },
+          "waypoints": [
+            {
+              "x": 0.1711,
+              "y": 0.8749,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.2213,
+              "y": 0.8246,
+              "scale": 0.96,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.2478,
+              "y": 0.7722,
+              "scale": 0.92,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.2756,
+              "y": 0.7184,
+              "scale": 0.88,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.3306,
+              "y": 0.6635,
+              "scale": 0.84,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.4124,
+              "y": 0.6076,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.4949,
+              "y": 0.551,
+              "scale": 0.96,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.5522,
+              "y": 0.4938,
+              "scale": 0.92,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.584,
+              "y": 0.436,
+              "scale": 0.88,
+              "rotationDeg": -2
+            },
+            {
+              "x": 0.6164,
+              "y": 0.3777,
+              "scale": 0.84,
+              "rotationDeg": 5
+            },
+            {
+              "x": 0.6752,
+              "y": 0.3189,
+              "scale": 1,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.7604,
+              "y": 0.2596,
+              "scale": 0.96,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.846,
+              "y": 0.2,
+              "scale": 0.92,
+              "rotationDeg": 3
+            }
+          ],
+          "character": "sequenced ascent with a mid-route pause before a brisk push to the top"
+        }
+      },
+      "stars": {
+        "metric": "judgmentPoints",
+        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
+        "passThreshold": 59,
+        "star2Threshold": 208,
+        "star3Threshold": 260,
+        "provisional": true,
+        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 260 points are available. Pass is the 45% of a single pass (130) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+      },
+      "validation": {
+        "status": "ok",
+        "issues": []
+      },
+      "scoring": {
+        "streakBonusEligible": false,
+        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
+      }
+    },
+    "5": {
+      "difficulty": 5,
+      "supported": true,
+      "derivedFromNormalDifficulty": 1,
+      "difficultyOffset": 4,
       "measurePlan": {
         "attemptMeasures": 4,
         "beatsPerMeasure": 4,
@@ -537,11 +1107,11 @@
         "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
-    "4": {
-      "difficulty": 4,
+    "6": {
+      "difficulty": 6,
       "supported": true,
       "derivedFromNormalDifficulty": 2,
-      "difficultyOffset": 2,
+      "difficultyOffset": 4,
       "measurePlan": {
         "attemptMeasures": 4,
         "beatsPerMeasure": 4,
@@ -983,457 +1553,11 @@
         "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
       }
     },
-    "5": {
-      "difficulty": 5,
-      "supported": true,
-      "derivedFromNormalDifficulty": 3,
-      "difficultyOffset": 2,
-      "measurePlan": {
-        "attemptMeasures": 4,
-        "beatsPerMeasure": 4,
-        "visualSpanMeasures": 4,
-        "resetBetweenMeasures": false
-      },
-      "prompt": [
-        {
-          "index": 0,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 0,
-          "startMeasure": 1,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "1"
-        },
-        {
-          "index": 1,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 1,
-          "startMeasure": 1,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "2"
-        },
-        {
-          "index": 2,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 2,
-          "startMeasure": 1,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 3,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 3,
-          "startMeasure": 1,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "2"
-        },
-        {
-          "index": 4,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 4,
-          "startMeasure": 2,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 5,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 4.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 6,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 7,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 5.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 8,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 9,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 10,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 11,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 12,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 8,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 13,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 9,
-          "startMeasure": 3,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 14,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 10,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "7"
-        },
-        {
-          "index": 15,
-          "type": "note",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 11,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "b1"
-        },
-        {
-          "index": 16,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1,
-          "scaleDegree": "1"
-        },
-        {
-          "index": 17,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 12.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.5,
-          "scaleDegree": "2"
-        },
-        {
-          "index": 18,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 19,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 13.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.5,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 20,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 21,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 14.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 22,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15,
-          "startMeasure": 4,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "7"
-        },
-        {
-          "index": 23,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 15.5,
-          "startMeasure": 4,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "b1"
-        }
-      ],
-      "noteOpportunityCount": 24,
-      "authoredBeatCount": 16,
-      "visual": {
-        "routeDirection": "ascending",
-        "routeCharacter": "sequenced ascent with gear changes: deliberate footholds, a sprint, then a clean run out",
-        "steepness": 0.7,
-        "footholdScaleRange": [
-          0.75,
-          1
-        ],
-        "exposure": "high",
-        "destinationTreatment": "high alpine summit marker",
-        "waypointCount": 24,
-        "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_ascent_high_step",
-        "progressTrigger": "successful_note_judgment",
-        "route": {
-          "space": "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
-          "direction": "ascending",
-          "startPosition": {
-            "x": 0.14,
-            "y": 0.93
-          },
-          "destination": {
-            "x": 0.762,
-            "y": 0.12
-          },
-          "waypoints": [
-            {
-              "x": 0.1922,
-              "y": 0.8962,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.2384,
-              "y": 0.8625,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.2748,
-              "y": 0.8288,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.2992,
-              "y": 0.795,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.3123,
-              "y": 0.7612,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.317,
-              "y": 0.7275,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.3178,
-              "y": 0.6937,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.3198,
-              "y": 0.66,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.328,
-              "y": 0.6262,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.3459,
-              "y": 0.5925,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.3748,
-              "y": 0.5588,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.4139,
-              "y": 0.525,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.4602,
-              "y": 0.4913,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.5095,
-              "y": 0.4575,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.5569,
-              "y": 0.4237,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.598,
-              "y": 0.39,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.6299,
-              "y": 0.3562,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.6515,
-              "y": 0.3225,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.6641,
-              "y": 0.2888,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.6706,
-              "y": 0.255,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.6751,
-              "y": 0.2213,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.682,
-              "y": 0.1875,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.6952,
-              "y": 0.1537,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.717,
-              "y": 0.12,
-              "scale": 0.88,
-              "rotationDeg": -2
-            }
-          ],
-          "character": "sequenced ascent with gear changes: deliberate footholds, a sprint, then a clean run out"
-        }
-      },
-      "stars": {
-        "metric": "judgmentPoints",
-        "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 108,
-        "star2Threshold": 384,
-        "star3Threshold": 480,
-        "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 480 points are available. Pass is the 45% of a single pass (240) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
-      },
-      "validation": {
-        "status": "ok",
-        "issues": []
-      },
-      "scoring": {
-        "streakBonusEligible": false,
-        "note": "Scale material is not streak-eligible content (GDD §9.2 points streaks at triplets and sixteenth runs). The streak is still tracked and shown in the debug panel."
-      }
-    },
-    "6": {
-      "difficulty": 6,
+    "7": {
+      "difficulty": 7,
       "supported": true,
       "derivedFromNormalDifficulty": 4,
-      "difficultyOffset": 2,
+      "difficultyOffset": 3,
       "measurePlan": {
         "attemptMeasures": 4,
         "beatsPerMeasure": 4,
