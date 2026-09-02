@@ -16,7 +16,7 @@
  * engine works in {@link ScaleDegreeRef}, which has no notation at all.
  *
  * A third notation exists for scenarios written in the **pentatonic** scale:
- * `p1`..`p11`, the Blues Lick family's own vocabulary (see
+ * `p1`..`p6`, the Blues Lick family's own vocabulary (see
  * {@link PentatonicDegreeRef}). It is the one authored form that cannot be
  * turned into a lane at load time, because which diatonic degree a pentatonic
  * step is depends on the run's mode — the major pentatonic is `1 2 3 5 6`, the
@@ -47,20 +47,14 @@ export type ScaleDegreeRef = {
 export type PentatonicStep = 1 | 2 | 3 | 4 | 5;
 
 /**
- * The octave a pentatonic token was *written* in.
- *
- * The designer's notation counts eleven degrees across two octaves — `p1..p5`
- * below the tonic, `p6` the tonic itself ("middle root"), `p7..p10` above it
- * and `p11` the root above that — so the written octave has three values, one
- * more than the timeline can show. Band -1 is kept here as the authored truth
- * and folded by {@link resolveDegree}; it is not thrown away at parse time,
- * because the fold is a provisional display decision and the file should still
- * say what the designer wrote.
- */
-export type PentatonicBand = -1 | 0 | 1;
-
-/**
  * One authored pentatonic degree, not yet a pitch.
+ *
+ * The vocabulary is `p1..p6`: five steps from the root, then `p6`, the root an
+ * octave above — the same root-to-root span the timeline shows, so a pentatonic
+ * scenario is written in exactly the pitch space the player can see. There is
+ * deliberately nothing below `p1`: the lanes stop at the root, and a lick that
+ * dipped under it could only be drawn by moving the note somewhere it was not
+ * written.
  *
  * Distinct from {@link ScaleDegreeRef} on purpose: a pentatonic step has no
  * lane until the mode is known, and giving it a `degree` field would invite
@@ -68,7 +62,8 @@ export type PentatonicBand = -1 | 0 | 1;
  */
 export type PentatonicDegreeRef = {
   pentatonic: PentatonicStep;
-  octaveBand: PentatonicBand;
+  /** `0` = the run key's own octave, `1` = the root above it (`p6`). */
+  octaveBand: OctaveBand;
 };
 
 /** What a scenario's `prompt[]` may carry once parsed: either vocabulary. */
@@ -116,18 +111,17 @@ export class DegreeTokenError extends Error {
  * two-octave timeline and are now errors, not silently-folded notes.
  */
 export function parseDegreeToken(token: string): AuthoredDegreeRef {
-  const pentatonic = /^p([1-9]|1[01])$/.exec(token);
+  const pentatonic = /^p([1-6])$/.exec(token);
   if (pentatonic) {
-    // `p1..p5` below the tonic, `p6..p10` from it, `p11` the root above.
+    // `p1..p5` are the five steps from the root; `p6` is the root above them.
     const written = Number(pentatonic[1]);
-    return {
-      pentatonic: (((written - 1) % 5) + 1) as PentatonicStep,
-      octaveBand: (Math.floor((written - 1) / 5) - 1) as PentatonicBand,
-    };
+    return written === 6
+      ? { pentatonic: 1, octaveBand: 1 }
+      : { pentatonic: written as PentatonicStep, octaveBand: 0 };
   }
 
   const match = /^(b?)([1-7])$/.exec(token);
-  if (!match) throw new DegreeTokenError(token, "expected /^b?[1-7]$/ or /^p([1-9]|1[01])$/");
+  if (!match) throw new DegreeTokenError(token, "expected /^b?[1-7]$/ or /^p[1-6]$/");
 
   const band = TOKEN_BAND_PREFIX[match[1] ?? ""];
   if (band === undefined) throw new DegreeTokenError(token, "unknown octave-band prefix");
@@ -141,40 +135,25 @@ export function parseDegreeToken(token: string): AuthoredDegreeRef {
 
 /** Inverse of {@link parseDegreeToken}. Used by tests and by the debug panel. */
 export function formatDegreeToken(ref: AuthoredDegreeRef): string {
-  if (isPentatonic(ref)) return `p${(ref.octaveBand + 1) * 5 + ref.pentatonic}`;
+  if (isPentatonic(ref)) return `p${ref.octaveBand === 1 ? 6 : ref.pentatonic}`;
   return `${ref.octaveBand === 0 ? "" : "b"}${ref.degree}`;
 }
-
-/**
- * Whether a pentatonic degree written below the tonic (`p1..p5`) is shown an
- * octave up, in the timeline's own octave.
- *
- * PROVISIONAL — see `DECISION_LOG.md`. The timeline is one octave, root to
- * root (DECISION-012), and the Blues Lick material is written around a
- * *middle* root with notes on both sides of it. Folding the low octave up keeps
- * every authored pitch class exactly right, keeps every note on a lane the
- * player can see, and changes only the contour of the notes that cross the
- * root. When the timeline grows a second octave this becomes `false` and the
- * authored data is already correct for it — nothing in a scenario file changes.
- */
-export const PENTATONIC_LOW_OCTAVE_FOLDS_UP = true;
 
 /**
  * Resolves an authored degree of either vocabulary into a diatonic
  * {@link ScaleDegreeRef} for a key of the given mode.
  *
  * A diatonic ref passes through untouched. A pentatonic ref becomes the
- * diatonic degree its step is in this mode; the octave above holds only the
- * root, as it does for diatonic tokens; the octave below is folded up while
- * {@link PENTATONIC_LOW_OCTAVE_FOLDS_UP} says so, and refused otherwise, so a
- * lane that does not exist is a loud error rather than a silent transposition.
+ * diatonic degree its step is in this mode, and the band above holds only the
+ * root — the same rule the diatonic tokens follow, and the reason `p6` exists
+ * rather than a `p7` the timeline could not draw.
+ *
+ * Nothing here moves a note to make it fit. Both vocabularies describe pitches
+ * that are already inside the one-octave span, so a ref that could not be drawn
+ * is a loud error rather than a silent transposition.
  */
 export function resolveDegree(ref: AuthoredDegreeRef, mode: "major" | "minor"): ScaleDegreeRef {
   if (!isPentatonic(ref)) return ref;
-  const degree = PENTATONIC_TO_DIATONIC[mode][ref.pentatonic - 1];
-  if (degree === undefined) {
-    throw new DegreeTokenError(formatDegreeToken(ref), "pentatonic step out of range");
-  }
   if (ref.octaveBand === 1) {
     if (ref.pentatonic !== 1) {
       throw new DegreeTokenError(
@@ -184,11 +163,9 @@ export function resolveDegree(ref: AuthoredDegreeRef, mode: "major" | "minor"): 
     }
     return { degree: 1, octaveBand: 1 };
   }
-  if (ref.octaveBand === -1 && !PENTATONIC_LOW_OCTAVE_FOLDS_UP) {
-    throw new DegreeTokenError(
-      formatDegreeToken(ref),
-      "the timeline has no lanes below the tonic and the low octave is not folded"
-    );
+  const degree = PENTATONIC_TO_DIATONIC[mode][ref.pentatonic - 1];
+  if (degree === undefined) {
+    throw new DegreeTokenError(formatDegreeToken(ref), "pentatonic step out of range");
   }
   return { degree, octaveBand: 0 };
 }

@@ -53,13 +53,12 @@ export type RunOptions = {
    */
   difficultySequence?: readonly number[];
   /**
-   * Fills every slot this scenario is eligible for with it. **Developer use
-   * only** — the browser suite and a designer looking at one scenario need
-   * to know which one they will get, and with several scenarios authoring the
-   * same difficulty the pick is otherwise random. Slots the scenario does not
-   * author still fill normally.
+   * Fills every slot the named scenario is eligible for with that scenario.
+   * **Developer use only** — it is how one scenario gets looked at without
+   * rerolling the run until selection happens to pick it. Slots it does not
+   * author fall back to normal random selection.
    */
-  preferScenarioId?: string;
+  pinnedScenarioId?: string;
 };
 
 export class RunState {
@@ -75,7 +74,7 @@ export class RunState {
     this.slots = fillSlots(
       options.difficultySequence ?? DIFFICULTY_SEQUENCE,
       options.random ?? Math.random,
-      options.preferScenarioId ?? null
+      options.pinnedScenarioId ?? null
     );
   }
 
@@ -162,7 +161,7 @@ export class RunState {
 function fillSlots(
   sequence: readonly number[],
   random: () => number,
-  preferScenarioId: string | null
+  pinnedScenarioId: string | null
 ): RunSlot[] {
   const used = new Set<string>();
 
@@ -172,12 +171,12 @@ function fillSlots(
       return { ordinal, difficulty, scenario: null, result: null };
     }
 
-    // Dev-only preference, ahead of the reuse rule: the point is to see one
-    // scenario every slot it can fill, not to see it once.
-    const preferred = eligible.find((scenario) => scenario.id === preferScenarioId);
-    if (preferred) {
-      used.add(preferred.id);
-      return { ordinal, difficulty, scenario: preferred, result: null };
+    // Dev-only pin, ahead of the reuse rule: the point is to see one scenario
+    // in every slot it can fill, not to see it once.
+    const pinned = eligible.find((scenario) => scenario.id === pinnedScenarioId);
+    if (pinned) {
+      used.add(pinned.id);
+      return { ordinal, difficulty, scenario: pinned, result: null };
     }
 
     const unused = eligible.filter((scenario) => !used.has(scenario.id));

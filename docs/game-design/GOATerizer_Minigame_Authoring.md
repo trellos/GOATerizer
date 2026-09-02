@@ -180,8 +180,8 @@ beats of the notes the designer marked `F`; on one the performer strikes a
 `flourishPoses[]` entry for the note's length and summons
 `visual.goatsPerFlourish` crowd members from the wings. Bad notes flinch and
 bore the crowd; nothing earned is taken away. Blues Lick material is written
-in pentatonic degrees (`p1..p11`, `src/music/degrees.ts`), resolved to lanes by
-the run's mode.
+in pentatonic degrees (`p1..p6`, `src/music/degrees.ts`) — one octave, root to
+root, the same span the lanes show — resolved to lanes by the run's mode.
 
 ---
 

@@ -62,7 +62,7 @@ import { fingeringsForKey, STRING_NAMES, type Fingering } from "../music/fingeri
 import { keyDisplayName, keyShortName, parseKeyName, type RunKey } from "../music/keys.js";
 import { midiToName } from "../music/pitch.js";
 import { readHighScores, recordHighScore } from "../persistence/high-scores.js";
-import { SCENARIOS } from "../scenario/registry.js";
+import { SCENARIOS, scenarioById } from "../scenario/registry.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
@@ -176,7 +176,7 @@ export class GameApp {
    */
   #devLevel: number | null = null;
   /** `?dev=1&scenario=<id>`: fill every slot that scenario authors with it. */
-  #devScenario: string | null = null;
+  #devScenarioId: string | null = null;
   #autoplay: AutoplayMode = "off";
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
@@ -427,11 +427,14 @@ export class GameApp {
     }
 
     // `?dev=1&scenario=<id>` pins the pick where more than one scenario
-    // authors a difficulty. An unknown id is ignored rather than failing the
-    // run: the registry decides what exists, and the dev panel shows what was
-    // actually picked.
-    const requestedScenario = params.get("scenario");
-    if (this.#devMode && requestedScenario) this.#devScenario = requestedScenario;
+    // authors a difficulty. An unknown id warns and is ignored rather than
+    // failing the run: the registry decides what exists, and the dev panel
+    // shows what was actually picked.
+    const scenarioId = params.get("scenario");
+    if (this.#devMode && scenarioId) {
+      if (scenarioById(scenarioId)) this.#devScenarioId = scenarioId;
+      else console.warn(`[goaterizer] ?scenario=${scenarioId} is not a registered scenario id`);
+    }
 
     const requestedInput = params.get("input");
     if (this.#devMode && (requestedInput === "test" || requestedInput === "synth")) {
@@ -717,7 +720,7 @@ export class GameApp {
       ...(this.#devLevel !== null
         ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
         : {}),
-      ...(this.#devScenario !== null ? { preferScenarioId: this.#devScenario } : {}),
+      ...(this.#devScenarioId !== null ? { pinnedScenarioId: this.#devScenarioId } : {}),
     });
     this.#current = null;
     this.#next = null;

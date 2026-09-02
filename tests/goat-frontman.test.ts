@@ -16,7 +16,7 @@ import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/ga
 import { RunState } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import type { PlacedNote, Sprite, Stage, StageView } from "../src/minigame/api.js";
-import { formatDegreeToken } from "../src/music/degrees.js";
+import { formatDegreeToken, laneIndexOf, LANE_COUNT, resolveDegree } from "../src/music/degrees.js";
 import type { RunKey } from "../src/music/keys.js";
 import {
   crowdSlot,
@@ -152,18 +152,34 @@ describe("Goat Frontman scenario data", () => {
   it("is written in the designer's pentatonic notation, verbatim", () => {
     const tokens = (difficulty: number) =>
       level(difficulty).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "R")).join(" ");
-    // L1: variant 1 (5Q 6Q 7Q 6QF), four times.
-    expect(tokens(1)).toBe(Array(4).fill("p5 p6 p7 p6").join(" "));
-    // L3: variant 1 (5E 6E 7Q 6HF), four times.
-    expect(tokens(3)).toBe(Array(4).fill("p5 p6 p7 p6").join(" "));
+    // L1: variant 1 (5Q 1Q 2Q 1QF), four times.
+    expect(tokens(1)).toBe(Array(4).fill("p5 p1 p2 p1").join(" "));
+    // L3: variant 1 (5E 1E 2Q 1HF), four times.
+    expect(tokens(3)).toBe(Array(4).fill("p5 p1 p2 p1").join(" "));
     expect(level(3).prompt.map((e) => e.duration)).toEqual(
       Array(4).fill(["eighth", "eighth", "quarter", "half"]).flat()
     );
     // L2: two L1 variants, each twice. L4: two L3 variants, alternating.
-    expect(tokens(2)).toBe("p5 p5 p6 p7 p6 p5 p5 p6 p7 p6 p8 p6 p9 p6 p8 p6 p9 p6");
+    expect(tokens(2)).toBe("p5 p5 p1 p2 p1 p5 p5 p1 p2 p1 p3 p1 p4 p1 p3 p1 p4 p1");
     expect(tokens(4)).toBe(
-      "p5 p5 p6 p7 p6 R p7 p8 p6 p9 p6 R p11 p5 p5 p6 p7 p6 R p7 p8 p6 p9 p6 R p11"
+      "p5 p5 p1 p2 p1 R p2 p3 p1 p4 p1 R p6 p5 p5 p1 p2 p1 R p2 p3 p1 p4 p1 R p6"
     );
+  });
+
+  it("authors nothing outside the timeline's own octave, in either mode", () => {
+    // The reason the vocabulary stops at p6: there are no lanes below the root
+    // or above the octave root, so a lick that wanted one could only be drawn
+    // by moving the note. Nothing here is moved.
+    for (const difficulty of LEVELS) {
+      for (const event of level(difficulty).prompt) {
+        if (!event.degree) continue;
+        for (const mode of ["major", "minor"] as const) {
+          const lane = laneIndexOf(resolveDegree(event.degree, mode));
+          expect(lane, `L${difficulty} in ${mode}`).toBeGreaterThanOrEqual(0);
+          expect(lane, `L${difficulty} in ${mode}`).toBeLessThan(LANE_COUNT);
+        }
+      }
+    }
   });
 
   it.each(LEVELS)("L%i totals 16 beats and counts its own opportunities", (difficulty) => {
@@ -212,7 +228,7 @@ describe("Goat Frontman scenario data", () => {
     const minor = harness(1, G_MINOR).attempt.targets.slice(0, 4).map((t) => t.lane);
     const major = harness(1, D_MAJOR).attempt.targets.slice(0, 4).map((t) => t.lane);
     expect(minor).toEqual([6, 0, 2, 0]); // b7 1 b3 1
-    expect(major).toEqual([5, 0, 1, 0]); // 6 1 2 1
+    expect(major).toEqual([5, 0, 1, 0]); // 6  1 2  1
   });
 });
 
@@ -417,7 +433,7 @@ describe("PerformMinigame on the timeline", () => {
 
 describe("a run can be pinned to Goat Frontman for development", () => {
   it("fills every slot it authors with it, and the rest normally", () => {
-    const run = new RunState({ key: G_MINOR, bpm: BPM, preferScenarioId: "goat_frontman", random: () => 0 });
+    const run = new RunState({ key: G_MINOR, bpm: BPM, pinnedScenarioId: "goat_frontman", random: () => 0 });
     for (const slot of run.slots) {
       if (slot.difficulty <= 4) expect(slot.scenario?.id).toBe("goat_frontman");
       else expect(slot.scenario?.id).not.toBe("goat_frontman");
@@ -425,7 +441,7 @@ describe("a run can be pinned to Goat Frontman for development", () => {
   });
 
   it("ignores a preference for a scenario that does not exist", () => {
-    const run = new RunState({ key: G_MINOR, bpm: BPM, preferScenarioId: "nope", random: () => 0 });
+    const run = new RunState({ key: G_MINOR, bpm: BPM, pinnedScenarioId: "nope", random: () => 0 });
     expect(run.slots.every((slot) => slot.scenario !== null || slot.difficulty === 7)).toBe(true);
   });
 });

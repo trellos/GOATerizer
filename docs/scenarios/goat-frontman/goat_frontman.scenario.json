@@ -21,16 +21,11 @@
       "p3",
       "p4",
       "p5",
-      "p6",
-      "p7",
-      "p8",
-      "p9",
-      "p10",
-      "p11"
+      "p6"
     ],
     "transposeToRunKey": true,
     "nonDiatonicTargetsAllowed": false,
-    "note": "Eleven pentatonic degrees over two octaves, p6 the middle root. Resolved to diatonic degrees by the run's mode at run time (major 1 2 3 5 6, minor 1 b3 4 5 b7). The timeline is one octave, so p1..p5 are currently shown an octave up (src/music/degrees.ts PENTATONIC_LOW_OCTAVE_FOLDS_UP)."
+    "note": "Six pentatonic degrees, root to root: p1 is the run key's root and p6 the root an octave above it, which is exactly the span the timeline shows. Resolved to diatonic degrees by the run's mode at run time (major 1 2 3 5 6, minor 1 b3 4 5 b7), so the same lick is a different set of lanes in a major key and a minor one and is diatonic in both."
   },
   "classParameters": {
     "visualSpanMeasures": 4,
@@ -240,15 +235,15 @@
   ],
   "variantLibrary": {
     "L1": {
-      "variant 1": "5Q 6Q 7Q 6QF",
-      "variant 2": "5E 5E 6Q 7Q 6QF",
-      "variant 3": "8Q 6Q 9Q 6QF",
+      "variant 1": "5Q 1Q 2Q 1QF",
+      "variant 2": "5E 5E 1Q 2Q 1QF",
+      "variant 3": "3Q 1Q 4Q 1QF",
       "variant 4": "3Q 4Q 5Q 4Q"
     },
     "L3": {
-      "variant 1": "5E 6E 7Q 6HF",
-      "variant 2": "5E 5E 6E 7E 6Q RE 7EF",
-      "variant 3": "8E 6E 9E 6Q RE 11Q",
+      "variant 1": "5E 1E 2Q 1HF",
+      "variant 2": "5E 5E 1E 2E 1Q RE 2EF",
+      "variant 3": "3E 1E 4E 1Q RE 6Q",
       "variant 4": "2E 3E 4Q 3E 2E 1Q"
     }
   },
@@ -257,15 +252,15 @@
     "The canonical catalogue lists Goat Frontman at L2–6. The designer's authoring brief for this scenario specifies L1–4, which wins (AGENTS.md §20); L5–7 are unauthored.",
     "L2 and L4 pick two variants each from the previous library. The picks are fixed here, not rolled per attempt: the game does not procedurally choose exercises. The unpicked variants stay in `variantLibrary`.",
     "The flourish `F` is authored per note (`prompt[].flourish`) and mirrored into `visual.flourishBeats`, which is what the runtime reads. A test keeps the two equal.",
-    "Every note in the low octave (p1..p5) is displayed an octave up while the timeline is one octave. Provisional; the authored file is already correct for a two-octave timeline.",
+    "Every authored note sits inside the timeline's one-octave span, root to root, so nothing is folded, clamped or moved to be drawn. The first draft was written around a middle root with material below it; the two licks that dipped below the root were rewritten rather than displayed an octave up.",
     "The phrase tables and star thresholds are regenerable via scripts/author-goat-frontman.mjs."
   ],
   "designerReview": {
     "blockingIssues": [],
     "nonBlockingTBD": [
       "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
-      "L1 variant 4 and L3 variant 4 (the low-octave scale figures) are authored but unpicked.",
-      "The low-octave fold changes the contour of the one note below the root in variants 1 and 2. Reverts to the written contour when the timeline shows two octaves.",
+      "L1 variant 4 and L3 variant 4 are authored but unpicked; variant 4 is the only lick in either library that never lands on the root, which is why it is not the one a level repeats.",
+      "The licks resolve to the root rather than around it, because the timeline has no lanes below the root. If it ever spans two octaves, the middle-root versions in this scenario's history are the better material and worth restoring.",
       "Timing windows are the global per-subdivision ones; 'harder timing at higher levels' is carried by the material (eighths, a rest, an off-beat flourish), not by scenario-specific windows."
     ]
   },
@@ -298,7 +293,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 2,
@@ -308,7 +303,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 3,
@@ -318,7 +313,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -339,7 +334,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 6,
@@ -349,7 +344,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 7,
@@ -359,7 +354,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -380,7 +375,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 10,
@@ -390,7 +385,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 11,
@@ -400,7 +395,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -421,7 +416,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 14,
@@ -431,7 +426,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 15,
@@ -441,7 +436,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         }
       ],
@@ -450,10 +445,10 @@
       "visual": {
         "levelCharacter": "one lick, four times over; a flourish on every downbeat-to-be, and one goat wanders in for each",
         "variants": [
-          "L1 variant 1: 5Q 6Q 7Q 6QF",
-          "L1 variant 1: 5Q 6Q 7Q 6QF",
-          "L1 variant 1: 5Q 6Q 7Q 6QF",
-          "L1 variant 1: 5Q 6Q 7Q 6QF"
+          "L1 variant 1: 5Q 1Q 2Q 1QF",
+          "L1 variant 1: 5Q 1Q 2Q 1QF",
+          "L1 variant 1: 5Q 1Q 2Q 1QF",
+          "L1 variant 1: 5Q 1Q 2Q 1QF"
         ],
         "visualSpanMeasures": 4,
         "resetBetweenMeasures": false,
@@ -523,7 +518,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 3,
@@ -533,7 +528,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 4,
@@ -543,7 +538,7 @@
           "startBeat": 3,
           "startMeasure": 1,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -574,7 +569,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 8,
@@ -584,7 +579,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 9,
@@ -594,7 +589,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -605,7 +600,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "p8"
+          "scaleDegree": "p3"
         },
         {
           "index": 11,
@@ -615,7 +610,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 12,
@@ -625,7 +620,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p9"
+          "scaleDegree": "p4"
         },
         {
           "index": 13,
@@ -635,7 +630,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -646,7 +641,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "p8"
+          "scaleDegree": "p3"
         },
         {
           "index": 15,
@@ -656,7 +651,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 16,
@@ -666,7 +661,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p9"
+          "scaleDegree": "p4"
         },
         {
           "index": 17,
@@ -676,7 +671,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         }
       ],
@@ -685,10 +680,10 @@
       "visual": {
         "levelCharacter": "two licks, each twice — eighths first, then the wide leap to the fourth",
         "variants": [
-          "L1 variant 2: 5E 5E 6Q 7Q 6QF",
-          "L1 variant 2: 5E 5E 6Q 7Q 6QF",
-          "L1 variant 3: 8Q 6Q 9Q 6QF",
-          "L1 variant 3: 8Q 6Q 9Q 6QF"
+          "L1 variant 2: 5E 5E 1Q 2Q 1QF",
+          "L1 variant 2: 5E 5E 1Q 2Q 1QF",
+          "L1 variant 3: 3Q 1Q 4Q 1QF",
+          "L1 variant 3: 3Q 1Q 4Q 1QF"
         ],
         "visualSpanMeasures": 4,
         "resetBetweenMeasures": false,
@@ -748,7 +743,7 @@
           "startBeat": 0.5,
           "startMeasure": 1,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 2,
@@ -758,7 +753,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 3,
@@ -768,7 +763,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -789,7 +784,7 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 6,
@@ -799,7 +794,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 7,
@@ -809,7 +804,7 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -830,7 +825,7 @@
           "startBeat": 8.5,
           "startMeasure": 3,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 10,
@@ -840,7 +835,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 11,
@@ -850,7 +845,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         },
         {
@@ -871,7 +866,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 14,
@@ -881,7 +876,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 15,
@@ -891,7 +886,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6",
+          "scaleDegree": "p1",
           "flourish": true
         }
       ],
@@ -900,10 +895,10 @@
       "visual": {
         "levelCharacter": "the lick in eighths with a held flourish at the end of every bar",
         "variants": [
-          "L3 variant 1: 5E 6E 7Q 6HF",
-          "L3 variant 1: 5E 6E 7Q 6HF",
-          "L3 variant 1: 5E 6E 7Q 6HF",
-          "L3 variant 1: 5E 6E 7Q 6HF"
+          "L3 variant 1: 5E 1E 2Q 1HF",
+          "L3 variant 1: 5E 1E 2Q 1HF",
+          "L3 variant 1: 5E 1E 2Q 1HF",
+          "L3 variant 1: 5E 1E 2Q 1HF"
         ],
         "visualSpanMeasures": 4,
         "resetBetweenMeasures": false,
@@ -973,7 +968,7 @@
           "startBeat": 1,
           "startMeasure": 1,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 3,
@@ -983,7 +978,7 @@
           "startBeat": 1.5,
           "startMeasure": 1,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 4,
@@ -993,7 +988,7 @@
           "startBeat": 2,
           "startMeasure": 1,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 5,
@@ -1012,7 +1007,7 @@
           "startBeat": 3.5,
           "startMeasure": 1,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "p7",
+          "scaleDegree": "p2",
           "flourish": true
         },
         {
@@ -1023,7 +1018,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "p8"
+          "scaleDegree": "p3"
         },
         {
           "index": 8,
@@ -1033,7 +1028,7 @@
           "startBeat": 4.5,
           "startMeasure": 2,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 9,
@@ -1043,7 +1038,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p9"
+          "scaleDegree": "p4"
         },
         {
           "index": 10,
@@ -1053,7 +1048,7 @@
           "startBeat": 5.5,
           "startMeasure": 2,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 11,
@@ -1072,7 +1067,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p11"
+          "scaleDegree": "p6"
         },
         {
           "index": 13,
@@ -1102,7 +1097,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 16,
@@ -1112,7 +1107,7 @@
           "startBeat": 9.5,
           "startMeasure": 3,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "p7"
+          "scaleDegree": "p2"
         },
         {
           "index": 17,
@@ -1122,7 +1117,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 18,
@@ -1141,7 +1136,7 @@
           "startBeat": 11.5,
           "startMeasure": 3,
           "beatWithinMeasure": 4.5,
-          "scaleDegree": "p7",
+          "scaleDegree": "p2",
           "flourish": true
         },
         {
@@ -1152,7 +1147,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "p8"
+          "scaleDegree": "p3"
         },
         {
           "index": 21,
@@ -1162,7 +1157,7 @@
           "startBeat": 12.5,
           "startMeasure": 4,
           "beatWithinMeasure": 1.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 22,
@@ -1172,7 +1167,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "p9"
+          "scaleDegree": "p4"
         },
         {
           "index": 23,
@@ -1182,7 +1177,7 @@
           "startBeat": 13.5,
           "startMeasure": 4,
           "beatWithinMeasure": 2.5,
-          "scaleDegree": "p6"
+          "scaleDegree": "p1"
         },
         {
           "index": 24,
@@ -1201,7 +1196,7 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "p11"
+          "scaleDegree": "p6"
         }
       ],
       "noteOpportunityCount": 22,
@@ -1209,10 +1204,10 @@
       "visual": {
         "levelCharacter": "the two hardest licks alternating every bar, with a rest and an off-beat flourish to land",
         "variants": [
-          "L3 variant 2: 5E 5E 6E 7E 6Q RE 7EF",
-          "L3 variant 3: 8E 6E 9E 6Q RE 11Q",
-          "L3 variant 2: 5E 5E 6E 7E 6Q RE 7EF",
-          "L3 variant 3: 8E 6E 9E 6Q RE 11Q"
+          "L3 variant 2: 5E 5E 1E 2E 1Q RE 2EF",
+          "L3 variant 3: 3E 1E 4E 1Q RE 6Q",
+          "L3 variant 2: 5E 5E 1E 2E 1Q RE 2EF",
+          "L3 variant 3: 3E 1E 4E 1Q RE 6Q"
         ],
         "visualSpanMeasures": 4,
         "resetBetweenMeasures": false,

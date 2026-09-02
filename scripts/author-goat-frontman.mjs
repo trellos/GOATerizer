@@ -13,20 +13,26 @@
  * The designer wrote this scenario in **pentatonic** degrees, because the
  * Blues Lick family lives in the pentatonic scale and the same lick is a
  * different set of roman numerals in a major key and a minor one. The
- * vocabulary counts eleven degrees across two octaves:
+ * vocabulary is one octave, root to root:
  *
- *     1 2 3 4 5   6   7 8 9 10   11
- *     low octave  mid root        high root
+ *     1 2 3 4 5 6
+ *     root      root
  *
- * `5Q 6Q 7Q 6QF` is: the fifth pentatonic step below the middle root for a
- * quarter, the root, the step above it, the root again — with `F` marking the
- * note on which the goat hits a **flourish pose**. `RE` is an eighth rest.
+ * `5Q 1Q 2Q 1QF` is: the fifth pentatonic step for a quarter, the root, the
+ * step above it, the root again — with `F` marking the note on which the goat
+ * hits a **flourish pose**. `RE` is an eighth rest.
  *
- * In the scenario file those become `p5 p6 p7 p6` (`src/music/degrees.ts`),
+ * In the scenario file those become `p5 p1 p2 p1` (`src/music/degrees.ts`),
  * kept exactly as written; the resolution to a diatonic lane happens at run
- * time, when the mode is known. Note that the timeline is one octave and the
- * low octave (`p1..p5`) is currently *folded up* into it — provisional, see
- * `PENTATONIC_LOW_OCTAVE_FOLDS_UP` and `DECISION_LOG.md`.
+ * time, when the mode is known.
+ *
+ * The first draft of this scenario was written around a *middle* root, with
+ * five degrees below it and five above — eleven in all. The timeline is one
+ * octave (DECISION-012), so the lanes below the root do not exist, and showing
+ * that material meant displaying the low notes an octave up: right pitch class,
+ * wrong contour. The designer rewrote the two licks that dipped below the root
+ * instead, which is why the vocabulary above stops at six and why nothing here
+ * has to be folded, clamped or moved to be drawn.
  *
  * ## The ladder
  *
@@ -45,13 +51,14 @@
  * for a use, not a leftover.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.resolve(here, "..", "docs", "scenarios", "goat-frontman");
 const OUT_FILE = path.join(OUT_DIR, "goat_frontman.scenario.json");
+const TUNING_FILE = path.resolve(here, "..", "src", "config", "tuning.ts");
 
 const BEATS_PER_MEASURE = 4;
 const PHRASE_MEASURES = 4;
@@ -59,13 +66,27 @@ const ATTEMPT_BEATS = BEATS_PER_MEASURE * PHRASE_MEASURES;
 
 /** Mirrors src/config/tuning.ts JUDGMENT_POINTS.perfect. */
 const POINTS_PERFECT = 10;
+
 /**
- * Mirrors how many times an attempt plays the authored phrase. This branch's
- * game loop plays it once; `main` plays it `ATTEMPT_REPEATS` (2) times and its
- * registry test asserts every authored ceiling against that constant. When
- * these meet, set this to 2 and re-run.
+ * How many times an attempt plays the authored phrase, **read from
+ * `tuning.ts`** rather than mirrored here.
+ *
+ * The other authoring scripts hard-code this, and `scenario-registry.test.ts`
+ * exists to catch the drift that follows — change the repeat count and every
+ * authored star ceiling is quietly wrong until someone reruns the scripts. A
+ * `.mjs` script cannot import a TypeScript constant, but it can read the file
+ * that declares it, which removes the duplicate instead of guarding it.
+ *
+ * It matters here more than usual: this branch's game loop plays the phrase
+ * once and `main` plays it twice, so a hard-coded number would be wrong on one
+ * side of the merge whichever value it held.
  */
-const ATTEMPT_REPEATS = 1;
+const ATTEMPT_REPEATS = (() => {
+  const source = readFileSync(TUNING_FILE, "utf8");
+  const match = /export const ATTEMPT_REPEATS\s*=\s*(\d+)/.exec(source);
+  // Absent on a branch whose loop does not repeat the phrase; one pass, then.
+  return match ? Number(match[1]) : 1;
+})();
 
 /** The same provisional ladder every scenario uses — see author-rocky-scenarios.mjs. */
 const PASS_FRACTION = 0.45;
@@ -80,15 +101,24 @@ const DURATION_BEATS = { whole: 4, half: 2, quarter: 1, eighth: 0.5, sixteenth: 
 
 const VARIANTS = {
   1: {
-    1: "5Q 6Q 7Q 6QF",
-    2: "5E 5E 6Q 7Q 6QF",
-    3: "8Q 6Q 9Q 6QF",
+    // Call and answer around the root: the step below the octave, home, the
+    // step above, home again.
+    1: "5Q 1Q 2Q 1QF",
+    // The same shape with a doubled eighth-note pickup.
+    2: "5E 5E 1Q 2Q 1QF",
+    // Wider: a third above, home, a fourth above, home.
+    3: "3Q 1Q 4Q 1QF",
+    // The one variant that never touches the root — it climbs and steps back.
     4: "3Q 4Q 5Q 4Q",
   },
   3: {
-    1: "5E 6E 7Q 6HF",
-    2: "5E 5E 6E 7E 6Q RE 7EF",
-    3: "8E 6E 9E 6Q RE 11Q",
+    // L1 v1 with the pickup in eighths and the resolution held for a half.
+    1: "5E 1E 2Q 1HF",
+    // L1 v2 in eighths, with a rest and the flourish moved off the beat.
+    2: "5E 5E 1E 2E 1Q RE 2EF",
+    // L1 v3 in eighths, resolving up onto the octave root instead of home.
+    3: "3E 1E 4E 1Q RE 6Q",
+    // A run up and back down, resolving onto the root.
     4: "2E 3E 4Q 3E 2E 1Q",
   },
 };
@@ -134,7 +164,7 @@ const LEVEL_CHARACTER = {
  * `token` null for a rest.
  */
 function parseToken(word) {
-  const match = /^(R|[1-9]|1[01])([QEH])(F?)$/.exec(word);
+  const match = /^(R|[1-6])([QEH])(F?)$/.exec(word);
   if (!match) throw new Error(`cannot read ${JSON.stringify(word)}`);
   const [, degree, letter, flourish] = match;
   const duration = DURATION[letter];
@@ -249,13 +279,14 @@ const scenario = {
     "from the wings to watch. The higher the level, the bigger the crowd a flourish draws.",
   runTransposition: {
     promptRepresentation: "pentatonic_scale_degree",
-    degreeVocabulary: ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11"],
+    degreeVocabulary: ["p1", "p2", "p3", "p4", "p5", "p6"],
     transposeToRunKey: true,
     nonDiatonicTargetsAllowed: false,
     note:
-      "Eleven pentatonic degrees over two octaves, p6 the middle root. Resolved to diatonic degrees " +
-      "by the run's mode at run time (major 1 2 3 5 6, minor 1 b3 4 5 b7). The timeline is one octave, " +
-      "so p1..p5 are currently shown an octave up (src/music/degrees.ts PENTATONIC_LOW_OCTAVE_FOLDS_UP).",
+      "Six pentatonic degrees, root to root: p1 is the run key's root and p6 the root an octave " +
+      "above it, which is exactly the span the timeline shows. Resolved to diatonic degrees by the " +
+      "run's mode at run time (major 1 2 3 5 6, minor 1 b3 4 5 b7), so the same lick is a different " +
+      "set of lanes in a major key and a minor one and is diatonic in both.",
   },
   classParameters: {
     visualSpanMeasures: 4,
@@ -349,15 +380,15 @@ const scenario = {
     "The canonical catalogue lists Goat Frontman at L2–6. The designer's authoring brief for this scenario specifies L1–4, which wins (AGENTS.md §20); L5–7 are unauthored.",
     "L2 and L4 pick two variants each from the previous library. The picks are fixed here, not rolled per attempt: the game does not procedurally choose exercises. The unpicked variants stay in `variantLibrary`.",
     "The flourish `F` is authored per note (`prompt[].flourish`) and mirrored into `visual.flourishBeats`, which is what the runtime reads. A test keeps the two equal.",
-    "Every note in the low octave (p1..p5) is displayed an octave up while the timeline is one octave. Provisional; the authored file is already correct for a two-octave timeline.",
+    "Every authored note sits inside the timeline's one-octave span, root to root, so nothing is folded, clamped or moved to be drawn. The first draft was written around a middle root with material below it; the two licks that dipped below the root were rewritten rather than displayed an octave up.",
     "The phrase tables and star thresholds are regenerable via scripts/author-goat-frontman.mjs.",
   ],
   designerReview: {
     blockingIssues: [],
     nonBlockingTBD: [
       "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
-      "L1 variant 4 and L3 variant 4 (the low-octave scale figures) are authored but unpicked.",
-      "The low-octave fold changes the contour of the one note below the root in variants 1 and 2. Reverts to the written contour when the timeline shows two octaves.",
+      "L1 variant 4 and L3 variant 4 are authored but unpicked; variant 4 is the only lick in either library that never lands on the root, which is why it is not the one a level repeats.",
+      "The licks resolve to the root rather than around it, because the timeline has no lanes below the root. If it ever spans two octaves, the middle-root versions in this scenario's history are the better material and worth restoring.",
       "Timing windows are the global per-subdivision ones; 'harder timing at higher levels' is carried by the material (eighths, a rest, an off-beat flourish), not by scenario-specific windows.",
     ],
   },
