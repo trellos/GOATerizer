@@ -527,6 +527,48 @@ try {
     `${await dev(page, "perfect/good/miss")} judged, lane/streak ${actorMid}`
   );
   check("the scenario backdrop is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
+  /*
+   * ...and that it actually reaches the screen.
+   *
+   * `canvasHasInk` reads the bitmap, so it passes just as happily when the
+   * backdrop is painted and then covered by something opaque -- which is a
+   * real, reachable state: the whole overlay layout rests on
+   * `#screen-game[data-overlay="true"]` making `.timeline-pane` transparent,
+   * and `.timeline-pane`'s own rule paints it `var(--panel)`. Lose the
+   * attribute and the backdrop is drawn perfectly and seen by nobody, with
+   * every existing check still green.
+   *
+   * The computed background is what binds this. `elementFromPoint` alone does
+   * not: the pane carries `pointer-events: none` in overlay mode, so hit
+   * testing passes straight through an opaque pane to the canvas underneath.
+   * It is kept as the second half because it catches a covering element that
+   * the first half would not think to look at.
+   */
+  check(
+    "the backdrop is visible, not merely painted",
+    await page.evaluate(() => {
+      const screen = document.getElementById("screen-game");
+      const pane = document.querySelector("#screen-game .timeline-pane");
+      const canvas = document.getElementById("scenario-canvas");
+      if (!screen || !pane || !(canvas instanceof HTMLCanvasElement)) return false;
+      if (screen.dataset["overlay"] !== "true") return false;
+
+      // Transparent in every notation a browser might compute it to.
+      const background = getComputedStyle(pane).backgroundColor;
+      if (!/^(transparent$|rgba\(0, 0, 0, 0\)$)/.test(background)) return false;
+
+      // Nothing opaque sitting on top of the backdrop's own area. The dev panel
+      // legitimately covers the right-hand edge, so sample the left two thirds.
+      const box = canvas.getBoundingClientRect();
+      for (let fy = 0.2; fy < 0.9; fy += 0.15) {
+        for (let fx = 0.1; fx < 0.65; fx += 0.15) {
+          const top = document.elementFromPoint(box.x + box.width * fx, box.y + box.height * fy);
+          if (!top || top.id !== "scenario-canvas") return false;
+        }
+      }
+      return true;
+    })
+  );
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
