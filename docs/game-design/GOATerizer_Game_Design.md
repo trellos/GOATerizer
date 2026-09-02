@@ -595,6 +595,26 @@ The screen is vertically organized:
 2. **Scenario strip**
 3. **Timeline**
 
+> **Revised: the timeline *is* the play area** (`DECISION_LOG.md` DECISION-023).
+> The scenario strip is not a third band beside the timeline — it is a backdrop
+> behind it, carrying the background, the scenario label and the three-star
+> meter and nothing else. The characters, props and effects §11.2 lists below
+> live on the note bars, where the note that was hit and the thing that reacted
+> are the same pixels. §11.2's half-previous / full-current / half-next
+> composition assumed the panel was the playfield; the timeline spans the full
+> width now, so each backdrop is the full frame and the neighbours live
+> off-screen until the transition slides them through.
+>
+> **What a scenario may draw there is a contract, not a free hand**
+> (DECISION-043, DECISION-044). A minigame is a registered `MinigameModule`
+> whose only visible output is `render(view) → Stage`: a background over its own
+> measures, sprites, and art for its own note bars. The host computes every note
+> rect and hands it over read-only, so a skin can dress a note but never move,
+> resize or hide one; it washes each note with its outcome colour so
+> upcoming / Perfect / Good / Miss survive any art; and it draws the played-note
+> row and the current-time bar above everything a scenario produces. See
+> `GOATerizer_Minigame_Authoring.md`.
+
 ## 11.1 Top UI Bar
 
 ### Left

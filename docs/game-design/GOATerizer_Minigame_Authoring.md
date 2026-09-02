@@ -35,6 +35,7 @@ interface Minigame {
   onStarEarned(stars: number, beat: number): void;
   onComplete(passed: boolean, stars: number, beat: number): void;
   render(view: StageView): Stage;                    // the only visible output
+  aimAt?(lane: number | null): void;                 // optional: what to lean at
 }
 ```
 
@@ -42,6 +43,11 @@ Every lifecycle method returns `void`. A minigame **cannot** award itself score
 or stars, end an attempt, or move a note — not by convention, by signature. It
 never calls the host, holds no callbacks, and never reads a clock: `beat` is
 always a parameter, and always attempt-relative.
+
+`aimAt` is optional and is the one thing the host volunteers rather than
+reports: the lane the *next* target sits on. At 60bpm there is most of a second
+between quarter notes and an idle actor there is dead air; an actor leaning at
+the next lane doubles as a pointer at the note that is coming.
 
 `render` returns a value, rebuilt each frame:
 
@@ -55,6 +61,16 @@ type Stage = {
 
 All three are optional. A minigame returning `{}` is invisible and the timeline
 renders exactly as the host draws it alone.
+
+> **What is wired today.** `notes` is drawn (DECISION-044). `background` and
+> `sprites` are not yet: the scenario backdrop is still its own canvas behind
+> the timeline, so a background clipped to your `span` would be a second,
+> disagreeing answer about where the art goes, and the two actors are still
+> drawn by `ui/timeline/actor-layer.ts` and `repeat-layer.ts` through a
+> transitional `prototypeLayer()` hook. Return them anyway — the contract is
+> what a new family should be written against, and both are read once the
+> backdrop folds onto the timeline canvas and the crusher's solved arm is baked
+> to a pose ladder.
 
 ---
 
@@ -91,9 +107,9 @@ sprites.push({ key: "goat", assetId: pose, x: note.rect.x + note.rect.w / 2,
 actor here and let the notes come to it — a forehead waiting for cans, a threat
 closing in. Often better than chasing a scrolling bar.
 
-`view.measure.width` and `.beatWidth` give the golden-rectangle geometry, so
-"one beat ahead" is `strikeX + view.measure.beatWidth` rather than a guess at
-scroll speed.
+`view.measure.width` and `.beatWidth` give the measure geometry, so "one beat
+ahead" is `strikeX + view.measure.beatWidth` rather than a guess at scroll
+speed. Scroll speed is the host's and can change; never assume one.
 
 ---
 
@@ -127,23 +143,61 @@ The canonical asset slots in `GOATerizer_Scenario_Asset_Slot_Bindings.md` were
 written for a scenario panel. Here is what each becomes.
 
 ### `ClimbMinigame` — Scale — CLIMB
+Built: `src/scenario/minigames/climb-minigame.ts`.
+
 | Slot | On the timeline |
 |---|---|
 | `background` | the minigame's measures |
 | `climberPoses[]`, `finishPose` | actor, anchored to the note it stands on |
-| `waypointVisuals[]` | **becomes note art.** The bars *are* the footholds |
+| `footholdArt.{body,crag}` | **the note art.** The bars *are* the footholds |
 | `destinationVisual` | a sprite at or past the final note |
 | `stepEffects[]` | effects at the note that was hit |
 
-**`route` waypoint data is deleted.** Authored `startPosition` / `destination` /
-per-waypoint coordinates described positions in a panel that no longer exists.
-The notes supply every coordinate. Do not author routes.
+`footholdArt` is **derived from the scenario id**, not authored:
+`note_<id>_ledge` and `note_<id>_crag`, the same convention the other ten slots
+follow. A new Rocky scenario binds nothing extra to get its ledges, and
+`assetIds()` is where that answer belongs because which art a family needs is
+the family's question. A scenario may still bind `assetBindings.footholdArt`
+explicitly to override it.
+
+The crag is the `underlay` at `scale: 1.55` — wider than the bar on purpose, so
+a run of footholds overlaps into one ridge line — and it is drawn at `0.4`
+opacity ahead of the climber and solid behind, so the ridge fills in as the
+phrase is played and leaves a trace of how far the player got. **None of it
+carries information.**
+
+**`route` waypoint data is validated and then discarded.** Its coordinates
+described positions in a scenario panel that no longer exists and nothing has
+read them since. The one thing they still assert is about the *music* — one
+waypoint per note opportunity — so `parseLevel` checks that and throws if the
+two halves of a scenario have been edited apart. Do not author new routes.
+
+The climb lands on the **target's** lane, never the played pitch: a wrong note
+kills the actor without moving it anywhere. See the next family for why that is
+the interesting half of the contrast.
 
 ### `RepeatMinigame` — Straight Sixteenths — REPEAT
-The cleanest fit of the six. `repeatTarget` and `targetCompletedState` are simply
-the note's `body` before and after it is hit — the can *is* the note. Put
-`performerNeutral`/`performerAction` at `strikeX` and let the row of cans scroll
-into the forehead. `debrisEffects[]` fall with `y > 1`.
+Built: `src/scenario/minigames/repeat-module.ts`.
+
+**This family returns no note art at all**, and that is the point rather than an
+omission. An earlier draft of this brief had `repeatTarget` and
+`targetCompletedState` as the note's `body` before and after it is hit. They are
+not: the can is a *sprite* the performer knocks off the bar, and a can that were
+the bar could not fly, fall, pile up or be visibly missed. The bars stay the
+host's default. Put `performerNeutral`/`performerAction` at `strikeX` and let
+the row of cans scroll into the forehead; `impactEffects[]` fall with `y > 1`.
+
+The rule this family exists to demonstrate, and the reason its `onJudged` is not
+the climb's: **authored pitch places terrain, played pitch places projectiles.**
+A can lands where the player actually played, which is what makes a wrong note
+legible as a wrong note rather than as nothing happening. `Judged` carries both
+— `lane` is what was played, and the target is reachable through
+`opportunityIndex` — so the host never has to choose between them.
+
+`Judged.lane` is a **continuous** coordinate, so a bend can be drawn sliding and
+an off-scale note drawn where it actually was. A can needs a *lane*: anything
+that is not exactly on one has none, and wobbles. Take integers only; do not
+round.
 
 ### `BattleMinigame` — Sixteenth Phrases — BATTLE
 Hero at `strikeX`. The threat **closes in along the timeline** — start it at
@@ -178,19 +232,66 @@ thresholds. `payoffEffects[]` fire from `onStarEarned(3, …)`.
 
 ## 6. Scenario data
 
-A scenario is authored JSON naming a registered minigame. The **host** owns only
-identity, the prompt, the measure count, star thresholds and scoring flags.
-Everything else is yours, opaque to the host and validated by your own parsers:
+A scenario is authored JSON naming a registered minigame. The authored key is
+`"minigameClass"` and it reaches the model as `ScenarioDefinition.minigameId` —
+the old name, kept so existing content still loads, for what is now an **open
+string** resolved through the registry rather than the closed six-way union it
+was. The **host** owns only identity, the prompt, the measure count, star
+thresholds and scoring flags. Everything else is yours, opaque to the host (`config` and `data`
+are `unknown` on the scenario model) and validated by your own parsers:
 
 ```ts
-parseConfig(raw): unknown              // scenario-level: asset slots, parameters
-parseLevel(raw, shape): unknown        // per level; shape = { noteOpportunityCount, measures }
-assetIds(config, levels): string[]     // every asset id you need preloaded
-create(context): Minigame
+interface MinigameModule {
+  readonly id: MinigameId;              // an open string, not a union
+  readonly displayName: string;
+  readonly apiVersion: number;          // must equal MINIGAME_API_VERSION
+
+  parseConfig(raw): unknown;            // scenario-level: asset slots, parameters
+  parseLevel(raw, shape): unknown;      // shape = { noteOpportunityCount, measures }
+  assetIds(config, levels): string[];   // every asset id you need preloaded
+  backgroundId(config): string;         // the scenario-wide backdrop
+  create(context): Minigame;
+  debug?(instance): Record<string, string>;   // rows for the ?dev=1 panel
+}
 ```
 
+`parseLevel` is handed the **whole level object** and decides for itself which
+of it means anything — a climb reads `measurePlan` and `visual.route`, a repeat
+reads only `measurePlan`.
+
+`backgroundId` is distinct from `Stage.background`: this one answers for a
+scenario that is **not being played at all**, the neighbouring panels either
+side of a handover, which have no live instance to ask.
+
+`debug()` is how the dev panel stays family-free. It used to carry one row per
+family printing `—` for whichever was not playing, so a third family meant
+editing the panel; now each family answers for itself and the rows it does not
+own are simply absent.
+
 Both parsers must **throw** on anything they cannot map. Authored data is the
-authority; a bad edit should fail a test, not transpose a note mid-run.
+authority; a bad edit should fail a test, not transpose a note mid-run. Read
+your slots in slot order, so an author fixing bindings top to bottom is told
+about the first one they are missing rather than whichever the parser reached
+first.
+
+## 6a. Registration
+
+```ts
+// src/scenario/registry.ts — the composition root
+registerMinigame(CLIMB_MINIGAME);
+registerMinigame(REPEAT_MINIGAME);
+```
+
+Registration happens at the composition root, which is already the module that
+knows which content this build ships, so `minigame/registry.ts` never imports a
+minigame and the dependency runs one way. The registry refuses a module built
+against a different `apiVersion` rather than letting it fail later inside a
+render call, and refuses a duplicate id rather than letting one package silently
+shadow another. A scenario naming an unregistered minigame throws with the ids
+that *are* available.
+
+Adding a family touches `scenario/registry.ts` and nothing else in the host:
+not `types.ts`, not `load.ts`, not `attempt.ts`, not `game-app.ts`.
 
 ---
 
@@ -204,3 +305,7 @@ authority; a bad edit should fail a test, not transpose a note mid-run.
 - [ ] **What is on screen during a rest, when nothing is being played?**
 - [ ] Which slots need somewhere that is not a note — above the band, below it,
       or at the edges of your own span?
+- [ ] Does a judged note act on **authored** pitch or **played** pitch? Terrain
+      is authored; projectiles are played. Getting this backwards makes a wrong
+      note look like nothing happening.
+- [ ] What does the `?dev=1` panel need to show to debug it? (`debug()`)

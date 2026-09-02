@@ -204,6 +204,23 @@ Examples:
 
 A minigame class must not contain scenario-specific asset names.
 
+**A class is a registered module, and the host does not know which one is
+playing.** A family implements `MinigameModule` (`src/minigame/api.ts`, which
+imports nothing) and is registered at the composition root,
+`src/scenario/registry.ts`. Its scenario `config` and level `data` are `unknown`
+to everything outside it, and it is the module — not the loader, the runtime or
+the renderer — that says what its asset slots are, what a judged note does to
+it, what its backdrop is, and what is drawn on its note bars.
+
+So the rule that gameplay systems stay family-free is now enforced by the type
+system rather than by convention: `scenario/types.ts`, `scenario/load.ts` and
+`game/attempt.ts` have no way to name a climber, a foothold or a can. Adding a
+family touches `src/scenario/registry.ts` and nothing else in the host. Do not
+put a family's rules back into a gameplay system, and do not widen `config` or
+`data` into a union the host can branch on.
+
+See `DECISION_LOG.md` DECISION-043 and `GOATerizer_Minigame_Authoring.md`.
+
 ### Scenarios Own
 
 Data.
@@ -467,6 +484,13 @@ The timeline must clearly communicate:
 - recent history
 
 Do not make a gameplay challenge harder because target information is visually ambiguous.
+
+This is why **the host owns every note rect**. A minigame is handed each note's
+placement read-only and answers with art to draw under, on and over it, so a
+skin can dress a note but never move it in time or pitch, resize it or hide it
+(`DECISION_LOG.md` DECISION-044). Compute a rect once and use it both to draw
+and to hand out: two computations can drift, and a skin anchored to a rect the
+host does not actually draw on is exactly the ambiguity this rule forbids.
 
 Keep one underlying timeline / judgment model however it is presented.
 Key View — eight diatonic pitch lanes, one octave root to root — is the only

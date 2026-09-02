@@ -260,13 +260,27 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 - **Scenario data drives content.** Adding another scenario of a class that
   already exists means a JSON file, art, and one line in
   `src/scenario/registry.ts`.
+- **The host does not know which minigame is playing.** A family is a
+  `MinigameModule` registered at the composition root; its `config` and level
+  `data` are `unknown` to everything outside it, and it is the module that says
+  what its asset slots are, what a judged note does to it, and what is drawn on
+  its note bars. Adding a family touches `src/scenario/registry.ts` and nothing
+  else in the host (`DECISION_LOG.md`, DECISION-043).
+- **The host owns every note rect.** A minigame is handed each note's rect
+  read-only and answers with art to draw under, on and over it, so a skin can
+  dress a note but never move, resize or hide one — a challenge can never be
+  made harder through visual ambiguity (`DECISION_LOG.md`, DECISION-044).
 
 ### Adding a scenario
 
 1. Author `docs/scenarios/<id>/<id>.scenario.json` — supported levels, prompts
    in scale-degree tokens, star thresholds, asset bindings, and whatever else
-   the declared `minigameClass` requires (a climb authors a route; a repeat
-   scenario authors none, and the loader refuses one).
+   the minigame named in `minigameClass` requires. The loader does not know what
+   that is: it resolves the id through the minigame registry and hands the raw
+   JSON to that family's own `parseConfig` / `parseLevel`, which throw on
+   anything they cannot map (`DECISION_LOG.md`, DECISION-043). The authored key
+   is still `minigameClass`; it reaches the model as `ScenarioDefinition.minigameId`,
+   which is an open string rather than the closed union the old name implies.
 2. Drop art in `public/assets/scenarios/<id>/`, and record its provenance in
    `docs/assets/ASSET_SOURCES.md`.
 3. Add one entry to `src/scenario/registry.ts`.
