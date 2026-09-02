@@ -13,6 +13,12 @@
  * here is the *metric* those thresholds are denominated in.
  */
 
+// The only import in this file, and type-only: keying the window table by
+// `NoteDuration` makes a new duration a compile error here rather than an
+// `undefined` window discovered when someone plays the note. `minigame/api.ts`
+// imports nothing, so this cannot cycle.
+import type { NoteDuration } from "../minigame/api.js";
+
 /* -------------------------------------------------------------------------- */
 /* Judgment windows                                                            */
 /* -------------------------------------------------------------------------- */
@@ -73,17 +79,16 @@ export type SubdivisionWindows = {
  */
 export const GOOD_WINDOW_FLOOR_BEATS = 0.5;
 
-export const TIMING_WINDOWS_BEATS: {
-  whole: SubdivisionWindows;
-  half: SubdivisionWindows;
-  quarter: SubdivisionWindows;
-  eighth: SubdivisionWindows;
-  sixteenth: SubdivisionWindows;
-} = {
+export const TIMING_WINDOWS_BEATS: Readonly<Record<NoteDuration, SubdivisionWindows>> = {
   whole: { perfect: 0.22, good: 0.5 },
   half: { perfect: 0.2, good: 0.5 },
   quarter: { perfect: 0.18, good: 0.5 },
   eighth: { perfect: 0.11, good: 0.25 },
+  // Interpolated between its neighbours in length rather than measured: a third
+  // of a beat sits between an eighth and a sixteenth, and so does 0.08. The row
+  // most likely to want retuning by ear, because it is also the subdivision
+  // Tuninator is least accurate on (~94-124ms published onset error).
+  eighthTriplet: { perfect: 0.08, good: 1 / 6 },
   sixteenth: { perfect: 0.06, good: 0.125 },
 };
 
