@@ -39,7 +39,7 @@ sixteenth and triplet patterns are built, tested and unheard; one scenario
 authored in each would light them up. Note the content rule the loader test
 enforces: a level must not test both.
 
-**Half closed, 2026-09-02 (DECISION-046).** Butt-Butt-BONK authors triplets at
+**Half closed, 2026-09-02 (DECISION-048).** Butt-Butt-BONK authors triplets at
 L1-6, so the triplet variant is now selected by real content and
 `tests/subdivisions.test.ts` asserts it comes from exactly one scenario. The
 **sixteenth** variant is still unheard: nothing authors a sixteenth, and the
@@ -227,7 +227,7 @@ as a fighting hero, not a climber — and the quadruped the Rocky swap actually
 wants is Sevarihk's Mountain Goat pack, at the cost of CC-BY attribution
 instead of CC0.
 
-Both sit behind `docs/game-design/PROPOSED_Next_Families.md` (DECISION-045),
+Both sit behind `docs/game-design/PROPOSED_Next_Families.md` (DECISION-047),
 which is where the re-verification was done and where the full provenance table
 lives.
 

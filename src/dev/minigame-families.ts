@@ -13,8 +13,8 @@
  */
 
 import { DIFFICULTY_SEQUENCE, type RunSlot } from "../game/run.js";
-import { scenariosForDifficulty } from "../scenario/registry.js";
-import type { MinigameClassId, ScenarioDefinition } from "../scenario/types.js";
+import { scenariosForDifficulty, SCENARIOS } from "../scenario/registry.js";
+import type { MinigameId, ScenarioDefinition } from "../scenario/types.js";
 
 /**
  * The six permanent minigame families (`AGENTS.md` §1, GDD §1.2), fixed
@@ -23,7 +23,7 @@ import type { MinigameClassId, ScenarioDefinition } from "../scenario/types.js";
  * a row in the table, entirely blank, because the table describes the game's
  * structure rather than today's content.
  */
-export const MINIGAME_FAMILIES: readonly { family: string; minigameClass: MinigameClassId }[] = [
+export const MINIGAME_FAMILIES: readonly { family: string; minigameClass: MinigameId }[] = [
   { family: "Scale", minigameClass: "ClimbMinigame" },
   { family: "Blues Lick", minigameClass: "PerformMinigame" },
   { family: "Scale Run", minigameClass: "TraverseMinigame" },
@@ -38,14 +38,20 @@ export const MINIGAME_DIFFICULTY_LEVELS: readonly number[] = Array.from(
   (_, index) => index + 1
 );
 
-/** Identifies one table cell. Family names never contain `|`. */
-export function cellKey(family: string, level: number): string {
-  return `${family}|${level}`;
+/**
+ * Every registered scenario belonging to `family`, in registry order — one
+ * dev-panel row each. A family with more than one (Rocky Ascent and Rocky
+ * Ascent High both author "Scale") used to share a single row and a single
+ * table cell per level, so pinning or disabling one meant *all* of them at
+ * that level — the table could not actually name which variant it meant.
+ */
+export function scenariosForFamily(family: string): readonly ScenarioDefinition[] {
+  return SCENARIOS.filter((scenario) => scenario.family === family);
 }
 
-/** Whether any registered scenario authors `family` at `level` — blank otherwise. */
-export function familyHasLevel(family: string, level: number): boolean {
-  return scenariosForDifficulty(level).some((scenario) => scenario.family === family);
+/** Identifies one table cell: one scenario variant at one difficulty. Scenario ids never contain `|`. */
+export function cellKey(scenarioId: string, level: number): string {
+  return `${scenarioId}|${level}`;
 }
 
 export type MinigameOverrideState = {
@@ -54,7 +60,7 @@ export type MinigameOverrideState = {
   /** The sticky difficulty selected at the top of the table, or none. */
   targetDifficulty: number | null;
   /** The one-shot pin from a double-click, consumed by the next resolution. */
-  pendingPin: { family: string; difficulty: number } | null;
+  pendingPin: { scenarioId: string; difficulty: number } | null;
 };
 
 export type MinigameResolution = {
@@ -72,13 +78,17 @@ export type MinigameResolution = {
  * table for behaves exactly as before.
  *
  * A pin takes priority over the sticky target difficulty; either forces a
- * difficulty and re-rolls the scenario for it. With neither active, the slot
- * is still re-rolled if its own current pick has since been disabled — a
- * developer unhighlighting a cell mid-run should not require also touching
- * the other two controls to see an effect. `random` is a seam for tests;
- * production leaves it as `Math.random`, consistent with the un-seeded random
- * selection `fillSlots` itself uses (`src/dev/auto-performance.ts` is the one
- * seeded exception, and for a reason specific to replayable autoplay).
+ * difficulty and re-rolls the scenario for it. A pin names one exact scenario
+ * id, so — unlike the sticky difficulty column, which still rolls among
+ * whichever variants of whichever families are left eligible — it is
+ * deterministic: the named scenario if it is eligible, otherwise nothing.
+ * With neither active, the slot is still re-rolled if its own current pick
+ * has since been disabled — a developer unhighlighting a cell mid-run should
+ * not require also touching the other two controls to see an effect.
+ * `random` is a seam for tests; production leaves it as `Math.random`,
+ * consistent with the un-seeded random selection `fillSlots` itself uses
+ * (`src/dev/auto-performance.ts` is the one seeded exception, and for a
+ * reason specific to replayable autoplay).
  */
 export function resolveMinigameOverride(
   slot: Pick<RunSlot, "difficulty" | "scenario">,
@@ -87,19 +97,18 @@ export function resolveMinigameOverride(
 ): MinigameResolution | null {
   const pin = state.pendingPin;
   const forcedDifficulty = pin ? pin.difficulty : state.targetDifficulty;
-  const familyFilter = pin ? pin.family : null;
+  const scenarioFilter = pin ? pin.scenarioId : null;
 
   const currentPickDisabled =
-    slot.scenario !== null &&
-    state.disabledCells.has(cellKey(slot.scenario.family, slot.difficulty));
+    slot.scenario !== null && state.disabledCells.has(cellKey(slot.scenario.id, slot.difficulty));
 
   if (forcedDifficulty === null && !currentPickDisabled) return null;
 
   const difficulty = forcedDifficulty ?? slot.difficulty;
   const eligible = scenariosForDifficulty(difficulty).filter(
     (scenario) =>
-      !state.disabledCells.has(cellKey(scenario.family, difficulty)) &&
-      (familyFilter === null || scenario.family === familyFilter)
+      !state.disabledCells.has(cellKey(scenario.id, difficulty)) &&
+      (scenarioFilter === null || scenario.id === scenarioFilter)
   );
   const scenario = eligible.length > 0 ? (eligible[Math.floor(random() * eligible.length)] ?? null) : null;
 

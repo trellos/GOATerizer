@@ -224,7 +224,7 @@ function parseStars(raw: unknown, where: string): StarThresholds {
 function parseLevel(
   raw: unknown,
   where: string,
-  parseMinigameData: (visual: unknown, shape: { noteOpportunityCount: number; measures: number }) => unknown
+  parseMinigameData: (levelData: unknown, shape: { noteOpportunityCount: number; measures: number }) => unknown
 ): ScenarioLevelData {
   const level = obj(raw, where);
   const measurePlan = parseMeasurePlan(level["measurePlan"], `${where}.measurePlan`);
@@ -287,8 +287,8 @@ export function loadScenario(
     if (entry === undefined) {
       throw new ScenarioDataError("scenario.levels", `level ${level} is supported but absent`);
     }
-    const parsed = parseLevel(entry, `scenario.levels.${level}`, (visual, shape) =>
-      minigame.parseLevel(visual, shape)
+    const parsed = parseLevel(entry, `scenario.levels.${level}`, (levelData, shape) =>
+      minigame.parseLevel(levelData, shape)
     );
     if (parsed.difficulty !== level) {
       throw new ScenarioDataError(

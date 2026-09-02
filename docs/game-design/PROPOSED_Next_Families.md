@@ -9,7 +9,7 @@
 > the triplet slot was filled by **Butt-Butt-BONK** — triplets against a wolf, by
 > moonlight — rather than Hop-Hop-LEAP, on the designer's instruction. It uses
 > the same two asset packs entry 2 names below, plus the backdrop from entry 3
-> recoloured to night. See `DECISION-046` and
+> recoloured to night. See `DECISION-048` and
 > `docs/scenarios/butt-butt-bonk/`. The four entries below that are not built
 > stand as written.
 >
