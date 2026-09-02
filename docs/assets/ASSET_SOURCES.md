@@ -453,6 +453,53 @@ averaging filter before shipping — the renderer disables image smoothing, so a
 high-resolution source scaled down at render time will look like noise rather
 than crisp pixel art.
 
+## Butt-Butt-BONK — third-party art (CURRENT)
+
+**The first scenario whose every slot is third-party art.** Goat Frontman above
+landed first and ships two real assets among sixteen; this one has no generated
+placeholder in it at all. The source sheets are vendored under `art-sources/`
+(see its README) and cut into
+one static billboard per slot by `scripts/import-scenario-art.mjs`
+(`npm run art:import`). Nothing is fetched at build time; nothing is hotlinked
+at runtime; the run is deterministic, so re-running it produces an empty diff.
+
+| Asset id | Slot | Derived from | Author | Licence |
+|---|---|---|---|---|
+| `bg_butt_butt_bonk` | `background` | all 8 parallax layers flattened, recoloured to moonlight, upscaled 3x, cropped to 384x216, moon drawn on | DustDFG | CC0 |
+| `goat_butt_butt_bonk_step_1` | `stepAPoseOrEffect` | `bergschaf-laufanimation-m.png`, right-facing row, frame 1 | Sevarihk | CC-BY 4.0 |
+| `goat_butt_butt_bonk_step_2` | `stepBPoseOrEffect` | same sheet, frame 3 | Sevarihk | CC-BY 4.0 |
+| `goat_butt_butt_bonk_step_3` | `stepCPoseOrEffect` | `bergschaf-bocksprung-m.png` (*bocksprung* — a goat's leap), frame 2 | Sevarihk | CC-BY 4.0 |
+| `goat_butt_butt_bonk_step_3_alt` | `alternateStepC[]` | same sheet, frame 4 | Sevarihk | CC-BY 4.0 |
+| `goat_butt_butt_bonk_finish` | `finishPose` | `bergschaf-grasend-m.png`, frame 1 | Sevarihk | CC-BY 4.0 |
+| `prop_butt_butt_bonk_target` | `targetVisuals[0]` | `wolf_run.png` frame 3, teal keyed out, mirrored to face the ram | alizard | CC0 |
+| `prop_butt_butt_bonk_target_hit` | `targetVisuals[1]` | `wolf_sit.png` frame 4, same treatment — a wolf that sits down is the catalogue's "humiliated" state, already drawn | alizard | CC0 |
+| `fx_butt_butt_bonk_hit_small` | `minorStepEffects[]` | `10_weaponhit`, an early cell of the expanding ring | CodeManu | CC0 |
+| `fx_butt_butt_bonk_hit_big` | `majorStepEffects[]` | `10_weaponhit`, a late cell of the same ring | CodeManu | CC0 |
+| `fx_butt_butt_bonk_accent` | `groupEffects[]` | `5_magickahit` at its tallest | CodeManu | CC0 |
+
+**Attribution is now a licence obligation, not only a courtesy.** Sevarihk's
+Mountain Goat Sprites is **CC-BY 4.0** and carries a copyright/attribution
+notice; every other pack used here is CC0. Credit Sevarihk wherever this
+scenario's art is shown.
+
+- **Sources:** `art-sources/sevarihk-mountain-goat/`,
+  `art-sources/alizard-pixel-wolf/`, `art-sources/dustdfg-mountains-parallax/`,
+  `art-sources/codemanu-pixel-effects/`.
+- **Verified:** 2026-09-02, from the build container — licence page read, files
+  downloaded, frame layouts measured, sprites inspected.
+
+### Two things worth knowing before reusing these sheets
+
+- **alizard's wolf has an opaque background, not alpha.** Its teal is
+  `rgb(12, 98, 98)` and has to be keyed out; `keyColour` does it at import and
+  drops 88% of the pixels to alpha 0 cleanly. A sheet's transparency is worth
+  checking rather than assuming.
+- **The parallax pack is a daytime scene.** The night palette is a recolour
+  applied at import (`night()` in `scripts/lib/external-art.mjs`), and the moon
+  is drawn rather than found. CC0 permits the derivative outright, and the pack
+  also ships its Aseprite source if a hand-authored night palette is wanted
+  later.
+
 ---
 
 ## Rules for any future asset

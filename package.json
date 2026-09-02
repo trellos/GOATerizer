@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "validate:browser": "node scripts/browser-validate.mjs",
     "shoot:actors": "node scripts/shoot-actors.mjs",
-    "art": "node scripts/generate-placeholder-art.mjs"
+    "art": "node scripts/generate-placeholder-art.mjs",
+    "art:import": "node scripts/import-scenario-art.mjs"
   },
   "dependencies": {
     "tuninator": "file:../Tuninator"

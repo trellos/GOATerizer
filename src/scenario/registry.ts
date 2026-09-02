@@ -14,6 +14,8 @@ import { registerMinigame } from "../minigame/registry.js";
 import { climbNoteArtIds, CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
 import { PERFORM_MINIGAME } from "./minigames/perform-minigame.js";
 import { REPEAT_MINIGAME } from "./minigames/repeat-module.js";
+import { THREE_STEP_MINIGAME } from "./minigames/three-step-minigame.js";
+import buttButtBonkJson from "../../docs/scenarios/butt-butt-bonk/butt_butt_bonk.scenario.json";
 import canCrushingJson from "../../docs/scenarios/can-crushing/can_crushing.scenario.json";
 import goatFrontmanJson from "../../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
@@ -41,6 +43,7 @@ const BASE_URL: string = import.meta.env?.BASE_URL ?? "/";
 registerMinigame(CLIMB_MINIGAME);
 registerMinigame(REPEAT_MINIGAME);
 registerMinigame(PERFORM_MINIGAME);
+registerMinigame(THREE_STEP_MINIGAME);
 
 /**
  * Placeholder art lives in the project's own asset tree, never hotlinked.
@@ -164,6 +167,44 @@ export const GOAT_FRONTMAN: ScenarioDefinition = loadScenario(
   assetUrls("goat-frontman", GOAT_FRONTMAN_ASSET_IDS)
 );
 
+/**
+ * The `ThreeStepMinigame` slots. Spelled out rather than templated, like Can
+ * Crushing's and for the same reason: these follow the catalogue's naming
+ * (`goat_`, `prop_`, `fx_`) rather than being a function of the scenario id.
+ *
+ * `targetVisuals` binds two ids where the catalogue lists one. That is not an
+ * invented slot — the array is the catalogue's — and the second state is what
+ * makes a headbutt land: [0] is the wolf standing, [1] the wolf sitting down.
+ */
+const BUTT_BUTT_BONK_ASSET_IDS: readonly string[] = [
+  "bg_butt_butt_bonk",
+  "goat_butt_butt_bonk_step_1",
+  "goat_butt_butt_bonk_step_2",
+  "goat_butt_butt_bonk_step_3",
+  "goat_butt_butt_bonk_step_3_alt",
+  "goat_butt_butt_bonk_finish",
+  "prop_butt_butt_bonk_target",
+  "prop_butt_butt_bonk_target_hit",
+  "fx_butt_butt_bonk_hit_small",
+  "fx_butt_butt_bonk_hit_big",
+  "fx_butt_butt_bonk_accent",
+];
+
+/**
+ * The one `ThreeStepMinigame` scenario: two horn taps and a headbutt, delivered
+ * to a wolf by moonlight.
+ *
+ * The first scenario with no generated placeholder in it at all — every slot is
+ * third-party art, vendored under `art-sources/` and cut down by
+ * `scripts/import-scenario-art.mjs` (see `docs/assets/ASSET_SOURCES.md`). It is
+ * also the first authored triplet content in the game, so it is the first thing
+ * that selects the drum kit's triplet rhythm variant.
+ */
+export const BUTT_BUTT_BONK: ScenarioDefinition = loadScenario(
+  buttButtBonkJson,
+  assetUrls("butt-butt-bonk", BUTT_BUTT_BONK_ASSET_IDS)
+);
+
 export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_ASCENT,
   ROCKY_ASCENT_HIGH,
@@ -171,6 +212,7 @@ export const SCENARIOS: readonly ScenarioDefinition[] = [
   ROCKY_DESCENT_HIGH,
   CAN_CRUSHING,
   GOAT_FRONTMAN,
+  BUTT_BUTT_BONK,
 ];
 
 export function scenarioById(id: string): ScenarioDefinition | undefined {

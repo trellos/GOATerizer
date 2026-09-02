@@ -23,6 +23,7 @@ import { ATTEMPT_REPEATS, JUDGMENT_POINTS } from "../src/config/tuning.js";
 import { formatDegreeToken, laneIndexOf, LANE_COUNT, resolveDegree } from "../src/music/degrees.js";
 import { loadScenario } from "../src/scenario/load.js";
 import {
+  BUTT_BUTT_BONK,
   CAN_CRUSHING,
   GOAT_FRONTMAN,
   ROCKY_ASCENT,
@@ -35,16 +36,19 @@ import {
 } from "../src/scenario/registry.js";
 
 describe("scenario registry", () => {
-  it("holds the four Rocky-family climbs, the one repeat scenario and the one performance", () => {
-    expect(SCENARIOS).toHaveLength(6);
+  it("holds the four Rocky climbs, one repeat, one performance and one three-step", () => {
+    expect(SCENARIOS).toHaveLength(7);
     for (const scenario of SCENARIOS) {
       if (scenario === CAN_CRUSHING || scenario === GOAT_FRONTMAN) continue;
+      if (scenario === BUTT_BUTT_BONK) continue;
       expect(scenario.minigameId).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
     expect(CAN_CRUSHING.minigameId).toBe("RepeatMinigame");
     expect(GOAT_FRONTMAN.minigameId).toBe("PerformMinigame");
     expect(GOAT_FRONTMAN.family).toBe("Blues Lick");
+    expect(BUTT_BUTT_BONK.minigameId).toBe("ThreeStepMinigame");
+    expect(BUTT_BUTT_BONK.family).toBe("Triplets");
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
       new Set([
         "rocky_ascent",
@@ -53,7 +57,16 @@ describe("scenario registry", () => {
         "rocky_descent_high",
         "can_crushing",
         "goat_frontman",
+        "butt_butt_bonk",
       ])
+    );
+  });
+
+  it("covers four of the six families, leaving TRAVERSE and BATTLE empty", () => {
+    // The registry is the honest answer to "which families does this build
+    // ship". Two remain: TRAVERSE (Scale Run) and BATTLE (Sixteenth Phrases).
+    expect(new Set(SCENARIOS.map((s) => s.minigameId))).toEqual(
+      new Set(["ClimbMinigame", "RepeatMinigame", "PerformMinigame", "ThreeStepMinigame"])
     );
   });
 

@@ -79,17 +79,17 @@ describe("the shipped scenarios' grids", () => {
     expect([...subdivisionsOf(ROCKY_ASCENT.levels.get(4)!.prompt)]).toEqual(["eighth"]);
   });
 
-  it("authors nothing off the binary grid yet, so the triplet feel stays unused", () => {
-    // Not an assertion that triplets are unsupported — the variant is live and
-    // unit-tested in `drum-intensity.test.ts`. This pins that no shipped
-    // scenario selects it, so a future triplet exercise shows up as a
-    // deliberate change here.
+  it("selects the triplet feel from exactly one scenario, and nothing else", () => {
+    // This used to assert that NO shipped scenario reached the triplet variant,
+    // and said a future triplet exercise should show up here as a deliberate
+    // change. Butt-Butt-BONK is that change: the variant was built, unit-tested
+    // and never heard because nothing authored a triplet.
     for (const scenario of SCENARIOS) {
       for (const [difficulty, level] of scenario.levels) {
         expect(
           subdivisionsOf(level.prompt).has("triplet"),
           `${scenario.id} L${difficulty}`
-        ).toBe(false);
+        ).toBe(scenario.id === "butt_butt_bonk");
       }
     }
     expect(subdivisionsOf(ROCKY_ASCENT_HIGH.levels.get(6)!.prompt).has("eighth")).toBe(true);
