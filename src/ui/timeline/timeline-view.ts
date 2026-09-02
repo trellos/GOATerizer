@@ -29,8 +29,10 @@ import type { Fingering } from "../../music/fingering.js";
 import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
+import type { NoteArt, PlacedNote, Stage, StageView } from "../../minigame/api.js";
 import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
+import type { AssetStore } from "../assets.js";
 import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
 import { drawRepeatPerformer, NO_REPEAT_SPRITES, type RepeatSprites } from "./repeat-layer.js";
 import type {
@@ -40,8 +42,29 @@ import type {
   TimelineSnapshot,
 } from "./timeline-model.js";
 
+/**
+ * Resolves the skin for one attempt's target notes.
+ *
+ * Keyed by attempt because two are on the timeline at once around a transition:
+ * the outgoing scenario's notes scroll out to the left while the incoming one's
+ * scroll in from the right, so each is skinned by the minigame that owns it and
+ * they never contend for the same pixels.
+ *
+ * Returning `null` — which is also what happens when no source is installed at
+ * all — gives the host's default look.
+ */
+export type StageSource = (attemptKey: string, view: StageView) => Stage | null;
+
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
+
+/**
+ * How strongly a skinned note is washed with its own colour.
+ *
+ * Enough that upcoming, Perfect, Good and Miss stay tellable apart across any
+ * art a scenario supplies; light enough that the art still reads under it.
+ */
+const JUDGMENT_WASH = 0.62;
 
 /**
  * How much of an overlay canvas the eight lanes occupy, centred vertically.
@@ -152,6 +175,8 @@ export class TimelineView {
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
+  #assets: AssetStore | null = null;
+  #stageFor: StageSource | null = null;
   #width = 0;
   #height = 0;
 
@@ -222,6 +247,17 @@ export class TimelineView {
   /** Pregame shows the physical shape; the run shows scale degrees. */
   setShowFingeringLabels(show: boolean): void {
     this.#showFingeringLabels = show;
+  }
+
+  /**
+   * Installs per-minigame note art. Without this every note gets the default.
+   *
+   * The pregame timeline never sets one: there is no attempt yet, so there is
+   * nothing whose look a scenario could own.
+   */
+  setStageSource(assets: AssetStore | null, stageFor: StageSource | null): void {
+    this.#assets = assets;
+    this.#stageFor = stageFor;
   }
 
   /* ------------------------------------------------------------------ */
@@ -341,15 +377,119 @@ export class TimelineView {
     }
 
     const snapshot = model.snapshot(nowBeat, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
+    // Asked once per frame, before anything is drawn: a minigame answers with
+    // art for every note of its own attempt at once, so two attempts sharing
+    // the timeline across a transition cannot see each other's rects.
+    const stages = this.#resolveStages(model, nowBeat);
 
     this.#drawBeatGrid(nowBeat);
     this.#drawRows();
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
-    for (const note of snapshot.targets) this.#drawTarget(note, nowBeat);
+    for (const note of snapshot.targets) {
+      this.#drawTarget(note, nowBeat, stages.get(note.attemptKey)?.notes?.get(note.id));
+    }
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawActor(snapshot, nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
+  }
+
+  /**
+   * Places every visible target, then asks each attempt's minigame what it
+   * wants drawn on its own notes.
+   *
+   * Placement is entirely the host's: a minigame receives rects it cannot
+   * change, so a skin can never move a note in time or pitch, resize it, or
+   * make a challenge harder through visual ambiguity (`AGENTS.md` §12).
+   *
+   * `Stage.background` is deliberately not read here yet. The scenario backdrop
+   * is still its own canvas behind this one, so a background clipped to
+   * `span` would be a second, disagreeing answer to where the art goes; that
+   * seam closes when the backdrop folds onto this canvas.
+   */
+  #resolveStages(model: TimelineModel, nowBeat: number): Map<string, Stage> {
+    const resolved = new Map<string, Stage>();
+    const stageFor = this.#stageFor;
+    if (!stageFor) return resolved;
+
+    const band = this.#bandHeight;
+    const top = this.#bandTop;
+    for (const attemptKey of model.attemptKeys) {
+      const targets = model.targetsFor(attemptKey);
+      const first = targets[0];
+      const last = targets[targets.length - 1];
+      if (!first || !last) continue;
+
+      // EVERY note of the attempt, not just the visible ones: an actor anchored
+      // to a note needs a coordinate after that note has scrolled off, or a
+      // climber loses its footing at the left edge.
+      const placed: PlacedNote[] = targets.map((note) => {
+        const rect = this.#targetRect(note, nowBeat);
+        return {
+          id: note.id,
+          opportunityIndex: note.opportunityIndex,
+          lane: note.lane,
+          duration: note.duration,
+          outcome: note.outcome,
+          // Normalised to the PLAYFIELD across and the LANE BAND down, so a
+          // note's rect and a sprite's y are in the same space and an actor can
+          // stand on a bar. Both may leave 0..1; only the playfield clips.
+          rect: {
+            x: (rect.x - this.#playLeft) / this.#playWidth,
+            y: (rect.y - top) / band,
+            w: rect.w / this.#playWidth,
+            h: rect.h / band,
+          },
+          beatsUntilStrike: note.startBeat - nowBeat,
+        };
+      });
+
+      // The attempt's own measures, rounded out to measure lines, which is what
+      // lets two backgrounds meet on one rather than overlap mid-bar.
+      const fromBeat = Math.floor(first.startBeat / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const toBeat =
+        Math.ceil((last.startBeat + last.durationBeats) / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const measureWidth = (BEATS_PER_MEASURE * this.#pixelsPerBeat) / this.#playWidth;
+
+      const stage = stageFor(attemptKey, {
+        beat: nowBeat - model.attemptStartBeat(attemptKey),
+        notes: placed,
+        laneCount: LANE_COUNT,
+        strikeX: (this.#strikeX - this.#playLeft) / this.#playWidth,
+        span: {
+          from: (this.#x(fromBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+          to: (this.#x(toBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+        },
+        measure: { width: measureWidth, beatWidth: measureWidth / BEATS_PER_MEASURE },
+      });
+      if (stage) resolved.set(attemptKey, stage);
+    }
+    return resolved;
+  }
+
+  /**
+   * A skin's `underlay` or `overlay`: natural proportions, centred on the
+   * note's rect, free to bleed outside it.
+   *
+   * `scale` 1 means "as tall as a row", so a glow at 1.6 spills into the rows
+   * above and below by design. Only the playfield clips it, which is what keeps
+   * ornament off the gutter labels.
+   */
+  #drawNoteArt(
+    art: { assetId: string; scale?: number; opacity?: number },
+    x: number,
+    y: number,
+    width: number
+  ): void {
+    const image = this.#assets?.get(art.assetId);
+    if (!image) return;
+    const ctx = this.#ctx;
+    const h = this.#rowHeight * (art.scale ?? 1);
+    const w = image.width * (h / image.height);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1));
+    ctx.drawImage(image, x + width / 2 - w / 2, y - h / 2, w, h);
+    ctx.restore();
   }
 
   /**
@@ -645,26 +785,77 @@ export class TimelineView {
    * the body stretches to the rect exactly, so duration stays honest whatever
    * is drawn over and under it.
    */
-  #drawTarget(note: TargetNote, nowBeat: number): void {
+  /**
+   * Where one target's bar goes, in canvas pixels.
+   *
+   * Computed once and used twice — to draw the bar, and as the rect handed to
+   * the minigame. Two computations could drift, and a skin anchored to a rect
+   * the host does not actually draw on is exactly the visual ambiguity the
+   * host-owned-geometry rule exists to prevent.
+   */
+  #targetRect(note: TargetNote, nowBeat: number): { x: number; y: number; w: number; h: number } {
+    const h = this.#noteHeight;
+    return {
+      x: this.#x(note.startBeat, nowBeat),
+      y: this.#rowY(note.lane) - h / 2,
+      w: Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2),
+      h,
+    };
+  }
+
+  #drawTarget(note: TargetNote, nowBeat: number, art?: NoteArt): void {
     const ctx = this.#ctx;
-    const x = this.#x(note.startBeat, nowBeat);
-    const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
-    const height = this.#noteHeight;
-    const y = this.#rowY(note.lane);
+    const rect = this.#targetRect(note, nowBeat);
+    const { x, w: width, h: height } = rect;
+    // The vertical centre of the row, which is what the art slots are centred
+    // on — a crag wider than its bar hangs off both ends of it symmetrically.
+    const y = rect.y + height / 2;
     const colour = this.#outcomeColour(note);
 
     ctx.save();
+    // The one clip a skin cannot escape. Ornament may bleed past the note as
+    // far as it likes and still never reach the gutter labels.
     this.#clipPlayfield();
 
-    ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
-    ctx.fillStyle = colour;
-    this.#roundRect(x, y - height / 2, width, height, 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
-    ctx.lineWidth = 1;
-    this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
-    ctx.stroke();
+    if (art?.underlay) this.#drawNoteArt(art.underlay, x, y, width);
+
+    const body = art?.body ? this.#assets?.get(art.body.assetId) : null;
+    if (body) {
+      // Stretched to the rect exactly, so note duration stays honest whatever
+      // is drawn around it.
+      ctx.save();
+      ctx.globalAlpha =
+        Math.max(0, Math.min(1, art?.body?.opacity ?? 1)) * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.drawImage(body, x, rect.y, width, height);
+      ctx.restore();
+    } else {
+      ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
+      ctx.fillStyle = colour;
+      this.#roundRect(x, rect.y, width, height, 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
+      ctx.lineWidth = 1;
+      this.#roundRect(x + 0.5, rect.y + 0.5, width - 1, height - 1, 2);
+      ctx.stroke();
+    }
+
+    // The colour language survives any skin.
+    //
+    // Applied whether or not the note has been judged, because "an upcoming
+    // target" is a state the player reads at a glance too — a skin that turned
+    // every note to stone and left only the judged ones coloured would make the
+    // thing you are about to play the *least* visible object on the timeline.
+    // A minigame that wants full control supplies an opaque body per outcome
+    // and paints over this.
+    if (body) {
+      ctx.globalAlpha = JUDGMENT_WASH * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.fillStyle = colour;
+      ctx.fillRect(x, rect.y, width, height);
+      ctx.globalAlpha = 1;
+    }
+
+    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
 
     ctx.restore();
   }

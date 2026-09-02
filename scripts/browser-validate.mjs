@@ -341,6 +341,45 @@ async function canvasBox(page, id) {
   }, id);
 }
 
+/**
+ * How many pixels of a scenario's note art reached the timeline canvas.
+ *
+ * The probe is the moss green in Rocky's crag sprite. Nothing else on this
+ * timeline is green: the note colours are cyan and gold, the bass and grid are
+ * blue-grey, and the labels are neutral. It tests *greenness* rather than
+ * nearness to one RGB triple, because an antialiased grey label pixel lands
+ * close to the moss triple by distance while never being green at all. The
+ * Good-note colour is green, but a flawless autoplay never produces one.
+ *
+ * Counting a colour says exactly where the art did and did not reach, and
+ * unlike hashing a strip of pixels it does not care that the timeline is
+ * scrolling the whole time.
+ *
+ * `region` is "gutter" for the labels down the left, or "notes" for everything
+ * right of them.
+ */
+async function countNoteArt(page, region) {
+  return page.evaluate((where) => {
+    const canvas = document.getElementById("game-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return -1;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return -1;
+    // The gutter is at most 30% of the width; 15% is safely inside it.
+    const gutter = Math.round(canvas.width * 0.15);
+    const x = where === "gutter" ? 0 : gutter;
+    const w = where === "gutter" ? gutter : canvas.width - gutter;
+    const { data } = ctx.getImageData(x, 0, w, canvas.height);
+    let moss = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (g - r > 12 && g - b > 20 && g > 95 && g < 165) moss += 1;
+    }
+    return moss;
+  }, region);
+}
+
 /** True when the canvas has drawn anything other than its ground colour. */
 async function canvasHasInk(page, id) {
   return page.evaluate((canvasId) => {
@@ -585,6 +624,33 @@ try {
    * the first half would not think to look at.
    */
   check("the backdrop is visible, not merely painted", await backdropIsVisible(page));
+
+  /*
+   * The scenario's note art, and the two properties that make skinning safe.
+   *
+   * Deliberately not `canvasHasInk`: the host inks this canvas — grid, lanes,
+   * notes, gutter — whether or not a minigame draws a single pixel, so that
+   * would pass over a dead seam. It did: the contract sat in the tree for
+   * fifteen commits with nothing calling `render()` and every check still
+   * green.
+   *
+   * The control is Can Crushing, below, which returns no note art at all and
+   * must therefore count zero. Two families, one product difference — a
+   * stronger differential than a debug toggle, because it is the shipped
+   * behaviour being compared.
+   */
+  const artOnNotes = await countNoteArt(page, "notes");
+  const artInGutter = await countNoteArt(page, "gutter");
+  check(
+    "the scenario's note art actually reaches the timeline",
+    artOnNotes > 0,
+    `${artOnNotes} px of scenario art`
+  );
+  check(
+    "note art never reaches the gutter, however far it bleeds past a note",
+    artInGutter === 0,
+    `${artInGutter} px in the gutter`
+  );
   /*
    * The lane geometry the canvas drew and the layout the stylesheet applied,
    * agreeing.
@@ -716,6 +782,27 @@ try {
       Number((crushed ?? "0/0").split("/")[0]) >= 4 &&
         Number((crushed ?? "0/0").split("/")[1]) === 0,
       `crushed/missed ${crushed}`
+    );
+
+    /*
+     * The control for Rocky's note art, and it has to be measured HERE.
+     *
+     * This family returns no note art — the can IS the note, and it is a sprite
+     * knocked off the bar rather than paint on it — so its bars are the host's
+     * default and the green probe finds nothing. A skin leaking across families
+     * would show up here and nowhere else.
+     *
+     * Measured under the flawless tier, exactly as Rocky's is. The Good-note
+     * colour is green; at full strength it is too bright for the probe, but
+     * dimmed by the judgment wash it lands squarely inside it. Reading this
+     * after the 25% tier below therefore counts a handful of Good notes as
+     * scenario art — which it did, at five pixels, until this moved up here.
+     */
+    const crusherArt = await countNoteArt(crush, "notes");
+    check(
+      "a family that skins nothing gets the host's default bars",
+      crusherArt === 0,
+      `${crusherArt} px of note art on a scenario that asks for none`
     );
 
     // The 25% tier fumbles most of its notes as audible wrong pitches, which

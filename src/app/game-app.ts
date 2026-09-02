@@ -355,6 +355,25 @@ export class GameApp {
       this.#setup.key,
       this.#overlayTimeline
     );
+    /*
+     * The note-art seam, and the last thing the host decides about a look.
+     *
+     * Placement stays here — the view computes every rect and the minigame is
+     * handed them read-only — so a skin can dress a note but never move, resize
+     * or hide one. Which attempt is asked is decided by its timeline key rather
+     * than by "the current one": two are on the timeline at once across a
+     * transition, and each must be skinned by the minigame that owns it.
+     *
+     * Pregame gets no source at all. There is no attempt yet, so there is
+     * nothing whose look a scenario could own.
+     */
+    this.#gameView.setStageSource(this.#assets, (attemptKey, view) => {
+      const attempt = [this.#current, this.#next, this.#previous].find(
+        (entry) => entry?.timelineKey === attemptKey
+      );
+      return attempt?.runtime.minigame.render(view) ?? null;
+    });
+
     this.#strip = new ScenarioBackdropView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
