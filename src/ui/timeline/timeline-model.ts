@@ -242,6 +242,28 @@ export class TimelineModel {
       if (note.endBeat === null) this.#unreleasedPruned += 1;
       return false;
     });
+
+    /*
+     * Targets age out on the same rule, rather than being dropped the moment
+     * their attempt finishes.
+     *
+     * A minigame is asked to render for exactly as long as it owns targets, so
+     * deleting them at completion made the outgoing scenario's background,
+     * notes and actor vanish in a single frame — and its finish pose, computed
+     * at the end of every passed attempt, was never once seen. Letting the
+     * notes scroll off is what GDD §11.6 describes and what the surface is for.
+     */
+    const before = this.#targets.length;
+    this.#targets = this.#targets.filter(
+      (target) => nowBeat - (target.startBeat + target.durationBeats) < HISTORY_BEATS
+    );
+    if (this.#targets.length !== before) {
+      for (const key of [...this.#attemptStarts.keys()]) {
+        if (!this.#targets.some((target) => target.attemptKey === key)) {
+          this.#attemptStarts.delete(key);
+        }
+      }
+    }
   }
 
   clearPlayed(): void {

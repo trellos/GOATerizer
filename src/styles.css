@@ -297,13 +297,31 @@ button.chip[data-selected="true"] {
 /* Pregame setup — lives in the stage, where the scenario goes                 */
 /* -------------------------------------------------------------------------- */
 
+/*
+ * The pregame controls float OVER the timeline, they do not replace it.
+ *
+ * Both play screens share one grid so the timeline is pixel-identical between
+ * pregame and the run (see the .play-screen comment above), which means this
+ * block now sits on top of the live timeline rather than in a band of its own.
+ * An opaque background here hides the very thing the copy invites the player to
+ * noodle at. The control blocks carry their own `--panel` fill, so they read as
+ * panels over a working timeline; `align-content: start` keeps the block from
+ * stretching over the lanes it does not need.
+ */
 .setup-stage {
   display: flex;
   flex-direction: column;
+  align-content: start;
   gap: 0.6rem;
   padding: 0.7rem;
   overflow-y: auto;
-  background: var(--bg);
+  background: transparent;
+  pointer-events: none;
+}
+
+.setup-stage > * {
+  pointer-events: auto;
+  flex: 0 0 auto;
 }
 
 .setup-row {

@@ -333,6 +333,37 @@ try {
   await page.waitForTimeout(200);
 
   check("pregame timeline is drawing", (await canvasHasInk(page, "pregame-canvas")) > 40);
+
+  /*
+   * Drawing is not the same as visible.
+   *
+   * Both play screens share one grid row so the timeline is pixel-identical
+   * between pregame and the run, which means the pregame controls sit ON TOP of
+   * a live timeline. An opaque background on that block hid the whole surface
+   * while `canvasHasInk` went on happily reporting a well-drawn canvas — it
+   * reads the bitmap, and `canvasBox` reads a bounding rect; neither can see
+   * occlusion. This asks the DOM what is actually in front.
+   */
+  check(
+    "the pregame timeline is not covered by the controls over it",
+    await page.evaluate(() => {
+      const canvas = document.getElementById("pregame-canvas");
+      const stage = document.querySelector(".setup-stage");
+      if (!(canvas instanceof HTMLCanvasElement) || !(stage instanceof HTMLElement)) return false;
+
+      // Hit-testing alone is not enough: `elementFromPoint` honours
+      // `pointer-events: none`, so a fully opaque panel that let clicks through
+      // would still answer "the canvas". What actually broke was a painted
+      // background, so that is what is asserted.
+      const fill = getComputedStyle(stage).backgroundColor;
+      const opaque = !(fill === "transparent" || /rgba\(.*,\s*0\)$/.test(fill));
+      if (opaque) return false;
+
+      const r = canvas.getBoundingClientRect();
+      const top = document.elementFromPoint(r.left + r.width * 0.55, r.top + r.height * 0.7);
+      return top === canvas;
+    })
+  );
   await page.screenshot({ path: path.join(SHOTS, "02-pregame.png") });
 
   // The pulse, measured rather than assumed. `onsetsPerSecond` should match the
@@ -521,6 +552,35 @@ try {
     stars: await page.textContent("#hud-stars"),
   };
   await page.screenshot({ path: path.join(SHOTS, "05-after-first-attempt.png") });
+
+  /*
+   * The outgoing minigame keeps drawing as its measures scroll away.
+   *
+   * Deleting its targets at completion used to make its background, its notes
+   * and its goat at the summit vanish in a single frame — and the finish pose,
+   * computed at the end of every passed attempt, was never once seen. GDD §11.6
+   * says the outgoing measures travel off to the left while the incoming ones
+   * arrive from the right; this is what makes that true rather than aspirational.
+   *
+   * Probed on the LEFT half of the playfield, where the finished attempt's notes
+   * now are, using the same moss green the skin checks use.
+   */
+  check(
+    "the finished minigame is still on screen while its measures scroll away",
+    (await page.evaluate(() => {
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
+      if (!ctx || !(canvas instanceof HTMLCanvasElement)) return -1;
+      const gutter = Math.round(canvas.width * 0.15);
+      const { data } = ctx.getImageData(gutter, 0, Math.round(canvas.width * 0.3), canvas.height);
+      let moss = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+        if (g - r > 12 && g - b > 20 && g > 95 && g < 165) moss += 1;
+      }
+      return moss;
+    })) > 0
+  );
 
   check(
     "the first attempt completed and the run moved on",

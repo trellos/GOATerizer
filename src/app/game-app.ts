@@ -905,12 +905,14 @@ export class GameApp {
       return;
     }
 
-    // Promote immediately so judgment never has a gap; the strip takes exactly
-    // one beat to slide, and the beat does not stop.
+    // Promote immediately so judgment never has a gap. The outgoing attempt's
+    // targets are deliberately NOT removed here: it keeps owning its stretch of
+    // timeline, so its background and its goat at the summit scroll off to the
+    // left rather than blinking out (GDD §11.6). They age out in
+    // `TimelineModel.prune` once they are past the window.
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
-    this.#timeline.removeTargets(attempt.timelineKey);
     if (!this.#current) {
       this.#finishRun("content-limit");
       return;
@@ -976,6 +978,7 @@ export class GameApp {
 
     this.#current = null;
     this.#next = null;
+    this.#previous = null;
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
     // never be judged, and would play over the results screen.
