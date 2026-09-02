@@ -29,7 +29,11 @@ const SECONDS_PER_BEAT = 60 / BPM;
  * `startBeat` is deliberately not 0: an attempt begins wherever the continuous
  * transport happens to be, and off-by-one errors there would otherwise hide.
  */
-function harness(difficulty: number, startBeat = 20) {
+function harness(
+  difficulty: number,
+  options: { startBeat?: number; reactionDelayBeats?: number } = {}
+) {
+  const startBeat = options.startBeat ?? 20;
   const provider = new TestGuitarInputProvider();
   const toBeat = (contextTime: number) => contextTime / SECONDS_PER_BEAT;
   const attempt = new AttemptRuntime({
@@ -38,6 +42,9 @@ function harness(difficulty: number, startBeat = 20) {
     key: KEY,
     startBeat,
     toBeat,
+    ...(options.reactionDelayBeats === undefined
+      ? {}
+      : { reactionDelayBeats: options.reactionDelayBeats }),
   });
 
   const events: AttemptEvent[] = [];
@@ -161,6 +168,30 @@ function noteX(attempt: AttemptRuntime, opportunityIndex: number): number {
 }
 
 describe("ClimbMinigame on the timeline", () => {
+  it("reacts on the beat the note was judged, by default", () => {
+    const h = harness(1);
+    const target = h.attempt.targets[0]!;
+    h.playAt(target.midi, target.startBeat);
+    h.advanceTo(target.startBeat + 0.001);
+    // REACTION_DELAY_BEATS is 0: the goat steps on the note, not after it.
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(0);
+  });
+
+  it("holds the reaction back when a delay is configured", () => {
+    // There used to be a fixed ~0.28-beat gap here, carried by a streak flying
+    // from the note into the scenario panel. The panel is gone; whether any
+    // delay should survive it is a feel question, so it is a tuning value with
+    // a seam rather than a constant nobody can try the other side of.
+    const h = harness(1, { reactionDelayBeats: 0.5 });
+    const target = h.attempt.targets[0]!;
+    h.playAt(target.midi, target.startBeat);
+    h.advanceTo(target.startBeat + 0.1);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(-1);
+
+    h.advanceTo(target.startBeat + 0.6);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(0);
+  });
+
   it("waits left of the opening foothold before anything is played", () => {
     const { attempt } = harness(1);
     expect(climbIn(attempt).progress.noteIndex).toBe(-1);
@@ -527,7 +558,7 @@ describe("run shell", () => {
  */
 function playAutoPerformance(difficulty: number, mode: AutoplayMode, seed = 7) {
   const startBeat = 20;
-  const h = harness(difficulty, startBeat);
+  const h = harness(difficulty, { startBeat });
   const performance = planAutoPerformance({
     targets: h.attempt.targets,
     mode,

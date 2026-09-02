@@ -200,6 +200,24 @@ export const ATTEMPT_MEASURES = 4;
 export const ATTEMPT_BEATS = BEATS_PER_MEASURE * ATTEMPT_MEASURES;
 /** Scenario slide transition, in beats. GDD §10: exactly one beat. */
 export const TRANSITION_BEATS = 1;
+/**
+ * Beats between a note being judged and the minigame reacting to it.
+ *
+ * There used to be a fixed ~0.28-beat gap here, and it was not a delay for its
+ * own sake: a streak flew from the judged note into the scenario panel, and its
+ * *arrival* was what triggered the reaction, so the player read "my note caused
+ * that" rather than "two things happened at once". With one surface (GDD §6)
+ * there is nothing to fly between — the note and the reaction are the same
+ * pixels — so the streak is gone.
+ *
+ * Whether the *delay* should have gone with it is a feel question, not an
+ * argument: at zero the goat steps on the same frame the note is judged, which
+ * may read as crisp or may read as simultaneous rather than caused. Zero is
+ * today's behaviour and the current default; this exists so the alternative can
+ * be tried by ear rather than reasoned about. Provisional per `AGENTS.md` §17.
+ */
+export const REACTION_DELAY_BEATS = 0;
+
 /** Beats of lead-in between pressing Play and the first attempt's beat 1. */
 export const RUN_LEAD_IN_BEATS = 4;
 

@@ -468,9 +468,11 @@ try {
     (await dev(page, "perfect/good/miss"))?.split("/")[0] === String(footholdMid),
     `${await dev(page, "perfect/good/miss")} judged, foothold ${footholdMid}`
   );
-  // The minigame now lives on the timeline (GDD §11.2), so "is the scenario
-  // drawing" and "is the timeline drawing" are the same question.
-  check("the minigame is drawing on the timeline", (await canvasHasInk(page, "game-canvas")) > 200);
+  // Deliberately no `canvasHasInk(game-canvas)` check here. The host inks that
+  // canvas — grid, lanes, notes, gutter — whether or not a minigame renders a
+  // single pixel, so it would pass over a completely dead surface. The
+  // differential below, which turns the minigame's art off and back on, is the
+  // one that actually binds.
 
   /* --- the scenario's timeline art ----------------------------------- */
 

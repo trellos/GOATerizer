@@ -1,19 +1,32 @@
 /**
- * Energy streaks: the visible link between a judged note and the scenario.
+ * Short flights across the screen, in musical time.
  *
- * A short streak leaves the judged note on the timeline and flies up into the
- * scenario. On arrival it triggers the scenario's reaction, so the player reads
- * *I played that note correctly, and that made the scenario react* rather than
- * seeing two things happen near each other.
+ * One caller now: the stars earned by a finished minigame flying from the
+ * timeline up into their slot in the run history. That is a real distance
+ * between two regions, and the flight is what connects them.
+ *
+ * It used to have a second and more important job — carrying a judged note from
+ * the timeline into the scenario panel, with its *arrival* triggering the
+ * reaction so the player read causation rather than coincidence. The scenario
+ * panel is gone (GDD §11.2): the note and the reaction are now the same pixels,
+ * so a streak between them would have nowhere to go. Whether any *delay* should
+ * survive that is `REACTION_DELAY_BEATS` in `config/tuning.ts`, and it belongs
+ * to the attempt runtime rather than to a visual effect.
  *
  * Flight time is measured in **beats**, not milliseconds, so it stays
- * proportionate at 60bpm and at 140bpm and never outlives the note that caused
- * it. It is deliberately short: any longer and it stops reading as causation.
+ * proportionate at 60bpm and at 140bpm.
  */
 
 const FLIGHT_BEATS = 0.28;
 const TRAIL_SEGMENTS = 7;
 
+/**
+ * Kept, though only `"good"` has a producer today.
+ *
+ * The bad-energy flight died with the scenario panel. This is one line and a
+ * colour, and a minigame reaction that ever wants to throw something across the
+ * screen will want the other half of it back.
+ */
 export type EnergyPolarity = "good" | "bad";
 
 export type StreakOptions = {
@@ -62,9 +75,9 @@ export class EnergyLayer {
   /**
    * Advances flights and fires arrivals.
    *
-   * Arrivals fire here rather than in the draw pass so a hidden or offscreen
-   * canvas still delivers its energy — the scenario must never stall because
-   * the streak was not painted.
+   * Arrivals fire here rather than in the draw pass, so a hidden or offscreen
+   * canvas still runs the callback: a star must land in the history bar whether
+   * or not anyone watched it fly.
    */
   update(nowBeat: number): void {
     for (const streak of this.#streaks) {

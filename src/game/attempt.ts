@@ -13,7 +13,7 @@
  * timeline is what triggers the goat rather than a coincidence beside it.
  */
 
-import { ATTEMPT_BEATS, BEATS_PER_MEASURE } from "../config/tuning.js";
+import { ATTEMPT_BEATS, BEATS_PER_MEASURE, REACTION_DELAY_BEATS } from "../config/tuning.js";
 import type { GuitarInputEvent } from "../input/guitar-input.js";
 import type { RunKey } from "../music/keys.js";
 import type { Judged, Minigame, MinigameModule, Opportunity } from "../minigame/api.js";
@@ -69,6 +69,8 @@ export type AttemptOptions = {
    * caller. Injected so the whole runtime is testable without a transport.
    */
   toBeat: (contextTime: number) => number;
+  /** Test seam. Defaults to {@link REACTION_DELAY_BEATS}. */
+  reactionDelayBeats?: number;
 };
 
 export class AttemptRuntime {
@@ -84,11 +86,14 @@ export class AttemptRuntime {
   readonly minigame: Minigame;
 
   readonly #module: MinigameModule;
+  readonly #reactionDelayBeats: number;
   readonly #toBeat: (contextTime: number) => number;
   readonly #listeners: ((event: AttemptEvent) => void)[] = [];
   #nextEnergyId = 1;
   /** Latest attempt-relative beat seen by {@link AttemptRuntime.update}. */
   #beat = 0;
+  /** Judged notes waiting out the reaction delay. */
+  #pending: { judged: Judged; atBeat: number }[] = [];
   #measuresCompleted = 0;
   #complete = false;
   #result: AttemptResult | null = null;
@@ -108,6 +113,7 @@ export class AttemptRuntime {
     this.key = options.key;
     this.startBeat = options.startBeat;
     this.#toBeat = options.toBeat;
+    this.#reactionDelayBeats = options.reactionDelayBeats ?? REACTION_DELAY_BEATS;
 
     this.targets = resolveTargets(level, options.key);
     this.judge = new TargetJudge({ targets: this.targets, key: options.key });
@@ -205,6 +211,7 @@ export class AttemptRuntime {
   update(absoluteBeat: number): void {
     if (this.#complete) {
       this.#beat = this.toAttemptBeat(absoluteBeat);
+      this.#flushPending(this.#beat);
       this.minigame.update(this.#beat);
       return;
     }
@@ -212,6 +219,7 @@ export class AttemptRuntime {
     const beat = this.toAttemptBeat(absoluteBeat);
     this.#beat = beat;
     this.judge.tick(beat);
+    this.#flushPending(beat);
     this.minigame.update(beat);
 
     const measures = Math.min(
@@ -244,7 +252,23 @@ export class AttemptRuntime {
       lane: energy.lane,
       beat: energy.beat,
     };
-    this.minigame.onJudged(judged, atBeat);
+    // Zero is delivered on the spot rather than on the next frame, so the
+    // default really is "the reaction happens when the note is judged" and not
+    // "one frame later, usually".
+    if (this.#reactionDelayBeats <= 0) {
+      this.minigame.onJudged(judged, atBeat);
+      return;
+    }
+    this.#pending.push({ judged, atBeat: atBeat + this.#reactionDelayBeats });
+  }
+
+  /** Hands over any judged note whose reaction delay has elapsed. */
+  #flushPending(beat: number): void {
+    if (this.#pending.length === 0) return;
+    const due = this.#pending.filter((entry) => entry.atBeat <= beat);
+    if (due.length === 0) return;
+    this.#pending = this.#pending.filter((entry) => entry.atBeat > beat);
+    for (const entry of due) this.minigame.onJudged(entry.judged, beat);
   }
 
   /* ------------------------------------------------------------------ */
