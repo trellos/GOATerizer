@@ -9,14 +9,16 @@
  *
  * Slots (`GOATerizer_Scenario_Asset_Slot_Bindings.md` §2, `PerformMinigame`):
  * `background`, `performerPoses[]` (four), `flourishPoses[]` (two),
- * `finishPose`, `signatureProps[]` (a mic stand), `audienceStates[]` (a crowd
- * goat, unimpressed and impressed), `flourishEffects[]`, `accentEffects[]`,
- * `payoffEffects[]`, plus the two timeline note-art pieces the class binds: a
- * stage-light bar for the note body and a star to mark a flourish note.
+ * `finishPose`, `signatureProps[]` (a mic stand), `flourishEffects[]`,
+ * `accentEffects[]`, `payoffEffects[]`, plus the two timeline note-art pieces
+ * the class binds: a stage-light bar for the note body and a star to mark a
+ * flourish note.
  *
- * Every file is a static billboard. The crowd goat is drawn once and
- * instantiated up to a few dozen times, varied only by transform — which is
- * the whole art budget of this scenario (GDD §1.3).
+ * `audienceStates[]` (the crowd goat, unimpressed and impressed) is no longer
+ * drawn here: it ships as real art (`docs/assets/ASSET_SOURCES.md`), instanced
+ * up to a few dozen times per attempt and varied only by transform.
+ *
+ * Every file is a static billboard.
  */
 
 import { lcg, Pixels } from "./png.mjs";
@@ -51,12 +53,6 @@ export const FRONTMAN_PALETTE = {
   furRim: [126, 116, 148],
   horn: [236, 196, 84],
   eye: [250, 70, 70],
-  // The crowd is the ordinary white Rocky goat, unchanged.
-  crowdFur: DEFAULT_PALETTE.fur,
-  crowdShade: DEFAULT_PALETTE.furShade,
-  crowdDark: DEFAULT_PALETTE.furDark,
-  crowdHorn: DEFAULT_PALETTE.horn,
-  crowdEye: DEFAULT_PALETTE.eye,
   mic: [200, 204, 214],
   micDark: [96, 100, 112],
   micHead: [40, 40, 48],
@@ -171,58 +167,6 @@ export function frontmanFlourish(kind, C = FRONTMAN_PALETTE) {
     l: C.furRim,
     h: C.horn,
     e: C.eye,
-  });
-  return image;
-}
-
-/**
- * One crowd goat, 16x12, facing LEFT — toward the stage, which sits at the
- * strike line to the crowd's left for every goat on the right wing. The left
- * wing gets the same sprite; a crowd is allowed to look both ways.
- *
- * Two states, one drawing: `neutral` stands and chews, `impressed` is up on
- * its hind legs with its mouth open. The runtime swaps between them at star
- * thresholds; it never animates them.
- */
-const CROWD_NEUTRAL = [
-  "................",
-  "....hh..........",
-  "...hh...........",
-  "..ddff..........",
-  ".deffffddddd....",
-  ".dfffffffffffd..",
-  "..dffffffffffd..",
-  "..ddsffffffssd..",
-  "...dssssssssd...",
-  "...d.f....f.d...",
-  "...d.f....f.d...",
-  "...dd.d..dd.d...",
-];
-
-const CROWD_IMPRESSED = [
-  "hh..............",
-  ".hhh............",
-  "..ddff..........",
-  ".dfffff.........",
-  ".deffffd........",
-  ".ddffffddd......",
-  "..dfffffffdd....",
-  "...dfffffffd....",
-  "..f.dsffffffd...",
-  ".ff.dssffffsd...",
-  "dd..dssssssd....",
-  "....d.f..f.d....",
-];
-
-export function crowdGoat(state, C = FRONTMAN_PALETTE) {
-  const image = new Pixels(16, 12);
-  const rows = state === "impressed" ? CROWD_IMPRESSED : CROWD_NEUTRAL;
-  image.stamp(0, 0, rows, {
-    f: C.crowdFur,
-    s: C.crowdShade,
-    d: C.crowdDark,
-    h: C.crowdHorn,
-    e: C.crowdEye,
   });
   return image;
 }
