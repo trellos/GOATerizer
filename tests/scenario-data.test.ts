@@ -13,12 +13,12 @@ import { ATTEMPT_REPEATS } from "../src/config/tuning.js";
 
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import { formatDegreeToken } from "../src/music/degrees.js";
-import type {
-  ClimbAssetBindings,
-  ClimbClassParameters,
-  RouteData,
-  ScenarioLevelData,
-} from "../src/scenario/types.js";
+import type { ScenarioLevelData } from "../src/scenario/types.js";
+import {
+  climbConfig,
+  climbLevel,
+  CLIMB_MINIGAME,
+} from "../src/scenario/minigames/climb-minigame.js";
 
 const LEVELS = [1, 2, 3, 4] as const;
 
@@ -35,43 +35,25 @@ function level(difficulty: number): ScenarioLevelData {
 }
 
 /**
- * Rocky Ascent is a `ClimbMinigame`, so every level authors a route. Narrowing
- * here makes the failure mode "it stopped being a climb scenario" rather than a
- * wall of non-null assertions.
+ * `config` and `data` are `unknown` on the scenario model: the host carries them
+ * and only `ClimbMinigame` knows their shape. A test asserting on a foothold or
+ * a bad-note policy is a climb test and has to say so.
  */
-function routeOf(difficulty: number): RouteData {
-  const route = level(difficulty).route;
-  if (!route) throw new Error(`Rocky Ascent L${difficulty} must author a route`);
-  return route;
-}
-
-const ASCENT_BINDINGS: ClimbAssetBindings = (() => {
-  const bindings = ROCKY_ASCENT.assetBindings;
-  if (bindings.kind !== "climb") throw new Error("Rocky Ascent must bind ClimbMinigame slots");
-  return bindings;
-})();
-
-const ASCENT_PARAMETERS: ClimbClassParameters = (() => {
-  const parameters = ROCKY_ASCENT.classParameters;
-  if (parameters.kind !== "climb") {
-    throw new Error("Rocky Ascent must carry ClimbMinigame parameters");
-  }
-  return parameters;
-})();
+const ASCENT_CONFIG = climbConfig(ROCKY_ASCENT.config);
 
 describe("Rocky Ascent scenario", () => {
   it("is a ClimbMinigame supporting exactly L1-L4", () => {
     expect(ROCKY_ASCENT.id).toBe("rocky_ascent");
-    expect(ROCKY_ASCENT.minigameClass).toBe("ClimbMinigame");
+    expect(ROCKY_ASCENT.minigameId).toBe("ClimbMinigame");
     expect(ROCKY_ASCENT.family).toBe("Scale");
     expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...ROCKY_ASCENT.levels.keys()]).toEqual([1, 2, 3, 4]);
   });
 
   it("runs one continuous four-measure visual arc with no measure reset", () => {
-    expect(ASCENT_PARAMETERS.visualSpanMeasures).toBe(4);
-    expect(ASCENT_PARAMETERS.resetBetweenMeasures).toBe(false);
-    expect(ASCENT_PARAMETERS.badNotePolicy).toBe("Wobble");
+    expect(climbLevel(level(1).data).visualSpanMeasures).toBe(4);
+    expect(climbLevel(level(1).data).resetBetweenMeasures).toBe(false);
+    expect(ASCENT_CONFIG.badNotePolicy).toBe("Wobble");
   });
 
   it.each(LEVELS)("L%i totals exactly 16 beats", (difficulty) => {
@@ -147,43 +129,31 @@ describe("Rocky Ascent scenario", () => {
     }
   });
 
+  /*
+   * The authored route survives as an authoring check and nothing else.
+   *
+   * Its coordinates described positions in a scenario art panel; the actors
+   * moved onto the note bars and nothing has read them since, so
+   * `ClimbMinigame.parseLevel` validates the one thing they still assert about
+   * the *music* — one waypoint per note opportunity — and discards the rest.
+   * Testing the coordinates would be testing a space that no longer exists.
+   */
   it.each(LEVELS)("L%i authors one waypoint per note opportunity", (difficulty) => {
-    const data = level(difficulty);
-    expect(routeOf(difficulty).waypoints).toHaveLength(data.noteOpportunityCount);
+    // Every Rocky level loads, which is the invariant passing. This pins the
+    // count it is checked against.
+    expect(level(difficulty).noteOpportunityCount).toBe(EXPECTED_OPPORTUNITIES[difficulty]);
   });
 
-  it.each(LEVELS)("L%i waypoints stay inside normalised scenario space", (difficulty) => {
-    for (const wp of routeOf(difficulty).waypoints) {
-      expect(wp.x).toBeGreaterThanOrEqual(0);
-      expect(wp.x).toBeLessThanOrEqual(1);
-      expect(wp.y).toBeGreaterThanOrEqual(0);
-      expect(wp.y).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it.each(LEVELS)("L%i climbs: every waypoint is above the previous one", (difficulty) => {
-    const waypoints = routeOf(difficulty).waypoints;
-    for (let i = 1; i < waypoints.length; i += 1) {
-      // y is downwards, so "higher up the mountain" is a smaller y.
-      expect(waypoints[i]!.y).toBeLessThan(waypoints[i - 1]!.y);
-    }
-    expect(waypoints[0]!.y).toBeLessThan(routeOf(difficulty).startPosition.y);
-  });
-
-  it("escalates visually with difficulty", () => {
-    const rise = (difficulty: number) => {
-      const route = routeOf(difficulty);
-      const last = route.waypoints[route.waypoints.length - 1]!;
-      return route.startPosition.y - last.y;
+  it("refuses a route that has drifted from the phrase", () => {
+    // The whole level object, not just its visual half: `parseLevel` is handed
+    // the level and decides for itself which of it means anything to a climb.
+    const level = {
+      measurePlan: { visualSpanMeasures: 4, resetBetweenMeasures: false },
+      visual: { route: { waypoints: [{ x: 0, y: 0 }] } },
     };
-    // L4's climb covers more vertical frame than L1's, on twice the steps.
-    expect(rise(4)).toBeGreaterThan(rise(1));
-    expect(rise(3)).toBeGreaterThan(rise(1));
-    // ...and its summit sits nearer the top of the frame.
-    const summitY = (d: number) => routeOf(d).destination.y;
-    expect(summitY(4)).toBeLessThan(summitY(3));
-    expect(summitY(3)).toBeLessThan(summitY(2));
-    expect(summitY(2)).toBeLessThan(summitY(1));
+    expect(() => CLIMB_MINIGAME.parseLevel(level, { noteOpportunityCount: 15, measures: 4 })).toThrow(
+      /one successful note must advance exactly one waypoint/
+    );
   });
 
   it.each(LEVELS)("L%i star thresholds ascend and three stars means all Perfect", (difficulty) => {
@@ -220,7 +190,7 @@ describe("Rocky Ascent scenario", () => {
   });
 
   it("binds every class asset slot to a resolvable URL", () => {
-    const bindings = ASCENT_BINDINGS;
+    const bindings = ASCENT_CONFIG;
     expect(bindings.climberPoses).toHaveLength(4);
     expect(bindings.stepEffects).toHaveLength(2);
     const ids = [

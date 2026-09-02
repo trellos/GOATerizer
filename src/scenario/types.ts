@@ -11,16 +11,8 @@
  * `load.ts`.
  */
 
-import type { NoteDuration } from "../minigame/api.js";
+import type { MinigameId, NoteDuration } from "../minigame/api.js";
 import type { ScaleDegreeRef } from "../music/degrees.js";
-
-export type MinigameClassId =
-  | "ClimbMinigame"
-  | "PerformMinigame"
-  | "TraverseMinigame"
-  | "ThreeStepMinigame"
-  | "RepeatMinigame"
-  | "BattleMinigame";
 
 /**
  * Re-exported: a note's written duration is part of the minigame contract, not
@@ -29,6 +21,15 @@ export type MinigameClassId =
  * `minigame/api.ts`.
  */
 export type { NoteDuration };
+
+/**
+ * A minigame's stable identity, as written in scenario data.
+ *
+ * An open string resolved through `minigame/registry.ts`, not a closed union:
+ * the six canonical families are design vocabulary, and a seventh must not
+ * require editing this file.
+ */
+export type { MinigameId };
 
 /**
  * The written length of each duration, in beats.
@@ -67,7 +68,14 @@ export type PromptEvent = {
   degree: ScaleDegreeRef | null;
 };
 
-/** How a scenario uses the four measures it authors. */
+/**
+ * The musical length of an attempt.
+ *
+ * Only the two facts the host needs. *How* a scenario uses those measures —
+ * whether a visual cycle spans one, two or all of them, and what a boundary
+ * resets — belongs to the minigame and lives in its own level data: a BATTLE
+ * scenario varies it by difficulty, which no host-owned flag could express.
+ */
 export type MeasurePlan = {
   /**
    * Measures in the authored **phrase**, which is what the loader validates the
@@ -78,8 +86,6 @@ export type MeasurePlan = {
    */
   attemptMeasures: number;
   beatsPerMeasure: number;
-  visualSpanMeasures: number;
-  resetBetweenMeasures: boolean;
 };
 
 /** Cumulative judgment-point thresholds. Stars lock once earned. */
@@ -89,25 +95,6 @@ export type StarThresholds = {
   star3Threshold: number;
   provisional: boolean;
   note: string;
-};
-
-export type RoutePoint = { x: number; y: number };
-
-export type RouteWaypoint = RoutePoint & {
-  /** Transform-only variety on one reused sprite. */
-  scale: number;
-  rotationDeg: number;
-};
-
-/**
- * `ClimbMinigame` route data, in normalised scenario space: x rightwards 0..1,
- * y downwards 0..1 with 0 at the top of the frame.
- */
-export type RouteData = {
-  character: string;
-  startPosition: RoutePoint;
-  destination: RoutePoint;
-  waypoints: readonly RouteWaypoint[];
 };
 
 export type ScenarioLevelData = {
@@ -120,120 +107,28 @@ export type ScenarioLevelData = {
   stars: StarThresholds;
   scoring: { streakBonusEligible: boolean };
   /**
-   * The climber's authored path, in the scenario art panel.
-   *
-   * **Authored, validated, and no longer drawn.** The actors moved onto the
-   * note bars and the art panel became a backdrop
-   * (`docs/game-design/PROPOSED_Timeline_Actors.md`), so nothing reads these
-   * coordinates at runtime any more. They stay because they are the authored
-   * record of each route's shape and the loader still checks the invariant they
-   * encode — one waypoint per note opportunity — which is a real authoring
-   * check on the *musical* content whatever draws it.
-   *
-   * Null for a class that never had one: a `RepeatMinigame` performer stands
-   * still, and the loader does not invent a path for him.
+   * Whatever this scenario's minigame returned from `parseLevel`. Opaque: the
+   * host stores and forwards it and never looks inside, which is what lets a
+   * family define its own level shape without editing this file.
    */
-  route: RouteData | null;
-  /** Free-form per-level visual character, passed to the class as parameters. */
-  visual: Readonly<Record<string, unknown>>;
+  data: unknown;
 };
-
-/**
- * Asset slots are named by the *class*, never by the scenario. `ClimbMinigame`
- * asks for `climberPoses`; Rocky Ascent decides those are goats.
- *
- * Only `background` is drawn today — the scenario panel is a backdrop and the
- * goat is drawn from primitives on the timeline. The rest stay bound: they are
- * the canonical slots from `GOATerizer_Scenario_Asset_Slot_Bindings.md`, the
- * files exist, and they are what the actor layer should draw once it stops
- * being a prototype.
- */
-export type ClimbAssetBindings = {
-  background: string;
-  climberPoses: readonly string[];
-  finishPose: string;
-  waypointVisuals: readonly string[];
-  destinationVisual: string;
-  stepEffects: readonly string[];
-};
-
-/**
- * Authored, and — like the route — no longer read at runtime: `badNotePolicy`
- * described a wobble in the art panel, and `showDestinationFromStart` a summit
- * cairn nothing draws now. Kept as authored scenario data.
- */
-export type ClimbClassParameters = {
-  visualSpanMeasures: number;
-  resetBetweenMeasures: boolean;
-  badNotePolicy: "Wobble" | "Stall";
-  showDestinationFromStart: boolean;
-};
-
-/**
- * `RepeatMinigame`'s parameters. Shares nothing with the climb's but the two
- * measure-cycle fields: there is no route to show from the start and no wobble
- * policy, because a wrong note here places a can rather than shaking a climber.
- */
-export type RepeatClassParameters = {
-  visualSpanMeasures: number;
-  resetBetweenMeasures: boolean;
-  /** `sequence`: targets arrive one at a time. `accumulate`: they pile up. */
-  repeatMode: "sequence" | "accumulate";
-  /**
-   * Whether the performer may change lanes at a measure boundary, telegraphed
-   * by walking through the preceding one. Designed, not built — every scenario
-   * authors `false` today.
-   */
-  performerMovesBetweenMeasures: boolean;
-};
-
-/**
- * `RepeatMinigame`'s slots, from the canonical schema in
- * `GOATerizer_Scenario_Asset_Slot_Bindings.md` §2.
- *
- * A performer who stands still and does one thing over and over to a reusable
- * target. Can Crushing decides the target is a beer can.
- */
-export type RepeatAssetBindings = {
-  background: string;
-  performerNeutral: string;
-  performerAction: string;
-  performerFinish: string;
-  /** The reusable untouched unit — the can. */
-  repeatTarget: string;
-  /** What it becomes once dealt with. */
-  targetCompletedState: string;
-  impactEffects: readonly string[];
-};
-
-/**
- * Bindings are named by the *class*, and which class a scenario belongs to is
- * what decides the shape. Discriminated so nothing can read `waypointVisuals`
- * off a scenario that has no waypoints.
- */
-export type ScenarioAssetBindings =
-  | ({ kind: "climb" } & ClimbAssetBindings)
-  | ({ kind: "repeat" } & RepeatAssetBindings);
-
-/**
- * Class parameters, discriminated the same way and by the same class decision,
- * so a scenario can only ever carry the parameters its own class reads.
- */
-export type ScenarioClassParameters =
-  | ({ kind: "climb" } & ClimbClassParameters)
-  | ({ kind: "repeat" } & RepeatClassParameters);
 
 export type ScenarioDefinition = {
   id: string;
   displayName: string;
   theme: string;
-  minigameClass: MinigameClassId;
+  /** Which minigame plays this scenario. Resolved through `minigame/registry`. */
+  minigameId: MinigameId;
   family: string;
   visualVerb: string;
   supportedLevels: readonly number[];
   premise: string;
-  classParameters: ScenarioClassParameters;
-  assetBindings: ScenarioAssetBindings;
+  /**
+   * Whatever this scenario's minigame returned from `parseConfig`. Opaque, for
+   * the same reason as {@link ScenarioLevelData.data}.
+   */
+  config: unknown;
   /** Asset id -> URL, resolved against the app's base path at load time. */
   assetUrls: Readonly<Record<string, string>>;
   levels: ReadonlyMap<number, ScenarioLevelData>;

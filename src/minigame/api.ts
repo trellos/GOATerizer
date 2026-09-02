@@ -338,6 +338,40 @@ export interface Minigame {
   update(beat: number): void;
 
   /**
+   * Which lane the player should be aiming at, or null between phrases.
+   *
+   * Optional, because it is a hint rather than an event: a family with an actor
+   * can lean it toward the note that is coming, and at 60bpm — most of a second
+   * between quarter notes — that is what stops the actor reading as dead air. A
+   * family with nothing to point simply does not implement it.
+   */
+  aimAt?(lane: number | null): void;
+
+  /**
+   * TRANSITIONAL. What the prototype actor layers need in order to draw.
+   *
+   * `render(view) → Stage` is the real answer and covers a family's background
+   * and note art today. It cannot yet carry the *actors*: the can crusher is
+   * drawn from canvas primitives with an IK-solved arm, and `Stage` is
+   * sprite-only by design — giving a minigame a canvas would make the
+   * static-billboard rule unenforceable and hand a downloadable package raw
+   * pixel access.
+   *
+   * So until that figure is baked into a pose ladder at build time, a family
+   * may hand back the opaque state its host-side layer draws, tagged with which
+   * layer that is. The host branches on this tag rather than on scenario data,
+   * which is the difference that matters: `types.ts`, `load.ts` and
+   * `AttemptRuntime` no longer know a climber from a can. This whole method
+   * disappears when the bake lands.
+   */
+  prototypeLayer?(): {
+    readonly kind: "actor" | "repeat";
+    readonly state: unknown;
+    /** Asset ids the layer draws with, in the order it expects them. */
+    readonly sprites: readonly string[];
+  } | null;
+
+  /**
    * A measure boundary passed. The minigame decides what, if anything, resets.
    *
    * The host has no opinion: a CLIMB scenario spans the whole attempt
@@ -405,6 +439,16 @@ export interface MinigameModule {
 
   /** Every asset id this scenario needs, so the host can preload them. */
   assetIds(config: unknown, levels: readonly unknown[]): readonly string[];
+
+  /**
+   * The scenario-wide backdrop image.
+   *
+   * Distinct from {@link Stage.background}, which is what this family paints
+   * behind *its own measures* while it is being played. This one answers for a
+   * scenario that is not being played at all — the neighbouring panels either
+   * side of a handover, which have no live instance to ask.
+   */
+  backgroundId(config: unknown): string;
 
   create(context: AttemptContext): Minigame;
 

@@ -28,7 +28,15 @@
  * option and is noted in `DECISION_LOG.md` (DECISION-023).
  */
 
+import { requireMinigame } from "../minigame/registry.js";
 import type { ScenarioDefinition } from "../scenario/types.js";
+
+/** Which image sits behind a scenario. Its own family answers. */
+function backgroundIdOf(scenario: ScenarioDefinition): string {
+  return requireMinigame(scenario.minigameId, `scenario ${scenario.id}`).backgroundId(
+    scenario.config
+  );
+}
 import type { AssetStore } from "./assets.js";
 
 export type BackdropPanel = {
@@ -150,7 +158,7 @@ export class ScenarioBackdropView {
   }
 
   #drawBackground(scenario: ScenarioDefinition, x: number, width: number): void {
-    const image = this.#assets.get(scenario.assetBindings.background);
+    const image = this.#assets.get(backgroundIdOf(scenario));
     const ctx = this.#ctx;
     if (!image) {
       ctx.fillStyle = "#141a22";

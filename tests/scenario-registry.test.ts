@@ -35,10 +35,10 @@ describe("scenario registry", () => {
     expect(SCENARIOS).toHaveLength(5);
     for (const scenario of SCENARIOS) {
       if (scenario === CAN_CRUSHING) continue;
-      expect(scenario.minigameClass).toBe("ClimbMinigame");
+      expect(scenario.minigameId).toBe("ClimbMinigame");
       expect(scenario.family).toBe("Scale");
     }
-    expect(CAN_CRUSHING.minigameClass).toBe("RepeatMinigame");
+    expect(CAN_CRUSHING.minigameId).toBe("RepeatMinigame");
     expect(new Set(SCENARIOS.map((s) => s.id))).toEqual(
       new Set([
         "rocky_ascent",

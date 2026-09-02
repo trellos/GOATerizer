@@ -27,6 +27,7 @@ import {
   DUCK_MAX_MISSES,
   duckInputFor,
 } from "../src/game/backing-duck.js";
+import { climbActor } from "../src/scenario/minigames/climb-minigame.js";
 import { AttemptRuntime } from "../src/game/attempt.js";
 import type { JudgmentEvent } from "../src/game/judgment.js";
 import type { ResolvedTarget } from "../src/game/targets.js";
@@ -365,14 +366,14 @@ describe("ducking a real attempt", () => {
 
     const score = h.attempt.score.snapshot;
     const stars = h.attempt.starMeter.stars;
-    const actor = h.attempt.actor.state;
+    const actor = climbActor(h.attempt.minigame);
 
     h.releaseAt(id, target.startBeat + target.durationBeats);
 
     expect(h.attempt.score.snapshot).toEqual(score);
     expect(h.attempt.starMeter.stars).toBe(stars);
     // The goat does not take a second step because a note ended tidily.
-    expect(h.attempt.actor.state).toEqual(actor);
+    expect(climbActor(h.attempt.minigame)).toEqual(actor);
     // ...and it really did happen, so the assertions above mean something.
     expect(h.duck.gain).toBe(1);
     expect(h.gains).toHaveLength(3); // PerfectNote, TargetResolved, release
