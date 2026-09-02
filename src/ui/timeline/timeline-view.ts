@@ -29,7 +29,32 @@ import type { Fingering } from "../../music/fingering.js";
 import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
+import type {
+  NoteArt,
+  PlacedNote,
+  Sprite,
+  TimelineContext,
+  TimelineSkin,
+} from "../../minigame/api.js";
+import type { AssetStore } from "../assets.js";
 import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js";
+
+/**
+ * Resolves the skin for one attempt's target notes.
+ *
+ * Keyed by attempt because two are on the timeline at once around a transition:
+ * the outgoing scenario's notes scroll out to the left while the incoming one's
+ * scroll in from the right, so each is skinned by the minigame that owns it and
+ * they never contend for the same pixels.
+ *
+ * Returning `null` — which is also what happens when no source is installed at
+ * all — gives the host's default look.
+ */
+export type TimelineSkinSource = (
+  attemptKey: string,
+  placed: readonly PlacedNote[],
+  view: TimelineContext
+) => TimelineSkin | null;
 
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
@@ -71,6 +96,8 @@ export class TimelineView {
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
+  #assets: AssetStore | null = null;
+  #skinFor: TimelineSkinSource | null = null;
   #width = 0;
   #height = 0;
 
@@ -93,6 +120,17 @@ export class TimelineView {
   /** Pregame shows the physical shape; the run shows scale degrees. */
   setShowFingeringLabels(show: boolean): void {
     this.#showFingeringLabels = show;
+  }
+
+  /**
+   * Installs per-minigame note art. Without this every note gets the default.
+   *
+   * The pregame timeline never sets one: there is no attempt yet, so there is
+   * nothing whose look a scenario could own.
+   */
+  setSkinSource(assets: AssetStore | null, skinFor: TimelineSkinSource | null): void {
+    this.#assets = assets;
+    this.#skinFor = skinFor;
   }
 
   /* ------------------------------------------------------------------ */
@@ -189,13 +227,147 @@ export class TimelineView {
 
     const snapshot = model.snapshot(nowBeat, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
 
+    const skins = this.#resolveSkins(snapshot.targets, nowBeat);
+
     this.#drawBeatGrid(nowBeat);
     this.#drawRows();
+    for (const skin of skins.values()) this.#drawBackdrop(skin);
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
-    for (const note of snapshot.targets) this.#drawTarget(note, nowBeat);
+    for (const note of snapshot.targets) {
+      this.#drawTarget(note, nowBeat, skins.get(note.attemptKey)?.skin.notes?.get(note.id));
+    }
+    // Above every skin, always: the player's own note and the exact moment are
+    // the two things a scenario's art may compose around but never obscure.
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Skinning                                                            */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Places every visible target, then asks each attempt's minigame what it
+   * wants drawn on its own notes.
+   *
+   * Placement is entirely the host's: a minigame receives rects it cannot
+   * change, so a skin can never move a note in time or pitch, resize it, or
+   * make a challenge harder through visual ambiguity (`AGENTS.md` §12).
+   *
+   * Rects are normalised against the **playfield** — the area right of the
+   * gutter — because that is where notes live and where a backdrop belongs.
+   */
+  #resolveSkins(
+    targets: readonly TargetNote[],
+    nowBeat: number
+  ): Map<string, { skin: TimelineSkin; span: { from: number; to: number } }> {
+    const resolved = new Map<string, { skin: TimelineSkin; span: { from: number; to: number } }>();
+    const skinFor = this.#skinFor;
+    if (!skinFor || targets.length === 0) return resolved;
+
+    const byAttempt = new Map<string, PlacedNote[]>();
+    const spans = new Map<string, { from: number; to: number }>();
+
+    for (const note of targets) {
+      const x = this.#x(note.startBeat, nowBeat);
+      const w = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
+      const y = this.#rowY(note.lane);
+      const h = this.#noteHeight;
+      const placed: PlacedNote = {
+        id: note.id,
+        opportunityIndex: note.opportunityIndex,
+        lane: note.lane,
+        duration: note.duration,
+        outcome: note.outcome,
+        rect: {
+          x: (x - this.#playLeft) / this.#playWidth,
+          y: (y - h / 2) / this.#height,
+          w: w / this.#playWidth,
+          h: h / this.#height,
+        },
+        beatsUntilStrike: note.startBeat - nowBeat,
+      };
+      const list = byAttempt.get(note.attemptKey);
+      if (list) list.push(placed);
+      else byAttempt.set(note.attemptKey, [placed]);
+
+      const span = spans.get(note.attemptKey);
+      const to = placed.rect.x + placed.rect.w;
+      if (!span) spans.set(note.attemptKey, { from: placed.rect.x, to });
+      else spans.set(note.attemptKey, { from: Math.min(span.from, placed.rect.x), to: Math.max(span.to, to) });
+    }
+
+    for (const [attemptKey, placed] of byAttempt) {
+      const span = spans.get(attemptKey) ?? { from: 0, to: 1 };
+      const skin = skinFor(attemptKey, placed, {
+        beat: nowBeat,
+        laneCount: LANE_COUNT,
+        span,
+      });
+      if (skin) resolved.set(attemptKey, { skin, span });
+    }
+    return resolved;
+  }
+
+  /** A skin's backdrop, clipped to the span its own notes occupy. */
+  #drawBackdrop(entry: { skin: TimelineSkin; span: { from: number; to: number } }): void {
+    const sprites = entry.skin.backdrop;
+    if (!sprites || sprites.length === 0) return;
+    const ctx = this.#ctx;
+
+    ctx.save();
+    const left = this.#playLeft + entry.span.from * this.#playWidth;
+    const right = this.#playLeft + entry.span.to * this.#playWidth;
+    ctx.beginPath();
+    ctx.rect(
+      Math.max(this.#playLeft, left),
+      0,
+      Math.max(0, Math.min(this.#width, right) - Math.max(this.#playLeft, left)),
+      this.#height
+    );
+    ctx.clip();
+    for (const sprite of sprites) this.#drawSkinSprite(sprite);
+    ctx.restore();
+  }
+
+  #drawSkinSprite(sprite: Sprite): void {
+    const image = this.#assets?.get(sprite.assetId);
+    if (!image) return;
+    const ctx = this.#ctx;
+    const h = this.#rowHeight * (sprite.scale ?? 1);
+    const w = image.width * (h / image.height);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, sprite.opacity ?? 1));
+    ctx.translate(this.#playLeft + sprite.x * this.#playWidth, sprite.y * this.#height);
+    if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
+    ctx.drawImage(image, -w / 2, sprite.anchor === "bottom" ? -h : -h / 2, w, h);
+    ctx.restore();
+  }
+
+  /**
+   * A skin's `underlay` or `overlay`: natural proportions, centred on the
+   * note's rect, free to bleed outside it.
+   *
+   * `scale` 1 means "as tall as a row", so a glow at 1.6 spills into the rows
+   * above and below by design. Only the playfield clips it, which is what keeps
+   * ornament off the gutter labels.
+   */
+  #drawNoteArt(
+    art: { assetId: string; scale?: number; opacity?: number },
+    x: number,
+    y: number,
+    width: number
+  ): void {
+    const image = this.#assets?.get(art.assetId);
+    if (!image) return;
+    const ctx = this.#ctx;
+    const h = this.#rowHeight * (art.scale ?? 1);
+    const w = image.width * (h / image.height);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1));
+    ctx.drawImage(image, x + width / 2 - w / 2, y - h / 2, w, h);
+    ctx.restore();
   }
 
   #resize(): void {
@@ -373,7 +545,7 @@ export class TimelineView {
    * small for the same reason: rounded ends would open a visible gap exactly
    * where the eye is tracking the line.
    */
-  #drawTarget(note: TargetNote, nowBeat: number): void {
+  #drawTarget(note: TargetNote, nowBeat: number, art?: NoteArt): void {
     const ctx = this.#ctx;
     const x = this.#x(note.startBeat, nowBeat);
     const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
@@ -382,17 +554,45 @@ export class TimelineView {
     const colour = this.#outcomeColour(note);
 
     ctx.save();
+    // The one clip a skin cannot escape. Ornament may bleed past the note as
+    // far as it likes and still never reach the gutter labels.
     this.#clipPlayfield();
 
-    ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
-    ctx.fillStyle = colour;
-    this.#roundRect(x, y - height / 2, width, height, 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
-    ctx.lineWidth = 1;
-    this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
-    ctx.stroke();
+    if (art?.underlay) this.#drawNoteArt(art.underlay, x, y, width);
+
+    const body = art?.body ? this.#assets?.get(art.body.assetId) : null;
+    if (body) {
+      // Stretched to the rect exactly, so note duration stays honest whatever
+      // is drawn around it.
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, art?.body?.opacity ?? 1));
+      ctx.drawImage(body, x, y - height / 2, width, height);
+      ctx.restore();
+    } else {
+      ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
+      ctx.fillStyle = colour;
+      this.#roundRect(x, y - height / 2, width, height, 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
+      ctx.lineWidth = 1;
+      this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
+      ctx.stroke();
+    }
+
+    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
+
+    // Judgment survives any skin. A minigame that supplies one sprite for every
+    // outcome gets it tinted; one that supplies a sprite per outcome has
+    // already said which is which and is left alone.
+    if (body && note.outcome) {
+      ctx.globalCompositeOperation = "source-atop";
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = colour;
+      ctx.fillRect(x, y - height / 2, width, height);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+    }
 
     ctx.restore();
   }

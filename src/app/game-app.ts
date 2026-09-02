@@ -69,7 +69,7 @@ import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import { TimelineView } from "../ui/timeline/timeline-view.js";
+import { TimelineView, type TimelineSkinSource } from "../ui/timeline/timeline-view.js";
 
 
 type Screen = "start" | "pregame" | "game" | "results";
@@ -211,6 +211,10 @@ export class GameApp {
     if (this.#assets.failed.length > 0) {
       console.warn("[goaterizer] assets failed to load:", this.#assets.failed);
     }
+
+    // Only the run timeline is skinnable. The pregame one has no attempt, so
+    // there is no scenario whose look it could belong to.
+    this.#gameView.setSkinSource(this.#assets, this.#timelineSkinFor);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -891,6 +895,21 @@ export class GameApp {
       onArrive: deliver,
     });
   }
+
+  /**
+   * Routes each note on the timeline to the minigame that authored it.
+   *
+   * Two attempts share the highway around a transition, so this is keyed by
+   * attempt rather than "the current scenario": the outgoing minigame keeps
+   * skinning its own notes all the way off the left edge while the incoming one
+   * skins its notes scrolling in from the right.
+   */
+  readonly #timelineSkinFor: TimelineSkinSource = (attemptKey, placed, view) => {
+    const attempt = [this.#current, this.#next, this.#previous].find(
+      (entry) => entry?.timelineKey === attemptKey
+    );
+    return attempt?.runtime.minigame.renderTimeline?.(placed, view) ?? null;
+  };
 
   /** Canvas-local point -> the energy overlay's coordinate space. */
   #toOverlay(canvasId: string, point: { x: number; y: number }): { x: number; y: number } | null {
