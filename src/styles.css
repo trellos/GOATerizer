@@ -866,6 +866,20 @@ button.chip[data-selected="true"] {
   font-weight: 700;
 }
 
+/*
+ * The level the *playing* minigame is actually at, independent of whatever
+ * the player has selected. A ring rather than a fill so it composes with
+ * `data-selected`'s solid fill when both land on the same column.
+ */
+.mg-table thead th button[data-current="true"] {
+  box-shadow: 0 0 0 1px var(--accent-strong) inset;
+  color: var(--accent-strong);
+}
+
+.mg-table thead th button[data-current="true"][data-selected="true"] {
+  box-shadow: 0 0 0 1px var(--text) inset;
+}
+
 .mg-table td {
   text-align: center;
   padding: 0.05rem 0.15rem;

@@ -192,6 +192,19 @@ export class DebugPanel {
     }
   }
 
+  /**
+   * Marks which column the *playing* minigame is actually at — distinct from
+   * `setMinigameTargetDifficulty`, which shows what the player forced (if
+   * anything). Normal, untouched play still moves this column-to-column as
+   * `DIFFICULTY_SEQUENCE` runs, so it is the only one of the two guaranteed to
+   * mean something on a run nobody has clicked the table for.
+   */
+  setMinigameCurrentDifficulty(level: number | null): void {
+    for (const [candidate, button] of this.#minigameDifficultyButtons) {
+      button.dataset["current"] = String(candidate === level);
+    }
+  }
+
   /** Pulses the pinned cell, or clears the pulse once the pin is consumed. */
   setMinigamePendingPin(key: string | null): void {
     if (this.#minigamePulsingCell) {

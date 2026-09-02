@@ -1366,6 +1366,7 @@ export class GameApp {
     const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
     if (this.#devMode) this.#resolveDevMinigameSlot(this.#run.currentSlot);
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
+    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
     this.#resetDuck();
     this.#refreshDrumBeat();
     this.#queueNextAttempt();
@@ -1522,6 +1523,7 @@ export class GameApp {
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
+    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
     // A new minigame starts on a full band. Carrying the previous attempt's
     // duck across would tell the player something untrue about the notes in
     // front of them.
@@ -1598,6 +1600,7 @@ export class GameApp {
 
     this.#current = null;
     this.#next = null;
+    this.#debug?.setMinigameCurrentDifficulty(null);
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
     // never be judged, and would play over the results screen.
