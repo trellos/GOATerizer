@@ -16,6 +16,8 @@ export type DebugHandlers = {
   onSourceChange: (source: "tuninator" | "synth" | "test") => void;
   onLatencyChange: (milliseconds: number) => void;
   onAutoplay: (mode: AutoplayMode) => void;
+  /** Turns per-minigame timeline art off, back to the host's default notes. */
+  onSkinsToggle: (enabled: boolean) => void;
 };
 
 export class DebugPanel {
@@ -51,6 +53,18 @@ export class DebugPanel {
       root
         .querySelector(`#dev-autoplay-${mode}`)
         ?.addEventListener("click", () => handlers.onAutoplay(mode));
+    }
+
+    // A skin is the one place a minigame can hurt readability, so there is a
+    // one-click way to see the same phrase with the host's default notes and
+    // decide whether the art or the timeline is at fault.
+    const skins = root.querySelector("#dev-skins");
+    if (skins instanceof HTMLElement) {
+      skins.addEventListener("click", () => {
+        const enabled = skins.dataset["selected"] !== "true";
+        skins.dataset["selected"] = String(enabled);
+        handlers.onSkinsToggle(enabled);
+      });
     }
 
     root.querySelector("#dev-close")?.addEventListener("click", () => this.setEnabled(false));

@@ -26,8 +26,11 @@ import {
   type Judged,
   type Minigame,
   type MinigameModule,
+  type NoteArt,
+  type PlacedNote,
   type Scene,
   type Sprite,
+  type TimelineSkin,
 } from "../../minigame/api.js";
 import { bool, num, obj, ScenarioDataError, str, strings } from "../parse.js";
 
@@ -65,6 +68,12 @@ export type ClimbAssetBindings = {
   waypointVisuals: readonly string[];
   destinationVisual: string;
   stepEffects: readonly string[];
+  /**
+   * Optional timeline note art. A climb scenario that omits the slot gets the
+   * host's default note bars, which is a complete and readable timeline — this
+   * only changes what the notes are made of.
+   */
+  timelineArt?: { body: string; outcrop: string };
 };
 
 export type ClimbConfig = {
@@ -127,6 +136,17 @@ const ACCENT_LIFT = -0.022;
 const WOBBLE_SHIFT = 0.0035;
 /** Degrees of lean at full Wobble. */
 const WOBBLE_TILT = 9;
+
+/*
+ * Timeline note art.
+ *
+ * The crag is taller than a lane by design — that is the whole point of an
+ * `underlay` — and the two opacities are what make the ridge build up behind
+ * the phrase as it is played rather than being a static texture.
+ */
+const CRAG_SCALE = 1.55;
+const CRAG_FADED = 0.55;
+const CRAG_SOLID = 0.95;
 
 export class ClimbMinigame implements Minigame {
   readonly #route: RouteData;
@@ -342,6 +362,40 @@ export class ClimbMinigame implements Minigame {
     return { background: this.#bindings.background, sprites };
   }
 
+  /**
+   * The phrase, as rock.
+   *
+   * Every note becomes a stone ledge with a crag rising behind it, so the
+   * timeline reads as terrain the player is climbing rather than a grid of
+   * bars — the same verb the scenario panel is showing, one beat ahead of it.
+   *
+   * The crag is drawn at nearly twice a lane's height on purpose: it is an
+   * `underlay`, so it bleeds above and below the note's own rect and the
+   * outcrops of neighbouring notes overlap into a ridge line. None of it
+   * carries information. The host's rect still says pitch, time and duration,
+   * and the host still draws the player's own note on top.
+   */
+  renderTimeline(placed: readonly PlacedNote[]): TimelineSkin | null {
+    const art = this.#bindings.timelineArt;
+    if (!art) return null;
+
+    const notes = new Map<string, NoteArt>();
+    for (const note of placed) {
+      notes.set(note.id, {
+        underlay: {
+          assetId: art.outcrop,
+          scale: CRAG_SCALE,
+          // A note still to be played sits back in the haze; one that has been
+          // judged is solid, so the ridge fills in behind the phrase as it is
+          // played.
+          opacity: note.outcome === null ? CRAG_FADED : CRAG_SOLID,
+        },
+        body: { assetId: art.body },
+      });
+    }
+    return { notes };
+  }
+
   /* ------------------------------------------------------------------ */
 
   get showDestination(): boolean {
@@ -419,7 +473,23 @@ function parseBindings(raw: unknown, where: string): ClimbAssetBindings {
     // Slot ordering is part of the class contract: [0] is the contact effect
     // where the climber lands, [1] the clean-progress accent.
     stepEffects: many("stepEffects", 2),
+    ...(bindings["timelineArt"] === undefined
+      ? {}
+      : { timelineArt: parseTimelineArt(bindings["timelineArt"], `${where}.timelineArt`) }),
   };
+}
+
+function parseTimelineArt(raw: unknown, where: string): { body: string; outcrop: string } {
+  const art = obj(raw, where);
+  const one = (slot: string): string => {
+    const values = strings(art[slot], `${where}.${slot}`);
+    const first = values[0];
+    if (values.length !== 1 || first === undefined) {
+      throw new ScenarioDataError(`${where}.${slot}`, "expected exactly one asset id");
+    }
+    return first;
+  };
+  return { body: one("body"), outcrop: one("outcrop") };
 }
 
 function parseRoute(raw: unknown, where: string, expectedWaypoints: number): RouteData {
@@ -536,6 +606,7 @@ export const CLIMB_MINIGAME: MinigameModule = {
       ...bindings.waypointVisuals,
       bindings.destinationVisual,
       ...bindings.stepEffects,
+      ...(bindings.timelineArt ? [bindings.timelineArt.body, bindings.timelineArt.outcrop] : []),
     ];
   },
 

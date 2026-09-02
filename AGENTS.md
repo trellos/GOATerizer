@@ -222,6 +222,22 @@ Examples:
 
 A minigame class must not contain scenario-specific asset names.
 
+A minigame is reached **only** through `src/minigame/api.ts`, which imports
+nothing (see `DECISION_LOG.md`, DECISION-023). The contract, in short:
+
+- it receives judged notes, measure boundaries, earned stars and completion;
+- it returns a `Scene` — billboards in normalised 0..1 space — and optionally a
+  `TimelineSkin` for its own target notes;
+- every lifecycle method returns `void`, so it cannot award score or stars, end
+  an attempt, or move a note;
+- it never calls the host, holds no callbacks, and never reads a clock: `beat`
+  is always a parameter;
+- its scenario `config` and per-level `data` are `unknown` to the host and
+  validated by its own parsers.
+
+Do not add a minigame's name to `game/`, `ui/`, `scenario/types.ts` or
+`scenario/load.ts`. Register it in `scenario/registry.ts` instead.
+
 ### Scenarios Own
 
 Data.

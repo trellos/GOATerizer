@@ -410,6 +410,9 @@ export class GameApp {
       onAutoplay: (mode) => {
         void this.#setAutoplayMode(mode);
       },
+      onSkinsToggle: (enabled) => {
+        this.#gameView?.setSkinSource(this.#assets, enabled ? this.#timelineSkinFor : null);
+      },
     });
     this.#debug.setEnabled(this.#devMode);
 

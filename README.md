@@ -155,7 +155,7 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
                                               │  normalised guitar events
                                               ▼
                                      AttemptRuntime
-                            (TargetJudge, AttemptScore, StarMeter, ClimbMinigame)
+                          (TargetJudge, AttemptScore, StarMeter, Minigame)
                                               │  judgment + energy
                      ┌────────────────────────┼────────────────────────┐
                      ▼                        ▼                        ▼
@@ -169,7 +169,8 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
 | `src/music/` | Degrees, keys, transposition, guitar fingerings, pitch maths |
 | `src/input/` | The `GuitarInputProvider` boundary, the Tuninator adapter, the deterministic test provider |
 | `src/game/` | Target resolution, judgment, score, stars, the attempt, the 16-slot run, ranks |
-| `src/scenario/` | Scenario schema and loader, the registry, `ClimbMinigame` |
+| `src/minigame/` | The game↔minigame API and the minigame registry |
+| `src/scenario/` | Scenario schema and loader, the scenario registry, `ClimbMinigame` |
 | `src/ui/` | Timeline model and view, scenario strip, energy streaks, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
 | `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
@@ -181,9 +182,15 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
   into attack / retune / sustain / release events in audio-clock time. Nothing
   downstream knows Tuninator exists; nothing in the adapter knows what a scale
   degree is. GOATerizer implements no pitch detection of its own.
-- **`ClimbMinigame` contains no scenario-specific asset names.** It is handed a
-  route, class asset *slots* and class parameters. Rocky Ascent decides those
-  slots hold goats and boulders.
+- **A minigame is an API, not a type the engine knows.** `src/minigame/api.ts`
+  is the whole boundary and imports nothing, so a package needs that one file.
+  The minigame is code; its output is data. It receives judged notes, measure
+  boundaries, stars and completion, and returns a `Scene` of billboards in
+  normalised 0..1 space — every lifecycle method returns `void`, so it
+  structurally cannot award score or stars, end an attempt or move a note. Its
+  scenario `config` and per-level `data` are `unknown` to the host and validated
+  by the minigame's own parsers, so a scenario defines whatever shape its
+  minigame wants. See `DECISION_LOG.md` (DECISION-023).
 - **The timeline has one model and one presentation.** Key View renders
   `TimelineModel`; there is no second scoring engine. Tablature View was removed
   (`DECISION_LOG.md`, DECISION-021) — the vertical axis is harmonic role, and
@@ -193,6 +200,11 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
   and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).
 - **Timing is derived, never accumulated.** One anchor plus a linear map, so a
   tempo change is exact and a dropped frame moves nothing.
+- **A minigame may skin its own timeline notes.** The host owns every rect —
+  time, pitch and duration — and the minigame owns the paint, in three slots: a
+  glow and an ornament that bleed freely outside the note, and a body stretched
+  to the rect exactly. The played-note row and strike line always draw on top,
+  and `?dev=1` has a one-click toggle back to the default look.
 - **Scenario data drives content.** Adding another `ClimbMinigame` scenario means
   a JSON file, art, and one line in `src/scenario/registry.ts`.
 

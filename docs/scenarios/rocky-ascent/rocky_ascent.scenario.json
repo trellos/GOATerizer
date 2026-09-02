@@ -78,7 +78,15 @@
     "stepEffects": [
       "fx_rocky_ascent_dust",
       "fx_rocky_ascent_tick"
-    ]
+    ],
+    "timelineArt": {
+      "body": [
+        "note_rocky_ascent_ledge"
+      ],
+      "outcrop": [
+        "note_rocky_ascent_crag"
+      ]
+    }
   },
   "assets": [
     {

@@ -42,7 +42,18 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { background, dust, goal, goatFinish, goatPose, GOAT_LEGS, step, tick } from "./lib/rocky-art.mjs";
+import {
+  background,
+  crag,
+  dust,
+  goal,
+  goatFinish,
+  goatPose,
+  GOAT_LEGS,
+  ledge,
+  step,
+  tick,
+} from "./lib/rocky-art.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCENARIOS_ROOT = path.resolve(here, "..", "public", "assets", "scenarios");
@@ -75,6 +86,10 @@ for (const { dir, idPrefix, seed } of FAMILIES) {
     // and every reason to keep Rocky Ascent's original file reproducible.
     [`fx_${idPrefix}_dust`]: () => dust(),
     [`fx_${idPrefix}_tick`]: () => tick(),
+    // Timeline note art. Bound through `assetBindings.timelineArt`, so a climb
+    // scenario that omits the slot simply gets the host's default note bars.
+    [`note_${idPrefix}_ledge`]: () => ledge(),
+    [`note_${idPrefix}_crag`]: () => crag(),
   };
 
   mkdirSync(outDir, { recursive: true });

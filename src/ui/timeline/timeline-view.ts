@@ -59,6 +59,14 @@ export type TimelineSkinSource = (
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
 
+/**
+ * How strongly a skinned note is washed with its own colour.
+ *
+ * Enough that upcoming, Perfect, Good and Miss stay tellable apart across any
+ * art a scenario supplies; light enough that the art still reads under it.
+ */
+const JUDGMENT_WASH = 0.62;
+
 const THEME = {
   ground: "#0d1014",
   gutter: "#12161c",
@@ -565,7 +573,8 @@ export class TimelineView {
       // Stretched to the rect exactly, so note duration stays honest whatever
       // is drawn around it.
       ctx.save();
-      ctx.globalAlpha = Math.max(0, Math.min(1, art?.body?.opacity ?? 1));
+      ctx.globalAlpha =
+        Math.max(0, Math.min(1, art?.body?.opacity ?? 1)) * (note.outcome === "miss" ? 0.4 : 1);
       ctx.drawImage(body, x, y - height / 2, width, height);
       ctx.restore();
     } else {
@@ -580,19 +589,22 @@ export class TimelineView {
       ctx.stroke();
     }
 
-    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
-
-    // Judgment survives any skin. A minigame that supplies one sprite for every
-    // outcome gets it tinted; one that supplies a sprite per outcome has
-    // already said which is which and is left alone.
-    if (body && note.outcome) {
-      ctx.globalCompositeOperation = "source-atop";
-      ctx.globalAlpha = 0.45;
+    // The colour language survives any skin.
+    //
+    // Applied whether or not the note has been judged, because "an upcoming
+    // target" is a state the player reads at a glance too -- a skin that turned
+    // every note to stone and left only the judged ones coloured would make the
+    // thing you are about to play the *least* visible object on the timeline.
+    // A minigame that wants full control supplies an opaque body per outcome
+    // and paints over this.
+    if (body) {
+      ctx.globalAlpha = JUDGMENT_WASH * (note.outcome === "miss" ? 0.4 : 1);
       ctx.fillStyle = colour;
       ctx.fillRect(x, y - height / 2, width, height);
       ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
     }
+
+    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
 
     ctx.restore();
   }

@@ -323,6 +323,50 @@ describe("ClimbMinigame progress", () => {
     expect(climber.assetId).toBe(ASCENT.bindings.finishPose);
   });
 
+  it("skins its own timeline notes without being able to move one", () => {
+    const h = harness(1);
+    const climb = climbIn(h.attempt);
+    const placed = h.attempt.targets.slice(0, 3).map((target, index) => ({
+      id: `a0-${index}`,
+      opportunityIndex: target.opportunityIndex,
+      lane: target.lane,
+      duration: target.duration,
+      outcome: null,
+      rect: { x: 0.1 * index, y: 0.2, w: 0.05, h: 0.1 },
+      beatsUntilStrike: target.startBeat,
+    }));
+    const before = structuredClone(placed);
+
+    const skin = climb.renderTimeline(placed);
+    expect(skin?.notes?.size).toBe(3);
+    for (const note of placed) {
+      const art = skin!.notes!.get(note.id)!;
+      // Bound art, and only art: the crag is an underlay that bleeds outside
+      // the rect, the ledge is the body stretched to it.
+      expect(art.body?.assetId).toBe(ASCENT.bindings.timelineArt?.body);
+      expect(art.underlay?.assetId).toBe(ASCENT.bindings.timelineArt?.outcrop);
+      expect(art.underlay?.scale).toBeGreaterThan(1);
+    }
+    // The host owns geometry absolutely. A skin is handed rects and returns
+    // art; there is no path by which it could have changed one.
+    expect(placed).toEqual(before);
+  });
+
+  it("asks for no note art at all when the scenario binds none", () => {
+    const level = ascentLevel(1);
+    const bare = new ClimbMinigame({
+      route: level.route,
+      bindings: { ...ASCENT.bindings, timelineArt: undefined },
+      parameters: {
+        badNotePolicy: ASCENT.badNotePolicy,
+        showDestinationFromStart: ASCENT.showDestinationFromStart,
+      },
+      resetBetweenMeasures: level.resetBetweenMeasures,
+    });
+    // Null means "use the host's default notes", which is a complete timeline.
+    expect(bare.renderTimeline([])).toBeNull();
+  });
+
   it("freezes at the furthest earned waypoint when the attempt fails", () => {
     const h = harness(1);
     const target = h.attempt.targets[0]!;

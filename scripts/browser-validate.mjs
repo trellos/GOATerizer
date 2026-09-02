@@ -443,6 +443,73 @@ try {
     `${await dev(page, "perfect/good/miss")} judged, waypoint ${waypointMid}`
   );
   check("scenario strip is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
+
+  /* --- the scenario's timeline art ----------------------------------- */
+
+  /*
+   * A minigame may skin its own target notes, and it is the one place a
+   * scenario can hurt readability. These check the properties that make that
+   * safe rather than checking it looks nice.
+   *
+   * The probe is the moss green in the Rocky crag sprite. Nothing else on this
+   * timeline is green: the note colours are cyan and gold, the bass and grid
+   * are blue-grey, and the labels are neutral. It tests *greenness* rather than
+   * nearness to one RGB triple, because an antialiased grey label pixel lands
+   * close to the moss triple by distance while never being green at all. The
+   * Good-note colour is green, but a flawless autoplay never produces one.
+   *
+   * Counting a colour says exactly where the art did and did not reach, and
+   * unlike hashing a strip of pixels it does not care that the timeline is
+   * scrolling the whole time.
+   */
+  const countMoss = (region) =>
+    page.evaluate((where) => {
+      const canvas = document.getElementById("game-canvas");
+      const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
+      if (!ctx || !(canvas instanceof HTMLCanvasElement)) return -1;
+      // The gutter is at most 30% of the width; 15% is safely inside it.
+      const gutter = Math.round(canvas.width * 0.15);
+      const x = where === "gutter" ? 0 : gutter;
+      const w = where === "gutter" ? gutter : canvas.width - gutter;
+      const { data } = ctx.getImageData(x, 0, w, canvas.height);
+      let moss = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        if (g - r > 12 && g - b > 20 && g > 95 && g < 165) moss += 1;
+      }
+      return moss;
+    }, region);
+
+  const skinnedNotes = await countMoss("notes");
+  const skinnedGutter = await countMoss("gutter");
+
+  await page.click("#dev-skins");
+  await page.waitForTimeout(250);
+  const plainNotes = await countMoss("notes");
+  await page.screenshot({ path: path.join(SHOTS, "04b-notes-unskinned.png") });
+  await page.click("#dev-skins");
+  await page.waitForTimeout(250);
+  const restored = await countMoss("notes");
+
+  check(
+    "the scenario's note art actually reaches the timeline",
+    skinnedNotes > 0,
+    `${skinnedNotes} px of scenario art`
+  );
+  check(
+    "note art never reaches the gutter, however far it bleeds past a note",
+    skinnedGutter === 0,
+    `${skinnedGutter} px in the gutter`
+  );
+  check(
+    "the dev toggle restores the host's default notes exactly",
+    plainNotes === 0,
+    `${plainNotes} px of scenario art with the toggle off`
+  );
+  check("and puts the scenario's art back", restored > 0, `${restored} px`);
+
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
