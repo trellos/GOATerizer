@@ -49,7 +49,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { background, dust, goal, goatFinish, goatPose, GOAT_LEGS, step, tick } from "./lib/rocky-art.mjs";
+import { background, dust, goal, step, tick } from "./lib/rocky-art.mjs";
 import {
   beachBackground,
   broAction,
@@ -90,14 +90,13 @@ function writeScenarioAssets(dir, assets) {
   );
 }
 
+// The climber pose cycle (`goat_<idPrefix>_advance_01..04` and `_finish`) is
+// intentionally NOT generated here any more: it now ships real art (Mountain
+// Goat Sprites by Sevarihk, CC-BY 4.0 — see docs/assets/ASSET_SOURCES.md) in
+// all four directories below. Re-running this generator must not clobber it.
 for (const { dir, idPrefix, seed } of FAMILIES) {
   writeScenarioAssets(dir, {
     [`bg_${idPrefix}`]: () => background(undefined, seed),
-    [`goat_${idPrefix}_advance_01`]: () => goatPose(GOAT_LEGS[0]),
-    [`goat_${idPrefix}_advance_02`]: () => goatPose(GOAT_LEGS[1]),
-    [`goat_${idPrefix}_advance_03`]: () => goatPose(GOAT_LEGS[2]),
-    [`goat_${idPrefix}_advance_04`]: () => goatPose(GOAT_LEGS[3]),
-    [`goat_${idPrefix}_finish`]: () => goatFinish(),
     [`prop_${idPrefix}_step`]: () => step(),
     [`prop_${idPrefix}_goal`]: () => goal(),
     // Dust keeps its own default seed regardless of family: it is a small,

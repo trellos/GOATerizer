@@ -1,0 +1,12 @@
+GOATerizer — third-party art credits
+
+Rocky Ascent (and its companions: Rocky Ascent High, Rocky Descent, Rocky
+Descent High) — climber pose cycle
+
+"Mountain Goat Sprites" by Sevarihk
+https://opengameart.org/content/mountain-goat-sprites
+Licence: CC-BY 4.0
+
+Used under CC-BY 4.0: cropped, mirrored and downsampled from
+bergschaf-laufanimation-f.png and bergschaf-bocksprung-f.png. No colour was
+changed. See docs/assets/ASSET_SOURCES.md for full provenance.
