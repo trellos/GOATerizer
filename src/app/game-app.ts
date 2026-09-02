@@ -43,6 +43,8 @@ import {
   type AutoplayMode,
 } from "../dev/auto-performance.js";
 import { SyntheticGuitarSource } from "../dev/synthetic-guitar.js";
+import { AutoplayMonitor } from "../dev/autoplay-monitor.js";
+import { cellKey, resolveMinigameOverride } from "../dev/minigame-families.js";
 import { pickWeightedKey } from "../config/key-weighting.js";
 import {
   DEFAULT_TEMPO_ID,
@@ -228,6 +230,13 @@ export class GameApp {
   #providerKind: "tuninator" | "test" = "tuninator";
   #synth: SyntheticGuitarSource | null = null;
   /**
+   * Plucks autoplay's gestures into the audible mix, purely so a developer can
+   * hear what autoplay is doing. Independent of `#synth`: it exists whichever
+   * sink (`synth` or `test`) is driving judgment, and never feeds the
+   * recognizer. See `src/dev/autoplay-monitor.ts`.
+   */
+  #autoplayMonitor: AutoplayMonitor | null = null;
+  /**
    * True while `#provider` is a real `TuninatorGuitarInputProvider` whose mic
    * was intercepted by `#synth`. Tracked separately from `#providerKind`,
    * which stays `"tuninator"` in this case — as far as the adapter can tell,
@@ -306,6 +315,14 @@ export class GameApp {
    */
   #devLevel: number | null = null;
   #devScenarioId: string | null = null;
+  /**
+   * The dev panel's minigame table (`src/dev/minigame-families.ts`). All three
+   * default to "no override", so a run nobody has touched the table for is
+   * unaffected: `#resolveDevMinigameSlot` is a no-op until one of these is set.
+   */
+  #devDisabledCells = new Set<string>();
+  #devTargetDifficulty: number | null = null;
+  #devPendingPin: { family: string; difficulty: number } | null = null;
   /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
   #devCalibrateOffsetMs: number | null = null;
   /**
@@ -631,6 +648,9 @@ export class GameApp {
       onAutoplay: (mode) => {
         void this.#setAutoplayMode(mode);
       },
+      onMinigameCellToggle: (family, level) => this.#onMinigameCellToggle(family, level),
+      onMinigameDifficultySelect: (level) => this.#onMinigameDifficultySelect(level),
+      onMinigameCellPin: (family, level) => this.#onMinigameCellPin(family, level),
     });
     this.#debug.setEnabled(this.#devMode);
     // A trim remembered from a previous session has to show in the panel, or
@@ -1337,7 +1357,9 @@ export class GameApp {
     // from the beat the player is *hearing*, so the lead-in they actually get
     // is the one the constant names however much latency their rig has.
     const startBeat = this.#transport.nextMeasureBoundary(this.#heardBeat) + RUN_LEAD_IN_BEATS;
+    if (this.#devMode) this.#resolveDevMinigameSlot(this.#run.currentSlot);
     this.#current = this.#createAttempt(this.#run.currentSlot, startBeat);
+    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
     this.#resetDuck();
     this.#refreshDrumBeat();
     this.#queueNextAttempt();
@@ -1375,6 +1397,7 @@ export class GameApp {
       this.#next = null;
       return;
     }
+    if (this.#devMode) this.#resolveDevMinigameSlot(run.nextSlot);
     this.#next = this.#createAttempt(run.nextSlot, current.runtime.endBeat + TRANSITION_BEATS);
   }
 
@@ -1493,6 +1516,7 @@ export class GameApp {
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
+    this.#debug?.setMinigameCurrentDifficulty(this.#current?.runtime.difficulty ?? null);
     // A new minigame starts on a full band. Carrying the previous attempt's
     // duck across would tell the player something untrue about the notes in
     // front of them.
@@ -1569,6 +1593,7 @@ export class GameApp {
 
     this.#current = null;
     this.#next = null;
+    this.#debug?.setMinigameCurrentDifficulty(null);
     this.#timeline.clearTargets();
     // The run is over; anything still queued belongs to an attempt that will
     // never be judged, and would play over the results screen.
@@ -2039,6 +2064,58 @@ export class GameApp {
   }
 
   /* ------------------------------------------------------------------ */
+  /* Dev minigame table                                                  */
+  /* ------------------------------------------------------------------ */
+
+  #onMinigameCellToggle(family: string, level: number): void {
+    const key = cellKey(family, level);
+    const disabled = !this.#devDisabledCells.has(key);
+    if (disabled) this.#devDisabledCells.add(key);
+    else this.#devDisabledCells.delete(key);
+    this.#debug?.setMinigameCellDisabled(family, level, disabled);
+  }
+
+  /** Clicking the already-selected number clears the override. */
+  #onMinigameDifficultySelect(level: number): void {
+    this.#devTargetDifficulty = this.#devTargetDifficulty === level ? null : level;
+    this.#debug?.setMinigameTargetDifficulty(this.#devTargetDifficulty);
+  }
+
+  /**
+   * Pinning re-enables the cell: pulsing a cell the player just disabled would
+   * promise a minigame that can never be selected.
+   */
+  #onMinigameCellPin(family: string, level: number): void {
+    const key = cellKey(family, level);
+    this.#devDisabledCells.delete(key);
+    this.#devPendingPin = { family, difficulty: level };
+    this.#debug?.setMinigameCellDisabled(family, level, false);
+    this.#debug?.setMinigamePendingPin(key);
+  }
+
+  /**
+   * Applies the table's overrides to a `RunSlot` immediately before it is
+   * turned into an attempt — late enough that the override always wins, early
+   * enough to be indistinguishable from `fillSlots` having picked differently.
+   * A no-op whenever nothing overrides the slot (`resolveMinigameOverride`).
+   */
+  #resolveDevMinigameSlot(slot: RunSlot | null): void {
+    if (!slot) return;
+    const resolution = resolveMinigameOverride(slot, {
+      disabledCells: this.#devDisabledCells,
+      targetDifficulty: this.#devTargetDifficulty,
+      pendingPin: this.#devPendingPin,
+    });
+    if (!resolution) return;
+    slot.difficulty = resolution.difficulty;
+    slot.scenario = resolution.scenario;
+    if (resolution.pinConsumed) {
+      this.#devPendingPin = null;
+      this.#debug?.setMinigamePendingPin(null);
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
   /* Dev autoplay                                                        */
   /* ------------------------------------------------------------------ */
 
@@ -2144,6 +2221,18 @@ export class GameApp {
     const testProvider = this.#provider instanceof TestGuitarInputProvider ? this.#provider : null;
     if (!synth && !testProvider) return;
 
+    // The monitor is a third, independent voice — it exists whichever sink is
+    // actually driving judgment, purely so the performance can be heard.
+    // Lazily built because it needs the audio context, which "test" input
+    // does not otherwise require (`#switchProvider`), but pregame unlocks
+    // audio unconditionally, so both are available by the time an attempt runs.
+    const context = this.#audio.context;
+    const master = this.#audio.master;
+    if (!this.#autoplayMonitor && context && master) {
+      this.#autoplayMonitor = new AutoplayMonitor(context, master);
+    }
+    const monitor = this.#autoplayMonitor;
+
     const secondsPerBeat = this.#transport.secondsPerBeat;
     // The same quantity `#toBeat` subtracts from a detected event, added back
     // so an autoplayed note is judged as landing on the target rather than
@@ -2161,6 +2250,22 @@ export class GameApp {
       if (attackTime <= earliest) return;
 
       const slotSeconds = gesture.durationBeats * secondsPerBeat;
+
+      /*
+       * The pluck has to leave real silence before the next attack: on the
+       * synthetic-mic sink, Tuninator ends a Note only after
+       * `tracking.releaseGraceMs` of it, and a Note that never ends never
+       * becomes a `release`. Take the gap out of the slot, then clamp — the
+       * floor is what keeps a fast passage audible at all, at the cost of
+       * separation it cannot have. The monitor reuses the same shape purely
+       * so distinct notes stay audibly distinct.
+       */
+      const sounding = Math.min(
+        AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS,
+        Math.max(AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS, slotSeconds - AUTOPLAY_PLUCK_GAP_SECONDS)
+      );
+      monitor?.pluck(gesture.midi, attackTime, sounding);
+
       if (testProvider) {
         const id = `auto-${attempt.timelineKey}-${index}`;
         testProvider.schedule([
@@ -2170,17 +2275,6 @@ export class GameApp {
         return;
       }
 
-      /*
-       * The synthetic pluck has to leave real silence before the next attack:
-       * Tuninator ends a Note only after `tracking.releaseGraceMs` of it, and a
-       * Note that never ends never becomes a `release`. Take the gap out of the
-       * slot, then clamp — the floor is what keeps a fast passage audible at
-       * all, at the cost of separation it cannot have.
-       */
-      const sounding = Math.min(
-        AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS,
-        Math.max(AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS, slotSeconds - AUTOPLAY_PLUCK_GAP_SECONDS)
-      );
       synth?.pluck(gesture.midi, attackTime, sounding);
     });
   }
@@ -2190,5 +2284,6 @@ export class GameApp {
     this.#autoplayScheduled.clear();
     if (this.#provider instanceof TestGuitarInputProvider) this.#provider.clearSchedule();
     this.#synth?.cancelFrom(this.#audio.now());
+    this.#autoplayMonitor?.cancelFrom(this.#audio.now());
   }
 }

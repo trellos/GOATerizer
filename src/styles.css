@@ -816,6 +816,106 @@ button.chip[data-selected="true"] {
   max-width: 11rem;
 }
 
+/*
+ * The minigame family x difficulty table. Rows are the six permanent
+ * families (`src/dev/minigame-families.ts`); columns 1-7. A blank cell means
+ * no scenario authors that combination yet. An `o` button toggles that cell's
+ * availability; the header numbers pick the sticky forced difficulty.
+ */
+.mg-table-wrap {
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.4rem 0;
+  margin-bottom: 0.4rem;
+}
+
+.mg-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.mg-table th {
+  font-weight: 400;
+  color: var(--text-dim);
+  text-align: left;
+  padding: 0.05rem 0.3rem;
+}
+
+.mg-table thead th {
+  text-align: center;
+  padding: 0.05rem 0.15rem;
+}
+
+.mg-table thead th button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font: inherit;
+  padding: 0.05rem 0.25rem;
+  cursor: pointer;
+}
+
+.mg-table thead th button[data-selected="true"] {
+  background: var(--accent);
+  border-color: var(--accent-strong);
+  color: #04161c;
+  font-weight: 700;
+}
+
+/*
+ * The level the *playing* minigame is actually at, independent of whatever
+ * the player has selected. A ring rather than a fill so it composes with
+ * `data-selected`'s solid fill when both land on the same column.
+ */
+.mg-table thead th button[data-current="true"] {
+  box-shadow: 0 0 0 1px var(--accent-strong) inset;
+  color: var(--accent-strong);
+}
+
+.mg-table thead th button[data-current="true"][data-selected="true"] {
+  box-shadow: 0 0 0 1px var(--text) inset;
+}
+
+.mg-table td {
+  text-align: center;
+  padding: 0.05rem 0.15rem;
+}
+
+.mg-cell {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  font: inherit;
+  line-height: 1;
+  padding: 0.05rem 0.2rem;
+  cursor: pointer;
+}
+
+.mg-cell[data-disabled="true"] {
+  color: var(--text-dim);
+  opacity: 0.35;
+}
+
+.mg-cell[data-pulsing="true"] {
+  animation: mg-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes mg-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(1.3);
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
