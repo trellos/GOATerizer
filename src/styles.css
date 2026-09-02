@@ -817,9 +817,14 @@ button.chip[data-selected="true"] {
 }
 
 /*
- * The minigame family x difficulty table. Rows are the six permanent
- * families (`src/dev/minigame-families.ts`); columns 1-7. A blank cell means
- * no scenario authors that combination yet. An `o` button toggles that cell's
+ * The minigame family x difficulty table. Columns are 1-7; a bold, full-width
+ * heading row names each family (`src/dev/minigame-families.ts`), and below
+ * it one row per scenario that family actually has registered — a family
+ * with several (Rocky Ascent, Rocky Ascent High, ...) gets one row per
+ * variant rather than folding them into a single cell, so each can be
+ * toggled or pinned on its own. A family nothing authors yet is just its
+ * heading, with no rows under it. A blank cell means this row's scenario
+ * does not author that level. An `o` button toggles that cell's
  * availability; the header numbers pick the sticky forced difficulty.
  */
 .mg-table-wrap {
@@ -842,6 +847,23 @@ button.chip[data-selected="true"] {
   color: var(--text-dim);
   text-align: left;
   padding: 0.05rem 0.3rem;
+}
+
+/* The family name, as its own full-width row above its variants. */
+.mg-family-row th {
+  color: var(--text);
+  font-weight: 600;
+  text-align: left;
+  padding-top: 0.35rem;
+}
+
+.mg-family-row:first-child th {
+  padding-top: 0.05rem;
+}
+
+/* The variant's own name, indented under its family heading. */
+.mg-table tbody th[scope="row"] {
+  padding-left: 0.9rem;
 }
 
 .mg-table thead th {
@@ -898,6 +920,19 @@ button.chip[data-selected="true"] {
 .mg-cell[data-disabled="true"] {
   color: var(--text-dim);
   opacity: 0.35;
+}
+
+/*
+ * The one cell that is actually playing right now — a contrast fill rather
+ * than the header ring's outline, because with several scenarios able to
+ * share a difficulty column (`scenariosForFamily`) the ring alone cannot say
+ * *which* row is live; this names the exact scenario.
+ */
+.mg-cell[data-current="true"] {
+  background: var(--good);
+  color: #04161c;
+  border-radius: 3px;
+  font-weight: 700;
 }
 
 .mg-cell[data-pulsing="true"] {
