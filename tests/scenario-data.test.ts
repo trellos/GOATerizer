@@ -132,43 +132,28 @@ describe("Rocky Ascent scenario", () => {
     }
   });
 
-  it.each(LEVELS)("L%i authors one waypoint per note opportunity", (difficulty) => {
-    const data = level(difficulty);
-    expect(climbLevel(difficulty).route.waypoints).toHaveLength(data.noteOpportunityCount);
+  /*
+   * The route tests that used to live here are gone with the route.
+   *
+   * A climb authored a start position, a destination and one waypoint per note
+   * opportunity, as coordinates in a scenario panel — and those tests checked
+   * that the waypoints stayed in the frame, ascended, and matched the note
+   * count. There is no panel (GDD §11.2): the note bars are the footholds, so
+   * every one of those properties is now structural rather than authored, and
+   * cannot be got wrong by an edit to a scenario file.
+   *
+   * What is left worth asserting is that the climb still escalates with
+   * difficulty — which it does through the music now, not through geometry.
+   */
+  it.each(LEVELS)("L%i spans all four measures in one continuous arc", (difficulty) => {
+    expect(climbLevel(difficulty).visualSpanMeasures).toBe(4);
+    expect(climbLevel(difficulty).resetBetweenMeasures).toBe(false);
   });
 
-  it.each(LEVELS)("L%i waypoints stay inside normalised scenario space", (difficulty) => {
-    for (const wp of climbLevel(difficulty).route.waypoints) {
-      expect(wp.x).toBeGreaterThanOrEqual(0);
-      expect(wp.x).toBeLessThanOrEqual(1);
-      expect(wp.y).toBeGreaterThanOrEqual(0);
-      expect(wp.y).toBeLessThanOrEqual(1);
-    }
-  });
-
-  it.each(LEVELS)("L%i climbs: every waypoint is above the previous one", (difficulty) => {
-    const waypoints = climbLevel(difficulty).route.waypoints;
-    for (let i = 1; i < waypoints.length; i += 1) {
-      // y is downwards, so "higher up the mountain" is a smaller y.
-      expect(waypoints[i]!.y).toBeLessThan(waypoints[i - 1]!.y);
-    }
-    expect(waypoints[0]!.y).toBeLessThan(climbLevel(difficulty).route.startPosition.y);
-  });
-
-  it("escalates visually with difficulty", () => {
-    const rise = (difficulty: number) => {
-      const route = climbLevel(difficulty).route;
-      const last = route.waypoints[route.waypoints.length - 1]!;
-      return route.startPosition.y - last.y;
-    };
-    // L4's climb covers more vertical frame than L1's, on twice the steps.
-    expect(rise(4)).toBeGreaterThan(rise(1));
-    expect(rise(3)).toBeGreaterThan(rise(1));
-    // ...and its summit sits nearer the top of the frame.
-    const summitY = (d: number) => climbLevel(d).route.destination.y;
-    expect(summitY(4)).toBeLessThan(summitY(3));
-    expect(summitY(3)).toBeLessThan(summitY(2));
-    expect(summitY(2)).toBeLessThan(summitY(1));
+  it("escalates with difficulty: more notes to climb, not a bigger drawing", () => {
+    const footholds = (difficulty: number) => level(difficulty).noteOpportunityCount;
+    expect(footholds(4)).toBeGreaterThan(footholds(1));
+    expect(footholds(3)).toBeGreaterThan(footholds(1));
   });
 
   it.each(LEVELS)("L%i star thresholds ascend and three stars means all Perfect", (difficulty) => {
@@ -201,9 +186,10 @@ describe("Rocky Ascent scenario", () => {
       bindings.background,
       ...bindings.climberPoses,
       bindings.finishPose,
-      ...bindings.waypointVisuals,
       bindings.destinationVisual,
       ...bindings.stepEffects,
+      bindings.footholdArt.body,
+      bindings.footholdArt.crag,
     ];
     for (const id of ids) expect(ROCKY_ASCENT.assetUrls[id]).toMatch(/\.png$/);
   });

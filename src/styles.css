@@ -198,7 +198,13 @@ button.chip[data-selected="true"] {
  */
 .play-screen[data-active="true"] {
   display: grid;
-  grid-template-rows: var(--topbar-height) minmax(0, 58fr) minmax(0, 42fr);
+  /*
+   * Two rows, not three. The scenario strip is gone (GDD §11.2): the timeline
+   * is the only play surface, so it takes the whole play area on BOTH screens —
+   * which is also what keeps it pixel-identical between pregame and the run.
+   * The pregame's setup block overlays it rather than displacing it.
+   */
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   position: relative;
   gap: 0.5rem;
   padding: 0.6rem;
@@ -259,6 +265,10 @@ button.chip[data-selected="true"] {
 }
 
 .stage {
+  /* Overlays the timeline in pregame; nothing uses it in the run. */
+  grid-row: 2;
+  grid-column: 1;
+  z-index: 1;
   min-height: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -266,6 +276,8 @@ button.chip[data-selected="true"] {
 }
 
 .timeline-pane {
+  grid-row: 2;
+  grid-column: 1;
   position: relative;
   min-height: 0;
   background: var(--panel);
@@ -648,4 +660,33 @@ button.chip[data-selected="true"] {
   .bar-hint {
     display: none;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Top-bar readouts re-homed from the scenario strip (GDD §11.1)               */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The three-star meter and the scenario name were drawn on the scenario panel.
+ * With one surface they belong beside the score they are denominated against,
+ * rather than on the timeline where they would compete with the notes.
+ */
+.bar-right {
+  display: flex;
+  gap: 0.9rem;
+  align-items: baseline;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.hud-meter {
+  color: #ffd34d;
+  letter-spacing: 0.08em;
+}
+
+.hud-scenario {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }

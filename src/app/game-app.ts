@@ -67,9 +67,8 @@ import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
 import { EnergyLayer } from "../ui/energy-layer.js";
 import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
-import { ScenarioStripView, type StripPanel } from "../ui/scenario-strip.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import { TimelineView, type TimelineSkinSource } from "../ui/timeline/timeline-view.js";
+import { TimelineView, type StageSource } from "../ui/timeline/timeline-view.js";
 
 
 type Screen = "start" | "pregame" | "game" | "results";
@@ -152,12 +151,12 @@ export class GameApp {
   #current: ActiveAttempt | null = null;
   #next: ActiveAttempt | null = null;
   /**
-   * The attempt that just finished. Kept so the outgoing panel still shows its
-   * goat at the summit (or frozen at the foothold it reached) while the strip
-   * slides — the payoff has to stay readable through the transition.
+   * The attempt that just finished.
+   *
+   * Kept so the outgoing minigame keeps drawing its own measures as they scroll
+   * off to the left — the payoff has to stay readable on its way out.
    */
   #previous: ActiveAttempt | null = null;
-  #slideStartBeat: number | null = null;
   #attemptCounter = 0;
 
   /* Views ------------------------------------------------------------ */
@@ -165,7 +164,6 @@ export class GameApp {
   readonly #timeline = new TimelineModel(this.#setup.key);
   #pregameView: TimelineView | null = null;
   #gameView: TimelineView | null = null;
-  #strip: ScenarioStripView | null = null;
   #energy: EnergyLayer | null = null;
   #debug: DebugPanel | null = null;
   #devMode = false;
@@ -201,7 +199,6 @@ export class GameApp {
 
     this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
     this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
-    this.#strip = new ScenarioStripView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
     // Every registered scenario, not just one: a run can draw any of them into
@@ -214,7 +211,7 @@ export class GameApp {
 
     // Only the run timeline is skinnable. The pregame one has no attempt, so
     // there is no scenario whose look it could belong to.
-    this.#gameView.setSkinSource(this.#assets, this.#timelineSkinFor);
+    this.#gameView.setStageSource(this.#assets, this.#stageFor);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -411,7 +408,7 @@ export class GameApp {
         void this.#setAutoplayMode(mode);
       },
       onSkinsToggle: (enabled) => {
-        this.#gameView?.setSkinSource(this.#assets, enabled ? this.#timelineSkinFor : null);
+        this.#gameView?.setStageSource(this.#assets, enabled ? this.#stageFor : null);
       },
     });
     this.#debug.setEnabled(this.#devMode);
@@ -715,7 +712,6 @@ export class GameApp {
     this.#current = null;
     this.#next = null;
     this.#previous = null;
-    this.#slideStartBeat = null;
     this.#timeline.clearTargets();
     this.#timeline.clearPlayed();
     this.#energy?.clear();
@@ -852,66 +848,35 @@ export class GameApp {
   }
 
   /**
-   * Launches the visual streak, and makes its *arrival* trigger the scenario.
+   * Hands a judged note to the minigame, at the note.
    *
-   * The step happening when the streak lands is what makes the causal chain
-   * legible: the player sees their note become the goat's next foothold.
+   * There used to be a streak here: a short flight from the judged note on the
+   * timeline into a separate scenario panel, whose *arrival* triggered the
+   * reaction so the player read cause and effect rather than coincidence. With
+   * one surface (GDD §6) there is nothing to fly between — the note the player
+   * hit is the thing that reacts — so the energy is delivered where and when it
+   * happened, and the minigame animates its own reaction from there.
    */
   #launchEnergy(attempt: ActiveAttempt, energy: EnergyEvent): void {
-    const view = this.#gameView;
-    const strip = this.#strip;
-    const layer = this.#energy;
-    const deliver = () =>
-      attempt.runtime.deliverEnergy(
-        energy,
-        attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
-      );
-
-    if (!view || !strip || !layer || this.#screen !== "game") {
-      deliver();
-      return;
-    }
-
-    const nowBeat = this.#transport.beat;
-    const from = this.#toOverlay(
-      "game-canvas",
-      // A streak with no lane (a played note off the octave entirely) launches
-      // from the middle of the pitch axis rather than from an edge.
-      view.pointFor(
-        energy.lane ?? (LANE_COUNT - 1) / 2,
-        attempt.runtime.startBeat + energy.beat,
-        nowBeat
-      )
+    attempt.runtime.deliverEnergy(
+      energy,
+      attempt.runtime.toAttemptBeat(this.#transport.running ? this.#transport.beat : 0)
     );
-    const to = this.#toOverlay("scenario-canvas", strip.currentPanelTarget);
-    if (!from || !to) {
-      deliver();
-      return;
-    }
-
-    layer.spawn({
-      from,
-      to,
-      polarity: energy.polarity,
-      strong: energy.cause === "perfect",
-      bornBeat: nowBeat,
-      onArrive: deliver,
-    });
   }
 
   /**
-   * Routes each note on the timeline to the minigame that authored it.
+   * Routes each attempt's stretch of timeline to the minigame that owns it.
    *
-   * Two attempts share the highway around a transition, so this is keyed by
-   * attempt rather than "the current scenario": the outgoing minigame keeps
-   * skinning its own notes all the way off the left edge while the incoming one
-   * skins its notes scrolling in from the right.
+   * Two minigames share the surface around a handover, so this is keyed by
+   * attempt rather than "the current scenario": the outgoing one keeps drawing
+   * its own measures all the way off the left edge while the incoming one's
+   * arrive from the right.
    */
-  readonly #timelineSkinFor: TimelineSkinSource = (attemptKey, placed, view) => {
+  readonly #stageFor: StageSource = (attemptKey, view) => {
     const attempt = [this.#current, this.#next, this.#previous].find(
       (entry) => entry?.timelineKey === attemptKey
     );
-    return attempt?.runtime.minigame.renderTimeline?.(placed, view) ?? null;
+    return attempt?.runtime.minigame.render(view) ?? null;
   };
 
   /** Canvas-local point -> the energy overlay's coordinate space. */
@@ -942,7 +907,6 @@ export class GameApp {
 
     // Promote immediately so judgment never has a gap; the strip takes exactly
     // one beat to slide, and the beat does not stop.
-    this.#slideStartBeat = this.#transport.beat;
     this.#previous = attempt;
     this.#current = this.#next;
     this.#next = null;
@@ -959,7 +923,7 @@ export class GameApp {
       `#hud-history .history-slot[data-ordinal="${ordinal}"]`
     );
     const layer = this.#energy;
-    const strip = this.#strip;
+    const view = this.#gameView;
     const setStars = (count: number) => {
       const label = slot?.querySelector(".slot-stars");
       if (label) label.textContent = "★".repeat(count);
@@ -969,12 +933,18 @@ export class GameApp {
     // while its stars are still in the air. Only the glyphs arrive with them.
     if (slot) slot.dataset["state"] = stars > 0 ? "done" : "failed";
 
-    if (!slot || !layer || !strip || stars === 0) {
+    if (!slot || !layer || !view || stars === 0) {
       setStars(stars);
       return;
     }
 
-    const from = this.#toOverlay("scenario-canvas", strip.currentPanelTarget);
+    // The stars leave from the current-time bar, where the run was just played.
+    // This is the one flight left: it genuinely crosses regions, from the
+    // timeline up into the history bar.
+    const from = this.#toOverlay(
+      "game-canvas",
+      view.pointFor((LANE_COUNT - 1) / 2, this.#transport.beat, this.#transport.beat)
+    );
     const rect = slot.getBoundingClientRect();
     const overlay = document.getElementById("energy-canvas");
     if (!from || !(overlay instanceof HTMLCanvasElement)) {
@@ -1081,48 +1051,10 @@ export class GameApp {
       this.#updatePregameReadouts();
     } else if (this.#screen === "game") {
       this.#gameView?.render(this.#timeline, beat);
-      this.#renderStrip(beat);
       this.#energy?.render(beat);
     }
 
     this.#updateDebug(beat);
-  }
-
-  #renderStrip(beat: number): void {
-    const run = this.#run;
-    const strip = this.#strip;
-    if (!run || !strip) return;
-
-    const slide =
-      this.#slideStartBeat === null
-        ? 0
-        : Math.min(1, (beat - this.#slideStartBeat) / TRANSITION_BEATS) - 1;
-    if (slide >= 0) this.#slideStartBeat = null;
-
-    const panelFor = (slot: RunSlot | null, attempt: ActiveAttempt | null): StripPanel | null => {
-      if (!slot) return null;
-      // Only the attempt that actually belongs to this slot may drive it.
-      const runtime = attempt?.slotOrdinal === slot.ordinal ? attempt.runtime : null;
-      return {
-        // Each on-screen slot is drawn by its own minigame instance, at its own
-        // attempt-relative beat -- which is negative for the panel sliding in
-        // and past the attempt length for the one sliding out.
-        scene: runtime ? runtime.minigame.renderScene(runtime.toAttemptBeat(beat)) : null,
-        stars: runtime ? runtime.starMeter.stars : slot.result?.stars ?? 0,
-        starProgress: runtime ? runtime.starMeter.progressToNextStar : 0,
-        difficulty: slot.difficulty,
-        label: slot.scenario
-          ? `${slot.scenario.displayName} · L${slot.difficulty}`
-          : `L${slot.difficulty}`,
-      };
-    };
-
-    strip.render({
-      previous: panelFor(run.previousSlot, this.#previous),
-      current: panelFor(run.currentSlot, this.#current),
-      next: panelFor(run.nextSlot, this.#next),
-      slide: Math.min(0, slide),
-    });
   }
 
   #updateHud(): void {
@@ -1131,6 +1063,16 @@ export class GameApp {
     const attemptScore = this.#current?.runtime.score.score ?? 0;
     must("hud-score", HTMLElement).textContent = String(run.totalScore + attemptScore);
     must("hud-stars", HTMLElement).textContent = `★ ${run.totalStars}`;
+
+    // Re-homed from the scenario panel (GDD §11.1): the meter and the name now
+    // sit beside the score, not on the timeline where they would compete with
+    // the notes for the player's eye.
+    const attempt = this.#current?.runtime;
+    const earned = attempt?.starMeter.stars ?? 0;
+    must("hud-meter", HTMLElement).textContent = "★".repeat(earned) + "☆".repeat(3 - earned);
+    must("hud-scenario", HTMLElement).textContent = attempt
+      ? `${attempt.scenario.displayName} · L${attempt.difficulty}`
+      : "—";
 
     for (const slot of document.querySelectorAll<HTMLElement>("#hud-history .history-slot")) {
       const ordinal = Number(slot.dataset["ordinal"] ?? -1);
@@ -1201,6 +1143,7 @@ export class GameApp {
       "good window": target
         ? (attempt?.judge.windowsFor(target.opportunityIndex)?.good.toFixed(3) ?? "—")
         : "—",
+      "note opportunities": attempt ? String(attempt.targets.length) : "—",
       "open targets": attempt ? String(attempt.judge.openTargetCount) : "—",
       "perfect/good/miss": score ? `${score.perfect}/${score.good}/${score.missed}` : "—",
       "wrong notes": score ? String(score.wrongNotes) : "—",

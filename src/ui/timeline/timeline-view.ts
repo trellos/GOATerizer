@@ -29,13 +29,7 @@ import type { Fingering } from "../../music/fingering.js";
 import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
-import type {
-  NoteArt,
-  PlacedNote,
-  Sprite,
-  TimelineContext,
-  TimelineSkin,
-} from "../../minigame/api.js";
+import type { NoteArt, PlacedNote, Sprite, Stage, StageView } from "../../minigame/api.js";
 import type { AssetStore } from "../assets.js";
 import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js";
 
@@ -50,11 +44,34 @@ import type { PlayedNote, TargetNote, TimelineModel } from "./timeline-model.js"
  * Returning `null` — which is also what happens when no source is installed at
  * all — gives the host's default look.
  */
-export type TimelineSkinSource = (
-  attemptKey: string,
-  placed: readonly PlacedNote[],
-  view: TimelineContext
-) => TimelineSkin | null;
+export type StageSource = (attemptKey: string, view: StageView) => Stage | null;
+
+/**
+ * The golden ratio. One measure is a golden rectangle (GDD §11.3), so
+ * pixels-per-beat is a consequence of the lane band's height rather than a
+ * tuning number, and the visible span is whatever the play width then allows.
+ */
+const PHI = 1.618033988749895;
+
+/** GDD §11.3: at least one whole measure each side of the current-time bar. */
+const MIN_VISIBLE_MEASURES = 2;
+
+/**
+ * Height of a `scale: 1` sprite, as a fraction of the lane band.
+ *
+ * One number so a minigame never sees a pixel and its art keeps its proportions
+ * at any pane size. Roughly a lane and a half, which is what an actor standing
+ * on a bar wants.
+ */
+const SPRITE_BAND_FRACTION = 0.19;
+
+/**
+ * The most of the pane the lane band may take.
+ *
+ * The rest is play area above and below the lanes: room for an actor standing
+ * on a bar, and for debris falling off one.
+ */
+const BAND_MAX_FRACTION = 0.62;
 
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
@@ -105,7 +122,7 @@ export class TimelineView {
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
   #assets: AssetStore | null = null;
-  #skinFor: TimelineSkinSource | null = null;
+  #stageFor: StageSource | null = null;
   #width = 0;
   #height = 0;
 
@@ -136,9 +153,9 @@ export class TimelineView {
    * The pregame timeline never sets one: there is no attempt yet, so there is
    * nothing whose look a scenario could own.
    */
-  setSkinSource(assets: AssetStore | null, skinFor: TimelineSkinSource | null): void {
+  setStageSource(assets: AssetStore | null, stageFor: StageSource | null): void {
     this.#assets = assets;
-    this.#skinFor = skinFor;
+    this.#stageFor = stageFor;
   }
 
   /* ------------------------------------------------------------------ */
@@ -153,7 +170,12 @@ export class TimelineView {
    * on a short viewport; the ceiling stops eight fat rows turning into posters.
    */
   get #labelFontPx(): number {
-    return Math.round(Math.max(12, Math.min(22, this.#rowHeight * 0.46)));
+    // Sized from the PANE, not from `#rowHeight`. The row height now derives
+    // from the lane band, the band from the play width, and the play width from
+    // the gutter this font sizes — reading `#rowHeight` here closes that loop
+    // and recurses until the stack gives out.
+    const nominalRow = this.#height / (this.#rowCount + 1);
+    return Math.round(Math.max(12, Math.min(22, nominalRow * 0.46)));
   }
 
   /** Advance width of the monospace face at the current label size. */
@@ -196,8 +218,40 @@ export class TimelineView {
     return this.#playLeft + this.#playWidth / 2;
   }
 
+  /**
+   * The lane band: the rows a note can sit on.
+   *
+   * Not the whole canvas. A measure is a golden rectangle, so the band's height
+   * decides how wide a measure is, and at least two must fit (GDD §11.3) — the
+   * band is therefore capped at `playWidth / (2 * PHI)` however tall the pane
+   * gets. What is left above and below is the play area the minigame's
+   * background fills, and where an actor stands when it hops onto a bar.
+   */
+  get #laneBandHeight(): number {
+    const widest = this.#playWidth / (MIN_VISIBLE_MEASURES * PHI);
+    return Math.min(this.#height * BAND_MAX_FRACTION, widest);
+  }
+
+  /** Vertical centre of the lane band within the pane. */
+  get #bandBottom(): number {
+    return (this.#height + this.#laneBandHeight) / 2;
+  }
+
+  /**
+   * Derived, never chosen: one measure is `PHI` times the lane band's height, so
+   * the scroll speed falls out of the layout (GDD §11.3).
+   *
+   * If the pane is ever laid out too tall for two whole measures to fit, the
+   * band is treated as the widest that does fit rather than silently showing
+   * less than a measure either side of the current-time bar.
+   */
   get #pixelsPerBeat(): number {
-    return this.#playWidth / 2 / TIMELINE_FUTURE_BEATS;
+    return (PHI * this.#laneBandHeight) / BEATS_PER_MEASURE;
+  }
+
+  /** Beats either side of the current-time bar. Half the visible span. */
+  get #halfSpanBeats(): number {
+    return this.#playWidth / 2 / this.#pixelsPerBeat;
   }
 
   #x(beat: number, nowBeat: number): number {
@@ -209,12 +263,12 @@ export class TimelineView {
   }
 
   get #rowHeight(): number {
-    return this.#height / (this.#rowCount + 1);
+    return this.#laneBandHeight / this.#rowCount;
   }
 
   /** Row 0 is drawn at the bottom: higher pitch reads as higher on screen. */
   #rowY(row: number): number {
-    return this.#height - this.#rowHeight * (row + 1);
+    return this.#bandBottom - this.#rowHeight * (row + 0.5);
   }
 
   /**
@@ -233,19 +287,25 @@ export class TimelineView {
     ctx.fillStyle = THEME.ground;
     ctx.fillRect(0, 0, this.#width, this.#height);
 
-    const snapshot = model.snapshot(nowBeat, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
-
-    const skins = this.#resolveSkins(snapshot.targets, nowBeat);
+    const span = this.#halfSpanBeats;
+    const snapshot = model.snapshot(nowBeat, span, span);
+    const stages = this.#resolveStages(model, nowBeat);
+    const notes = new Map();
+    for (const entry of stages.values()) {
+      for (const [id, art] of entry.stage.notes ?? []) notes.set(id, art);
+    }
 
     this.#drawBeatGrid(nowBeat);
     this.#drawRows();
-    for (const skin of skins.values()) this.#drawBackdrop(skin);
+    // Each minigame's background covers only its own measures, so around a
+    // handover the outgoing one scrolls off while the incoming one arrives.
+    for (const entry of stages.values()) this.#drawBackground(entry);
+    for (const entry of stages.values()) this.#drawSprites(entry.stage.sprites, "under");
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
-    for (const note of snapshot.targets) {
-      this.#drawTarget(note, nowBeat, skins.get(note.attemptKey)?.skin.notes?.get(note.id));
-    }
-    // Above every skin, always: the player's own note and the exact moment are
-    // the two things a scenario's art may compose around but never obscure.
+    for (const note of snapshot.targets) this.#drawTarget(note, nowBeat, notes.get(note.id));
+    for (const entry of stages.values()) this.#drawSprites(entry.stage.sprites, "over");
+    // Above every minigame, always: the player's own note and the exact moment
+    // are the two things its art may compose around but never obscure.
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
@@ -266,90 +326,144 @@ export class TimelineView {
    * Rects are normalised against the **playfield** — the area right of the
    * gutter — because that is where notes live and where a backdrop belongs.
    */
-  #resolveSkins(
-    targets: readonly TargetNote[],
+  #resolveStages(
+    model: TimelineModel,
     nowBeat: number
-  ): Map<string, { skin: TimelineSkin; span: { from: number; to: number } }> {
-    const resolved = new Map<string, { skin: TimelineSkin; span: { from: number; to: number } }>();
-    const skinFor = this.#skinFor;
-    if (!skinFor || targets.length === 0) return resolved;
+  ): Map<string, { stage: Stage; span: { from: number; to: number } }> {
+    const resolved = new Map<string, { stage: Stage; span: { from: number; to: number } }>();
+    const stageFor = this.#stageFor;
+    if (!stageFor) return resolved;
 
-    const byAttempt = new Map<string, PlacedNote[]>();
-    const spans = new Map<string, { from: number; to: number }>();
+    for (const attemptKey of model.attemptKeys) {
+      const targets = model.targetsFor(attemptKey);
+      const first = targets[0];
+      if (!first) continue;
 
-    for (const note of targets) {
-      const x = this.#x(note.startBeat, nowBeat);
-      const w = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
-      const y = this.#rowY(note.lane);
-      const h = this.#noteHeight;
-      const placed: PlacedNote = {
-        id: note.id,
-        opportunityIndex: note.opportunityIndex,
-        lane: note.lane,
-        duration: note.duration,
-        outcome: note.outcome,
-        rect: {
-          x: (x - this.#playLeft) / this.#playWidth,
-          y: (y - h / 2) / this.#height,
-          w: w / this.#playWidth,
-          h: h / this.#height,
-        },
-        beatsUntilStrike: note.startBeat - nowBeat,
-      };
-      const list = byAttempt.get(note.attemptKey);
-      if (list) list.push(placed);
-      else byAttempt.set(note.attemptKey, [placed]);
-
-      const span = spans.get(note.attemptKey);
-      const to = placed.rect.x + placed.rect.w;
-      if (!span) spans.set(note.attemptKey, { from: placed.rect.x, to });
-      else spans.set(note.attemptKey, { from: Math.min(span.from, placed.rect.x), to: Math.max(span.to, to) });
-    }
-
-    for (const [attemptKey, placed] of byAttempt) {
-      const span = spans.get(attemptKey) ?? { from: 0, to: 1 };
-      const skin = skinFor(attemptKey, placed, {
-        beat: nowBeat,
-        laneCount: LANE_COUNT,
-        span,
+      // EVERY note of the attempt, not just the visible ones: an actor anchored
+      // to a note needs a coordinate after that note has scrolled off, or a
+      // climber loses its footing at the left edge.
+      const band = this.#laneBandHeight;
+      const placed: PlacedNote[] = targets.map((note) => {
+        const x = this.#x(note.startBeat, nowBeat);
+        const w = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
+        const y = this.#rowY(note.lane);
+        const h = this.#noteHeight;
+        return {
+          id: note.id,
+          opportunityIndex: note.opportunityIndex,
+          lane: note.lane,
+          duration: note.duration,
+          outcome: note.outcome,
+          // Normalised to the LANE BAND, not the pane, so a note's rect and a
+          // sprite's y are in the same space and an actor can stand on a bar.
+          rect: {
+            x: (x - this.#playLeft) / this.#playWidth,
+            y: (y - h / 2 - (this.#bandBottom - band)) / band,
+            w: w / this.#playWidth,
+            h: h / band,
+          },
+          beatsUntilStrike: note.startBeat - nowBeat,
+        };
       });
-      if (skin) resolved.set(attemptKey, { skin, span });
+
+      // The attempt's own measures, which its background is clipped to.
+      const last = targets[targets.length - 1]!;
+      const fromBeat = Math.floor(first.startBeat / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const toBeat =
+        Math.ceil((last.startBeat + last.durationBeats) / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const span = {
+        from: (this.#x(fromBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+        to: (this.#x(toBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+      };
+
+      const measureWidth = (BEATS_PER_MEASURE * this.#pixelsPerBeat) / this.#playWidth;
+      const stage = stageFor(attemptKey, {
+        beat: nowBeat - model.attemptStartBeat(attemptKey),
+        notes: placed,
+        laneCount: LANE_COUNT,
+        strikeX: (this.#strikeX - this.#playLeft) / this.#playWidth,
+        span,
+        measure: { width: measureWidth, beatWidth: measureWidth / BEATS_PER_MEASURE },
+      });
+      if (stage) resolved.set(attemptKey, { stage, span });
     }
     return resolved;
   }
 
-  /** A skin's backdrop, clipped to the span its own notes occupy. */
-  #drawBackdrop(entry: { skin: TimelineSkin; span: { from: number; to: number } }): void {
-    const sprites = entry.skin.backdrop;
-    if (!sprites || sprites.length === 0) return;
+  /** A minigame's background, clipped to the measures it is active for. */
+  #drawBackground(entry: { stage: Stage; span: { from: number; to: number } }): void {
+    const assetId = entry.stage.background;
+    const image = assetId ? this.#assets?.get(assetId) : null;
+    if (!image) return;
     const ctx = this.#ctx;
 
-    ctx.save();
     const left = this.#playLeft + entry.span.from * this.#playWidth;
     const right = this.#playLeft + entry.span.to * this.#playWidth;
+    const clipLeft = Math.max(this.#playLeft, left);
+    const clipRight = Math.min(this.#width, right);
+    if (clipRight <= clipLeft) return;
+
+    ctx.save();
     ctx.beginPath();
-    ctx.rect(
-      Math.max(this.#playLeft, left),
-      0,
-      Math.max(0, Math.min(this.#width, right) - Math.max(this.#playLeft, left)),
-      this.#height
-    );
+    ctx.rect(clipLeft, 0, clipRight - clipLeft, this.#height);
     ctx.clip();
-    for (const sprite of sprites) this.#drawSkinSprite(sprite);
+    /*
+     * Fitted to the pane's HEIGHT and tiled across the span, not cover-fitted
+     * to it.
+     *
+     * A minigame's measures are several times wider than the pane is tall, so
+     * covering that span would magnify the art by the ratio between them — a
+     * 320px backdrop blown up sevenfold, showing one corner of a mountain. The
+     * art is authored at the scale it should be read at; what varies is how
+     * much of the timeline it has to cover, which is what tiling is for.
+     */
+    const scale = this.#height / image.height;
+    const w = image.width * scale;
+    for (let x = left; x < clipRight; x += w) {
+      ctx.drawImage(image, x, 0, w, this.#height);
+    }
     ctx.restore();
   }
 
-  #drawSkinSprite(sprite: Sprite): void {
-    const image = this.#assets?.get(sprite.assetId);
-    if (!image) return;
+  /**
+   * A minigame's sprites for one layer, in normalised timeline space.
+   *
+   * `y` is normalised to the LANE BAND, and going outside 0..1 is the point:
+   * above the lanes is where an actor stands on a bar, below is where debris
+   * falls. Only the play area clips.
+   */
+  #drawSprites(sprites: readonly Sprite[] | undefined, layer: NonNullable<Sprite["layer"]>): void {
+    if (!sprites || sprites.length === 0) return;
     const ctx = this.#ctx;
-    const h = this.#rowHeight * (sprite.scale ?? 1);
-    const w = image.width * (h / image.height);
+    const band = this.#laneBandHeight;
+
+    const ordered = sprites
+      .map((sprite, index) => ({ sprite, index }))
+      .filter((entry) => (entry.sprite.layer ?? "over") === layer)
+      .sort((a, b) => (a.sprite.z ?? 0) - (b.sprite.z ?? 0) || a.index - b.index);
+    if (ordered.length === 0) return;
+
     ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, sprite.opacity ?? 1));
-    ctx.translate(this.#playLeft + sprite.x * this.#playWidth, sprite.y * this.#height);
-    if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
-    ctx.drawImage(image, -w / 2, sprite.anchor === "bottom" ? -h : -h / 2, w, h);
+    this.#clipPlayfield();
+    for (const { sprite } of ordered) {
+      const image = this.#assets?.get(sprite.assetId);
+      // A missing sprite leaves a visible gap and is reported in the dev panel,
+      // rather than taking the frame down.
+      if (!image) continue;
+      const h = band * SPRITE_BAND_FRACTION * (sprite.scale ?? 1);
+      const w = image.width * (h / image.height);
+      const cx = this.#playLeft + sprite.x * this.#playWidth;
+      const cy = this.#bandBottom - band + (sprite.y + (sprite.offsetY ?? 0)) * band;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, sprite.opacity ?? 1));
+      ctx.translate(cx, cy);
+      if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
+      // The anchor is also the pivot: a bottom-anchored actor turns about the
+      // ground it stands on, a centred prop about its middle.
+      ctx.drawImage(image, -w / 2, sprite.anchor === "bottom" ? -h : -h / 2, w, h);
+      ctx.restore();
+    }
     ctx.restore();
   }
 

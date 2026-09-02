@@ -5,21 +5,22 @@
  * clean spatial increment.** Not a chase, not combat, not survival. Even at L4
  * it should read as ridiculous competence rather than panic.
  *
+ * On the timeline (GDD §11.2) that increment is literal: the note bars *are* the
+ * footholds, and the climber hops from one to the next as each is played. There
+ * is no authored route any more — a climb used to carry a start position, a
+ * destination and one waypoint per note opportunity as coordinates in a scenario
+ * panel, and every one of those is now supplied by the note itself. "One
+ * waypoint per successful note" stopped being a content rule that could be
+ * authored wrongly and became a structural fact of the surface.
+ *
  * This class contains no scenario-specific asset names and no scenario ids. It
- * is handed a route, a set of class asset *slots*, and class parameters; Rocky
- * Ascent decides those slots hold goats and boulders. A second climb scenario
- * needs data and art, not code.
- *
- * Slot ordering is part of the class contract, not a scenario detail:
- * `stepEffects[0]` is the contact effect shown where the climber lands, and
- * `stepEffects[1]` is the clean-progress accent shown for a successful note.
- *
- * It implements {@link Minigame} and reaches the screen only through
- * {@link ClimbMinigame.renderScene}: the host knows nothing about waypoints,
- * poses or wobble, and this class knows nothing about canvases or pixels.
+ * is handed a set of class asset *slots* and class parameters; Rocky Ascent
+ * decides those slots hold goats and boulders. A second climb scenario needs
+ * data and art, not code.
  */
 
 import {
+  arc,
   decay,
   MINIGAME_API_VERSION,
   type AttemptContext,
@@ -28,9 +29,9 @@ import {
   type MinigameModule,
   type NoteArt,
   type PlacedNote,
-  type Scene,
   type Sprite,
-  type TimelineSkin,
+  type Stage,
+  type StageView,
 } from "../../minigame/api.js";
 import { bool, num, obj, ScenarioDataError, str, strings } from "../parse.js";
 
@@ -38,52 +39,29 @@ import { bool, num, obj, ScenarioDataError, str, strings } from "../parse.js";
 /* Content shape — owned by this class, opaque to the host                     */
 /* -------------------------------------------------------------------------- */
 
-export type RoutePoint = { x: number; y: number };
-
-export type RouteWaypoint = RoutePoint & {
-  /** Transform-only variety on one reused sprite. */
-  scale: number;
-  rotationDeg: number;
-};
-
-/**
- * The climb route, in normalised scenario space: x rightwards 0..1, y downwards
- * 0..1 with 0 at the top of the frame.
- */
-export type RouteData = {
-  character: string;
-  startPosition: RoutePoint;
-  destination: RoutePoint;
-  waypoints: readonly RouteWaypoint[];
-};
-
 /**
  * Asset slots are named by the *class*, never by the scenario. `ClimbMinigame`
  * asks for `climberPoses`; Rocky Ascent decides those are goats.
  */
 export type ClimbAssetBindings = {
+  /** Fills the play area behind this scenario's own measures. */
   background: string;
   climberPoses: readonly string[];
   finishPose: string;
-  waypointVisuals: readonly string[];
+  /** Sits past the final note: the thing being climbed towards. */
   destinationVisual: string;
+  /** [0] the contact effect where the climber lands, [1] the clean accent. */
   stepEffects: readonly string[];
-  /**
-   * Optional timeline note art. A climb scenario that omits the slot gets the
-   * host's default note bars, which is a complete and readable timeline — this
-   * only changes what the notes are made of.
-   */
-  timelineArt?: { body: string; outcrop: string };
+  /** What a foothold is made of. `body` is the note bar; `crag` sits behind it. */
+  footholdArt: { body: string; crag: string };
 };
 
 export type ClimbConfig = {
   bindings: ClimbAssetBindings;
   badNotePolicy: "Wobble" | "Stall";
-  showDestinationFromStart: boolean;
 };
 
 export type ClimbLevelData = {
-  route: RouteData;
   /** How many measures one visual arc spans. Rocky spans all four. */
   visualSpanMeasures: number;
   resetBetweenMeasures: boolean;
@@ -95,7 +73,8 @@ type ClimbEffect = {
   id: number;
   kind: ClimbEffectKind;
   assetId: string;
-  position: RoutePoint;
+  /** Which note it happened on: its position follows that note as it scrolls. */
+  noteIndex: number;
   /** Multiplier on the effect's natural size. Perfect reads stronger. */
   strength: number;
   bornAtBeat: number;
@@ -103,9 +82,8 @@ type ClimbEffect = {
 };
 
 export type ClimbOptions = {
-  route: RouteData;
   bindings: ClimbAssetBindings;
-  parameters: { badNotePolicy: "Wobble" | "Stall"; showDestinationFromStart: boolean };
+  parameters: { badNotePolicy: "Wobble" | "Stall" };
   resetBetweenMeasures: boolean;
 };
 
@@ -113,49 +91,45 @@ export type ClimbOptions = {
 const EFFECT_LIFE_BEATS = 0.55;
 /** How long a Wobble takes to settle, in beats. */
 const WOBBLE_DECAY_BEATS = 0.7;
+/** How long the climber is in the air between footholds. Short: this is a step. */
+const HOP_BEATS = 0.22;
 
 /*
- * Sprite sizing and registration.
+ * Sprite sizing, in normalised timeline space.
  *
- * `Sprite.scale` multiplies the asset's natural size, and the host scales that
- * with the panel. These constants carry over the per-sprite-type sizing the
- * strip renderer used to hold, so the picture is unchanged; the y nudges are
- * the small registration offsets that sink the climber's feet into the rock and
- * lift the accent clear of the contact puff, expressed in normalised panel
- * units rather than as fixed pixels so they hold at any panel size.
+ * `y` is normalised to the lane band, so these are fractions of its height. The
+ * climber and the effects deliberately reach above `y = 0` and below `y = 1`
+ * into the play area the background fills — a goat standing on a bar has to
+ * stand *on top of* it.
  */
-const CLIMBER_SCALE = 1.5;
-const CLIMBER_SINK = 0.009;
-const FOOTHOLD_SCALE = 1.231;
-const FOOTHOLD_DIM = 0.72;
-const GOAL_SCALE = 1.133;
-const EFFECT_SCALE = 1.167;
-const CONTACT_DROP = 0.013;
-const ACCENT_LIFT = -0.022;
-/** Sideways lean during a Wobble, in normalised panel units. */
-const WOBBLE_SHIFT = 0.0035;
-/** Degrees of lean at full Wobble. */
-const WOBBLE_TILT = 9;
-
-/*
- * Timeline note art.
- *
- * The crag is taller than a lane by design — that is the whole point of an
- * `underlay` — and the two opacities are what make the ridge build up behind
- * the phrase as it is played rather than being a static texture.
- */
+const CLIMBER_SCALE = 1.35;
+/** Peak of the hop arc, as a fraction of the lane band. */
+const HOP_HEIGHT = 0.09;
+/** How far the climber's feet sink into the bar it lands on. */
+const CLIMBER_SINK = 0.012;
 const CRAG_SCALE = 1.55;
 const CRAG_FADED = 0.55;
 const CRAG_SOLID = 0.95;
+const EFFECT_SCALE = 1.0;
+const CONTACT_DROP = 0.02;
+const ACCENT_LIFT = -0.03;
+const DESTINATION_SCALE = 1.5;
+/** Sideways lean during a Wobble, as a fraction of the playfield. */
+const WOBBLE_SHIFT = 0.004;
+/** Degrees of lean at full Wobble. */
+const WOBBLE_TILT = 9;
 
 export class ClimbMinigame implements Minigame {
-  readonly #route: RouteData;
   readonly #bindings: ClimbAssetBindings;
   readonly #parameters: ClimbOptions["parameters"];
   readonly #resetBetweenMeasures: boolean;
 
   #successfulNotes = 0;
-  #waypointIndex = -1;
+  /** Index into the attempt's notes. -1 before the first successful note. */
+  #noteIndex = -1;
+  /** Where the climber hopped from, so the arc has a start. */
+  #fromNoteIndex = -1;
+  #hopStartedAtBeat: number | null = null;
   #poseIndex = 0;
   #wobbleStartedAtBeat: number | null = null;
   #finished = false;
@@ -165,29 +139,26 @@ export class ClimbMinigame implements Minigame {
   #beat = 0;
 
   constructor(options: ClimbOptions) {
-    this.#route = options.route;
     this.#bindings = options.bindings;
     this.#parameters = options.parameters;
     this.#resetBetweenMeasures = options.resetBetweenMeasures;
   }
 
   /**
-   * Route progress and terminal state, for the developer panel.
+   * Climb progress and terminal state, for the developer panel.
    *
    * Deliberately not the render path: the screen is fed by
-   * {@link ClimbMinigame.renderScene} alone, and nothing about this is drawn.
+   * {@link ClimbMinigame.render} alone, and nothing about this is drawn.
    */
   get progress(): {
     successfulNotes: number;
-    waypointIndex: number;
-    waypointCount: number;
+    noteIndex: number;
     finished: boolean;
     frozen: boolean;
   } {
     return {
       successfulNotes: this.#successfulNotes,
-      waypointIndex: this.#waypointIndex,
-      waypointCount: this.#route.waypoints.length,
+      noteIndex: this.#noteIndex,
       finished: this.#finished,
       frozen: this.#frozen,
     };
@@ -202,34 +173,33 @@ export class ClimbMinigame implements Minigame {
    *
    * Perfect and Good advance **identically** — both are successful notes, and
    * the difference between them is score, not distance. Nothing here advances
-   * two waypoints, ever. Only the outcome is read; a climb does not care which
-   * pitch was played or where it sat in the octave.
+   * two footholds, ever. Only the outcome and which note it was are read; a
+   * climb does not care which pitch was played.
    */
   onJudged(judged: Judged, beat: number): void {
     this.#beat = beat;
     if (this.#finished || this.#frozen) return;
 
     if (judged.outcome === "miss" || judged.outcome === "wrong") {
-      // Wobble: a brief lean, then back to exactly the same waypoint. Earned
+      // Wobble: a brief lean, then back to exactly the same foothold. Earned
       // progress is never taken away.
       if (this.#parameters.badNotePolicy === "Wobble") this.#wobbleStartedAtBeat = beat;
       return;
     }
 
+    const landing = judged.opportunityIndex;
+    if (landing === null) return;
+
     this.#successfulNotes += 1;
-    this.#waypointIndex = Math.min(this.#waypointIndex + 1, this.#route.waypoints.length - 1);
+    this.#fromNoteIndex = this.#noteIndex;
+    this.#noteIndex = landing;
+    this.#hopStartedAtBeat = beat;
     this.#poseIndex = (this.#poseIndex + 1) % Math.max(1, this.#bindings.climberPoses.length);
 
-    const landing = this.#route.waypoints[this.#waypointIndex];
-    if (!landing) return;
-
-    const contact = this.#bindings.stepEffects[0];
-    const accent = this.#bindings.stepEffects[1];
-    if (contact) {
-      this.#spawnEffect("contact", contact, landing, 1, beat);
-    }
+    const [contact, accent] = this.#bindings.stepEffects;
+    if (contact) this.#spawnEffect("contact", contact, landing, 1, beat);
+    // Stronger and cleaner for Perfect, smaller and weaker for Good.
     if (accent) {
-      // Stronger and cleaner for Perfect, smaller and weaker for Good.
       this.#spawnEffect("accent", accent, landing, judged.outcome === "perfect" ? 1 : 0.55, beat);
     }
   }
@@ -251,13 +221,14 @@ export class ClimbMinigame implements Minigame {
    */
   onMeasure(_measureIndex: number, beat: number): void {
     if (!this.#resetBetweenMeasures) return;
-    this.#waypointIndex = -1;
+    this.#noteIndex = -1;
+    this.#fromNoteIndex = -1;
     this.#effects = [];
     this.#wobbleStartedAtBeat = null;
     this.#beat = beat;
   }
 
-  /** A climb is indifferent to the star tier; the route is the whole story. */
+  /** A climb is indifferent to the star tier; the ascent is the whole story. */
   onStarEarned(_stars: number, beat: number): void {
     this.#beat = beat;
   }
@@ -265,9 +236,9 @@ export class ClimbMinigame implements Minigame {
   /**
    * The attempt is over.
    *
-   * Passed: move to the finish pose at the destination and hold it. Failed:
-   * freeze at the furthest waypoint actually earned — no bespoke failure art,
-   * because not getting there is the punishment.
+   * Passed: take the finish pose and hold it. Failed: freeze on the furthest
+   * foothold actually earned — no bespoke failure art, because not getting
+   * there is the punishment.
    */
   onComplete(passed: boolean, _stars: number, beat: number): void {
     this.#beat = beat;
@@ -280,133 +251,116 @@ export class ClimbMinigame implements Minigame {
   }
 
   /**
-   * The panel: the route's footholds, the destination, any live effects, and
-   * the climber on top of its own dust.
+   * The climb, on the timeline.
    *
-   * Every foothold keeps a stable key across frames, so the host can tell a
-   * reached one from an unreached one without the scene carrying that meaning
-   * itself, and the climber's key never changes as it advances — which is what
-   * would let the host interpolate between footholds later, if the design ever
-   * wants the goat to slide rather than step.
+   * Every note bar is a foothold — dressed as rock, and lit once it has been
+   * climbed. The climber stands on the last one it reached and arcs to the next
+   * as each note is played, which is why `arc` exists: a hop is not a slide.
+   * Everything is positioned from the notes the host placed, so the whole thing
+   * scrolls correctly for free and keeps working after a foothold has left the
+   * screen.
    */
-  renderScene(beat: number): Scene {
+  render(view: StageView): Stage {
     const sprites: Sprite[] = [];
-
-    const stepAsset = this.#bindings.waypointVisuals[0];
-    if (stepAsset) {
-      this.#route.waypoints.forEach((waypoint, index) => {
-        sprites.push({
-          key: `step-${index}`,
-          assetId: stepAsset,
-          x: waypoint.x,
-          y: waypoint.y,
-          scale: waypoint.scale * FOOTHOLD_SCALE,
-          rotationDeg: waypoint.rotationDeg,
-          opacity: index <= this.#waypointIndex ? 1 : FOOTHOLD_DIM,
-          layer: "stage",
-          z: index,
-        });
-      });
-    }
-
-    if (this.showDestination) {
-      sprites.push({
-        key: "goal",
-        assetId: this.#bindings.destinationVisual,
-        x: this.#route.destination.x,
-        y: this.#route.destination.y,
-        scale: GOAL_SCALE,
-        anchor: "bottom",
-        layer: "stage",
-        z: this.#route.waypoints.length + 1,
-      });
-    }
-
-    // Effects first, so the climber lands on top of its own dust.
-    for (const effect of this.#effects) {
-      const life = decay(effect.bornAtBeat, effect.lifeBeats, beat);
-      const age = 1 - life;
-      // The contact effect settles outward; the accent scales in and back out.
-      const pulse =
-        effect.kind === "accent" ? 0.6 + Math.sin(age * Math.PI) * 0.9 : 1 + age * 0.35;
-      sprites.push({
-        key: `fx-${effect.id}`,
-        assetId: effect.assetId,
-        x: effect.position.x,
-        y: effect.position.y,
-        scale: effect.strength * pulse * EFFECT_SCALE,
-        opacity: life * (effect.kind === "accent" ? 1 : 0.85),
-        offsetY: effect.kind === "contact" ? CONTACT_DROP : ACCENT_LIFT,
-        layer: "actor",
-        z: 0,
-      });
-    }
-
-    const wobble = this.#wobbleAmount(beat);
-    // A brief lean and a nudge, returning to exactly the same waypoint.
-    const swing = wobble > 0 ? Math.sin(wobble * Math.PI * 4) * wobble : 0;
-    const at = this.#position();
-    sprites.push({
-      key: "climber",
-      assetId: this.#poseAssetId(),
-      x: at.x + swing * WOBBLE_SHIFT,
-      y: at.y,
-      scale: CLIMBER_SCALE,
-      rotationDeg: swing * WOBBLE_TILT,
-      anchor: "bottom",
-      offsetY: CLIMBER_SINK,
-      layer: "actor",
-      z: 1,
-    });
-
-    return { background: this.#bindings.background, sprites };
-  }
-
-  /**
-   * The phrase, as rock.
-   *
-   * Every note becomes a stone ledge with a crag rising behind it, so the
-   * timeline reads as terrain the player is climbing rather than a grid of
-   * bars — the same verb the scenario panel is showing, one beat ahead of it.
-   *
-   * The crag is drawn at nearly twice a lane's height on purpose: it is an
-   * `underlay`, so it bleeds above and below the note's own rect and the
-   * outcrops of neighbouring notes overlap into a ridge line. None of it
-   * carries information. The host's rect still says pitch, time and duration,
-   * and the host still draws the player's own note on top.
-   */
-  renderTimeline(placed: readonly PlacedNote[]): TimelineSkin | null {
-    const art = this.#bindings.timelineArt;
-    if (!art) return null;
-
     const notes = new Map<string, NoteArt>();
-    for (const note of placed) {
+    const art = this.#bindings.footholdArt;
+
+    for (const note of view.notes) {
       notes.set(note.id, {
         underlay: {
-          assetId: art.outcrop,
+          assetId: art.crag,
           scale: CRAG_SCALE,
-          // A note still to be played sits back in the haze; one that has been
-          // judged is solid, so the ridge fills in behind the phrase as it is
-          // played.
-          opacity: note.outcome === null ? CRAG_FADED : CRAG_SOLID,
+          // The ridge fills in behind the phrase as it is climbed.
+          opacity: note.opportunityIndex <= this.#noteIndex ? CRAG_SOLID : CRAG_FADED,
         },
         body: { assetId: art.body },
       });
     }
-    return { notes };
+
+    // The summit, one measure past the final foothold: something to be climbing
+    // towards, which only enters the screen as the attempt ends.
+    const last = view.notes[view.notes.length - 1];
+    if (last) {
+      sprites.push({
+        key: "destination",
+        assetId: this.#bindings.destinationVisual,
+        x: last.rect.x + last.rect.w + view.measure.beatWidth,
+        y: last.rect.y,
+        scale: DESTINATION_SCALE,
+        anchor: "bottom",
+        layer: "under",
+      });
+    }
+
+    for (const effect of this.#effects) {
+      const on = view.notes[effect.noteIndex];
+      if (!on) continue;
+      const life = decay(effect.bornAtBeat, effect.lifeBeats, view.beat);
+      const age = 1 - life;
+      // The contact effect settles outward; the accent scales in and back out.
+      const pulse = effect.kind === "accent" ? 0.6 + Math.sin(age * Math.PI) * 0.9 : 1 + age * 0.35;
+      sprites.push({
+        key: `fx-${effect.id}`,
+        assetId: effect.assetId,
+        x: on.rect.x + on.rect.w / 2,
+        y: on.rect.y + (effect.kind === "contact" ? CONTACT_DROP : ACCENT_LIFT),
+        scale: effect.strength * pulse * EFFECT_SCALE,
+        opacity: life * (effect.kind === "accent" ? 1 : 0.85),
+        layer: "over",
+        z: 0,
+      });
+    }
+
+    const at = this.#climberAt(view);
+    if (at) {
+      const wobble = this.#wobbleAmount(view.beat);
+      const swing = wobble > 0 ? Math.sin(wobble * Math.PI * 4) * wobble : 0;
+      sprites.push({
+        key: "climber",
+        assetId: this.#poseAssetId(),
+        x: at.x + swing * WOBBLE_SHIFT,
+        y: at.y + CLIMBER_SINK,
+        scale: CLIMBER_SCALE,
+        rotationDeg: swing * WOBBLE_TILT,
+        anchor: "bottom",
+        layer: "over",
+        z: 1,
+      });
+    }
+
+    return { background: this.#bindings.background, sprites, notes };
   }
 
   /* ------------------------------------------------------------------ */
 
-  get showDestination(): boolean {
-    return this.#parameters.showDestinationFromStart || this.#finished;
+  /**
+   * Where the climber is standing, mid-hop or not.
+   *
+   * Before the first successful note it waits a beat to the left of the opening
+   * foothold, so it is visibly about to start rather than already standing on a
+   * note it has not earned.
+   */
+  #climberAt(view: StageView): { x: number; y: number } | null {
+    const target = this.#footholdAt(view, this.#noteIndex) ?? this.#startPosition(view);
+    if (!target) return null;
+    if (this.#hopStartedAtBeat === null) return target;
+
+    const from = this.#footholdAt(view, this.#fromNoteIndex) ?? this.#startPosition(view);
+    if (!from) return target;
+    // A hop, not a slide: THREE-STEP will want the same helper for its leap.
+    return arc(from, target, HOP_HEIGHT, this.#hopStartedAtBeat, HOP_BEATS, view.beat);
   }
 
-  #position(): RoutePoint {
-    if (this.#finished) return this.#route.destination;
-    if (this.#waypointIndex < 0) return this.#route.startPosition;
-    const waypoint = this.#route.waypoints[this.#waypointIndex];
-    return { x: waypoint?.x ?? 0, y: waypoint?.y ?? 0 };
+  #footholdAt(view: StageView, index: number): { x: number; y: number } | null {
+    if (index < 0) return null;
+    const note = view.notes[index];
+    return note ? { x: note.rect.x + note.rect.w / 2, y: note.rect.y } : null;
+  }
+
+  #startPosition(view: StageView): { x: number; y: number } | null {
+    const first = view.notes[0];
+    if (!first) return null;
+    return { x: first.rect.x - view.measure.beatWidth, y: first.rect.y };
   }
 
   #poseAssetId(): string {
@@ -417,7 +371,7 @@ export class ClimbMinigame implements Minigame {
   #spawnEffect(
     kind: ClimbEffectKind,
     assetId: string,
-    position: RoutePoint,
+    noteIndex: number,
     strength: number,
     beat: number
   ): void {
@@ -427,7 +381,7 @@ export class ClimbMinigame implements Minigame {
         id: this.#nextEffectId++,
         kind,
         assetId,
-        position: { x: position.x, y: position.y },
+        noteIndex,
         strength,
         bornAtBeat: beat,
         lifeBeats: EFFECT_LIFE_BEATS,
@@ -440,7 +394,6 @@ export class ClimbMinigame implements Minigame {
     return decay(this.#wobbleStartedAtBeat, WOBBLE_DECAY_BEATS, beat);
   }
 }
-
 
 /* -------------------------------------------------------------------------- */
 /* The package                                                                 */
@@ -463,71 +416,27 @@ function parseBindings(raw: unknown, where: string): ClimbAssetBindings {
     }
     return values;
   };
+  const foothold = obj(bindings["footholdArt"], `${where}.footholdArt`);
 
   return {
     background: one("background"),
     climberPoses: many("climberPoses", 1),
     finishPose: one("finishPose"),
-    waypointVisuals: many("waypointVisuals", 1),
     destinationVisual: one("destinationVisual"),
     // Slot ordering is part of the class contract: [0] is the contact effect
     // where the climber lands, [1] the clean-progress accent.
     stepEffects: many("stepEffects", 2),
-    ...(bindings["timelineArt"] === undefined
-      ? {}
-      : { timelineArt: parseTimelineArt(bindings["timelineArt"], `${where}.timelineArt`) }),
+    footholdArt: {
+      body: str(
+        strings(foothold["body"], `${where}.footholdArt.body`)[0],
+        `${where}.footholdArt.body`
+      ),
+      crag: str(
+        strings(foothold["crag"], `${where}.footholdArt.crag`)[0],
+        `${where}.footholdArt.crag`
+      ),
+    },
   };
-}
-
-function parseTimelineArt(raw: unknown, where: string): { body: string; outcrop: string } {
-  const art = obj(raw, where);
-  const one = (slot: string): string => {
-    const values = strings(art[slot], `${where}.${slot}`);
-    const first = values[0];
-    if (values.length !== 1 || first === undefined) {
-      throw new ScenarioDataError(`${where}.${slot}`, "expected exactly one asset id");
-    }
-    return first;
-  };
-  return { body: one("body"), outcrop: one("outcrop") };
-}
-
-function parseRoute(raw: unknown, where: string, expectedWaypoints: number): RouteData {
-  const route = obj(raw, where);
-  const point = (value: unknown, at: string): RoutePoint => {
-    const p = obj(value, at);
-    return { x: num(p["x"], `${at}.x`), y: num(p["y"], `${at}.y`) };
-  };
-
-  const waypoints = arrayOf(route["waypoints"], `${where}.waypoints`).map((entry, i) => {
-    const at = `${where}.waypoints[${i}]`;
-    const wp = obj(entry, at);
-    return {
-      ...point(wp, at),
-      scale: num(wp["scale"], `${at}.scale`),
-      rotationDeg: num(wp["rotationDeg"], `${at}.rotationDeg`),
-    };
-  });
-
-  if (waypoints.length !== expectedWaypoints) {
-    throw new ScenarioDataError(
-      `${where}.waypoints`,
-      `${waypoints.length} waypoints for ${expectedWaypoints} note opportunities — ` +
-        "one successful note must advance exactly one waypoint"
-    );
-  }
-
-  return {
-    character: str(route["character"], `${where}.character`),
-    startPosition: point(route["startPosition"], `${where}.startPosition`),
-    destination: point(route["destination"], `${where}.destination`),
-    waypoints,
-  };
-}
-
-function arrayOf(value: unknown, where: string): unknown[] {
-  if (!Array.isArray(value)) throw new ScenarioDataError(where, "expected an array");
-  return value;
 }
 
 /** Narrows a scenario's opaque config. Throws if it did not come from here. */
@@ -542,7 +451,7 @@ export function climbConfig(config: unknown): ClimbConfig {
 /** Narrows a level's opaque data. Throws if it did not come from here. */
 export function climbLevelData(data: unknown): ClimbLevelData {
   const value = data as Partial<ClimbLevelData> | null;
-  if (!value || typeof value !== "object" || !value.route) {
+  if (!value || typeof value !== "object" || typeof value.visualSpanMeasures !== "number") {
     throw new Error("not ClimbMinigame level data");
   }
   return value as ClimbLevelData;
@@ -552,9 +461,9 @@ export function climbLevelData(data: unknown): ClimbLevelData {
  * `ClimbMinigame` as the host sees it.
  *
  * The two parsers are why this class can define whatever content shape it
- * likes: only it knows what a route or a foothold is, so only it can say
- * whether a scenario file is valid. The host stores what they return without
- * ever looking inside.
+ * likes: only it knows what a foothold is, so only it can say whether a
+ * scenario file is valid. The host stores what they return without ever looking
+ * inside.
  */
 export const CLIMB_MINIGAME: MinigameModule = {
   id: "ClimbMinigame",
@@ -574,21 +483,18 @@ export const CLIMB_MINIGAME: MinigameModule = {
     return {
       bindings: parseBindings(root["assetBindings"], "scenario.assetBindings"),
       badNotePolicy: policy,
-      showDestinationFromStart: bool(
-        params["showDestinationFromStart"],
-        "scenario.classParameters.showDestinationFromStart"
-      ),
     };
   },
 
-  parseLevel(raw: unknown, shape): ClimbLevelData {
+  /**
+   * A climb authors no geometry at all now — the notes are the footholds, so
+   * there is nothing left that could disagree with them. What remains is how
+   * the scenario uses its four measures, which is the class's business and not
+   * the host's (a BATTLE scenario varies it by difficulty level).
+   */
+  parseLevel(raw: unknown): ClimbLevelData {
     const visual = obj(raw, "level.visual");
     return {
-      // One waypoint per note opportunity is the class's own invariant, checked
-      // here rather than by the generic loader -- a REPEAT scenario's row holds
-      // `noteOpportunityCount / measures` targets, and neither rule is the
-      // host's to enforce.
-      route: parseRoute(visual["route"], "level.visual.route", shape.noteOpportunityCount),
       visualSpanMeasures: num(visual["visualSpanMeasures"], "level.visual.visualSpanMeasures"),
       resetBetweenMeasures: bool(
         visual["resetBetweenMeasures"],
@@ -603,30 +509,29 @@ export const CLIMB_MINIGAME: MinigameModule = {
       bindings.background,
       ...bindings.climberPoses,
       bindings.finishPose,
-      ...bindings.waypointVisuals,
       bindings.destinationVisual,
       ...bindings.stepEffects,
-      ...(bindings.timelineArt ? [bindings.timelineArt.body, bindings.timelineArt.outcrop] : []),
+      bindings.footholdArt.body,
+      bindings.footholdArt.crag,
     ];
   },
 
-  create(context: AttemptContext): ClimbMinigame {
+  create(context: AttemptContext): Minigame {
     const config = climbConfig(context.config);
     const level = climbLevelData(context.data);
     return new ClimbMinigame({
-      route: level.route,
       bindings: config.bindings,
-      parameters: {
-        badNotePolicy: config.badNotePolicy,
-        showDestinationFromStart: config.showDestinationFromStart,
-      },
+      parameters: { badNotePolicy: config.badNotePolicy },
       resetBetweenMeasures: level.resetBetweenMeasures,
     });
   },
 
   debug(instance: Minigame): Readonly<Record<string, string>> {
     if (!(instance instanceof ClimbMinigame)) return {};
-    const { waypointIndex, waypointCount } = instance.progress;
-    return { waypoint: `${waypointIndex + 1}/${waypointCount}` };
+    const { noteIndex, successfulNotes } = instance.progress;
+    return { foothold: `${noteIndex + 1}`, "successful notes": String(successfulNotes) };
   },
 };
+
+/** Re-exported for tests: the placed note a climber would be standing on. */
+export type { PlacedNote };

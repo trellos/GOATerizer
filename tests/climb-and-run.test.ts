@@ -14,12 +14,8 @@ import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/ga
 import { rankForStars, GOAT_RANKS } from "../src/game/ranks.js";
 import { DIFFICULTY_SEQUENCE, RunState, RUN_SLOT_COUNT } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
-import type { Judged, Scene, Sprite } from "../src/minigame/api.js";
-import {
-  ClimbMinigame,
-  climbConfig,
-  climbLevelData,
-} from "../src/scenario/minigames/climb-minigame.js";
+import type { PlacedNote, Sprite, Stage, StageView } from "../src/minigame/api.js";
+import { ClimbMinigame, climbConfig } from "../src/scenario/minigames/climb-minigame.js";
 import { ROCKY_ASCENT, scenariosForDifficulty } from "../src/scenario/registry.js";
 import type { RunKey } from "../src/music/keys.js";
 
@@ -90,24 +86,47 @@ function playFlawlessly(difficulty: number): {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Scene helpers                                                               */
+/* Stage helpers                                                               */
 /*                                                                             */
-/* The minigame reaches the screen only through `renderScene`, so these read    */
-/* what would actually be drawn rather than an internal state object. That is   */
-/* the point of a scene being a value: this file asserts the picture without a  */
-/* canvas anywhere near it.                                                    */
+/* A minigame reaches the screen only through `render(view)`, and the view is   */
+/* pure data, so these assert what would actually be drawn on the timeline with */
+/* no canvas anywhere near them.                                               */
 /* -------------------------------------------------------------------------- */
 
-/** Rocky Ascent's climb config and per-level data, narrowed for assertions. */
 const ASCENT = climbConfig(ROCKY_ASCENT.config);
-const ascentLevel = (difficulty: number) =>
-  climbLevelData(ROCKY_ASCENT.levels.get(difficulty)!.data);
+
+/**
+ * A StageView as the timeline would hand one over.
+ *
+ * Notes are laid out left to right one beat apart, which is enough for every
+ * assertion here: what matters is that a minigame positions itself *from* the
+ * notes rather than from authored coordinates.
+ */
+function viewFor(attempt: AttemptRuntime, beat: number): StageView {
+  const notes: PlacedNote[] = attempt.targets.map((target) => ({
+    id: `a0-${target.opportunityIndex}`,
+    opportunityIndex: target.opportunityIndex,
+    lane: target.lane,
+    duration: target.duration,
+    outcome: null,
+    rect: { x: 0.05 * target.opportunityIndex, y: 0.5, w: 0.04, h: 0.1 },
+    beatsUntilStrike: target.startBeat - beat,
+  }));
+  return {
+    beat,
+    notes,
+    laneCount: 8,
+    strikeX: 0.5,
+    span: { from: 0, to: 1 },
+    measure: { width: 0.4, beatWidth: 0.1 },
+  };
+}
 
 /**
  * The attempt's minigame, as the concrete class.
  *
- * `AttemptRuntime.minigame` is a `Minigame` -- the runtime genuinely does not
- * know it is running a climb -- so a climb-specific assertion has to say so.
+ * `AttemptRuntime.minigame` is a `Minigame` — the runtime genuinely does not
+ * know it is running a climb — so a climb-specific assertion has to say so.
  */
 function climbIn(attempt: AttemptRuntime): ClimbMinigame {
   const minigame = attempt.minigame;
@@ -115,65 +134,76 @@ function climbIn(attempt: AttemptRuntime): ClimbMinigame {
   return minigame;
 }
 
-function scene(minigame: ClimbMinigame, beat = 0): Scene {
-  return minigame.renderScene(beat);
+function stageOf(attempt: AttemptRuntime, beat = 0): Stage {
+  return climbIn(attempt).render(viewFor(attempt, beat));
 }
 
-function spriteAt(minigame: ClimbMinigame, key: string, beat = 0): Sprite {
-  const found = scene(minigame, beat).sprites.find((entry) => entry.key === key);
+function spriteAt(attempt: AttemptRuntime, key: string, beat = 0): Sprite {
+  const found = (stageOf(attempt, beat).sprites ?? []).find((entry) => entry.key === key);
   if (!found) throw new Error(`no sprite keyed ${key}`);
   return found;
 }
 
-function climberAt(minigame: ClimbMinigame, beat = 0): Sprite {
-  return spriteAt(minigame, "climber", beat);
-}
-
 /** Effect sprites, split by which `stepEffects` slot they came from. */
-function effectsAt(
-  minigame: ClimbMinigame,
-  beat = 0
-): { contact: Sprite[]; accent: Sprite[] } {
+function effectsAt(attempt: AttemptRuntime, beat = 0): { contact: Sprite[]; accent: Sprite[] } {
   const [contactId, accentId] = ASCENT.bindings.stepEffects;
-  const fx = scene(minigame, beat).sprites.filter((entry) => entry.key.startsWith("fx-"));
+  const fx = (stageOf(attempt, beat).sprites ?? []).filter((e) => e.key.startsWith("fx-"));
   return {
     contact: fx.filter((entry) => entry.assetId === contactId),
     accent: fx.filter((entry) => entry.assetId === accentId),
   };
 }
 
-/** A judged note of the given outcome, as the attempt runtime would deliver it. */
-function judged(outcome: Judged["outcome"], beat: number): Judged {
-  return { id: 1, outcome, opportunityIndex: 0, playedMidi: 60, lane: 0, beat };
+/** Where the note bar the climber should be standing on sits. */
+function noteX(attempt: AttemptRuntime, opportunityIndex: number): number {
+  const note = viewFor(attempt, 0).notes[opportunityIndex]!;
+  return note.rect.x + note.rect.w / 2;
 }
 
-describe("ClimbMinigame progress", () => {
-  it("starts at the route's start position, on no waypoint", () => {
+describe("ClimbMinigame on the timeline", () => {
+  it("waits left of the opening foothold before anything is played", () => {
     const { attempt } = harness(1);
-    const progress = climbIn(attempt).progress;
-    expect(progress.waypointIndex).toBe(-1);
-    expect(progress.successfulNotes).toBe(0);
-    const start = ascentLevel(1).route.startPosition;
-    const climber = climberAt(climbIn(attempt));
-    expect({ x: climber.x, y: climber.y }).toEqual(start);
+    expect(climbIn(attempt).progress.noteIndex).toBe(-1);
+    expect(climbIn(attempt).progress.successfulNotes).toBe(0);
+    // A beat to the left of note 0: visibly about to start, not standing on a
+    // foothold it has not earned.
+    expect(spriteAt(attempt, "climber").x).toBeLessThan(noteX(attempt, 0));
   });
 
-  it("advances exactly one waypoint on a Perfect note", () => {
+  it("stands on the note it just played, and only that note", () => {
     const h = harness(1);
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(0);
     expect(climbIn(h.attempt).progress.successfulNotes).toBe(1);
+    // Landed: well past the hop, the climber is on note 0's bar.
+    expect(spriteAt(h.attempt, "climber", 4).x).toBeCloseTo(noteX(h.attempt, 0), 5);
   });
 
-  it("advances exactly one waypoint on a Good note too", () => {
+  it("advances exactly one foothold on a Good note too", () => {
     const h = harness(1);
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat, 0.4); // late, but successful
     h.advanceTo(0.45);
     expect(h.events.some((e) => e.type === "judgment" && e.judgment.type === "GoodNote")).toBe(true);
-    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(0);
+  });
+
+  it("hops rather than slides between footholds", () => {
+    const h = harness(1);
+    const [first, second] = [h.attempt.targets[0]!, h.attempt.targets[1]!];
+    h.playAt(first.midi, first.startBeat);
+    h.advanceTo(first.startBeat + 0.01);
+    h.advanceTo(second.startBeat);
+    h.playAt(second.midi, second.startBeat);
+    h.advanceTo(second.startBeat + 0.01);
+
+    // Mid-hop the climber is above the bar it is travelling between, which a
+    // straight interpolation could never produce.
+    const airborne = spriteAt(h.attempt, "climber", second.startBeat + 0.11);
+    const landed = spriteAt(h.attempt, "climber", second.startBeat + 4);
+    expect(airborne.y).toBeLessThan(landed.y);
   });
 
   it("does not advance on a wrong note, and does not lose earned progress", () => {
@@ -181,58 +211,43 @@ describe("ClimbMinigame progress", () => {
     const first = h.attempt.targets[0]!;
     h.playAt(first.midi, first.startBeat);
     h.advanceTo(0.01);
-    const earned = climbIn(h.attempt).progress.waypointIndex;
+    const earned = climbIn(h.attempt).progress.noteIndex;
 
     const second = h.attempt.targets[1]!;
     h.playAt(second.midi + 1, second.startBeat); // a semitone off
     h.advanceTo(second.startBeat + 0.01);
 
-    const progress = climbIn(h.attempt).progress;
-    expect(progress.waypointIndex).toBe(earned);
-    expect(progress.successfulNotes).toBe(1);
-    // Wobble is a lean, not a fall: the climber tilts and is still on the same
-    // foothold.
-    expect(climberAt(climbIn(h.attempt), second.startBeat).rotationDeg).not.toBe(0);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(earned);
+    expect(climbIn(h.attempt).progress.successfulNotes).toBe(1);
+    // Wobble is a lean, not a fall.
+    expect(spriteAt(h.attempt, "climber", second.startBeat).rotationDeg).not.toBe(0);
   });
 
   it("does not advance on a miss", () => {
     const h = harness(1);
     h.advanceTo(2); // let the first two targets expire unplayed
-    expect(climbIn(h.attempt).progress.waypointIndex).toBe(-1);
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(-1);
     expect(h.events.filter((e) => e.type === "judgment" && e.judgment.type === "MissedNote").length)
       .toBeGreaterThan(0);
   });
 
-  it("settles the wobble back to the same waypoint", () => {
-    // Driven directly, because in a live attempt every expiring target sends
-    // its own bad energy and would keep re-triggering the wobble.
-    const level = ascentLevel(1);
-    const climb = new ClimbMinigame({
-      route: level.route,
-      bindings: ASCENT.bindings,
-      parameters: {
-        badNotePolicy: ASCENT.badNotePolicy,
-        showDestinationFromStart: ASCENT.showDestinationFromStart,
-      },
-      resetBetweenMeasures: level.resetBetweenMeasures,
-    });
+  it("settles the wobble back onto the same foothold", () => {
+    const h = harness(1);
+    const first = h.attempt.targets[0]!;
+    h.playAt(first.midi, first.startBeat);
+    h.advanceTo(0.01);
 
-    climb.onJudged(judged("perfect", 0), 0);
-    const settled = climberAt(climb, 0);
-    const before = { x: settled.x, y: settled.y };
-
-    climb.onJudged(judged("wrong", 1), 1);
+    const climb = climbIn(h.attempt);
+    climb.onJudged({ id: 9, outcome: "wrong", opportunityIndex: null, playedMidi: 60, lane: 0, beat: 1 }, 1);
     climb.update(1.05);
-    const leaning = climberAt(climb, 1.05);
-    expect(leaning.rotationDeg).not.toBe(0);
-    expect(leaning.y).toBe(before.y);
+    expect(spriteAt(h.attempt, "climber", 1.05).rotationDeg).not.toBe(0);
 
     climb.update(2);
-    const after = climberAt(climb, 2);
+    const after = spriteAt(h.attempt, "climber", 2);
     expect(after.rotationDeg).toBe(0);
-    // Back to exactly the foothold it was on. Earned progress is never taken.
-    expect({ x: after.x, y: after.y }).toEqual(before);
-    expect(climb.progress.waypointIndex).toBe(0);
+    // Back on exactly the bar it was on. Earned progress is never taken.
+    expect(after.x).toBeCloseTo(noteX(h.attempt, 0), 5);
+    expect(climb.progress.noteIndex).toBe(0);
   });
 
   it("cycles the climber pose so consecutive steps do not look identical", () => {
@@ -242,7 +257,7 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.01);
-      poses.push(climberAt(climbIn(h.attempt), target.startBeat + 0.01).assetId);
+      poses.push(spriteAt(h.attempt, "climber", target.startBeat + 0.01).assetId);
     }
     expect(new Set(poses).size).toBeGreaterThan(1);
     for (const pose of poses) expect(ASCENT.bindings.climberPoses).toContain(pose);
@@ -253,45 +268,50 @@ describe("ClimbMinigame progress", () => {
     const first = perfect.attempt.targets[0]!;
     perfect.playAt(first.midi, first.startBeat);
     perfect.advanceTo(0.01);
-    const perfectFx = effectsAt(climbIn(perfect.attempt), first.startBeat);
+    const perfectFx = effectsAt(perfect.attempt, first.startBeat);
     expect(perfectFx.contact).toHaveLength(1);
     expect(perfectFx.accent).toHaveLength(1);
 
     const good = harness(1);
     good.playAt(first.midi, first.startBeat, 0.4);
     good.advanceTo(0.45);
-    const goodFx = effectsAt(climbIn(good.attempt), first.startBeat + 0.4);
+    const goodFx = effectsAt(good.attempt, first.startBeat + 0.4);
     // Same asset, drawn smaller: Perfect reads stronger than Good.
     expect(goodFx.accent[0]!.scale).toBeLessThan(perfectFx.accent[0]!.scale!);
   });
 
-  it("draws one foothold per authored waypoint, lighting them as they are reached", () => {
+  it("dresses every note as a foothold, lighting them as they are climbed", () => {
     const h = harness(1);
-    const level = ascentLevel(1);
-    const footholds = () =>
-      scene(climbIn(h.attempt)).sprites.filter((entry) => entry.key.startsWith("step-"));
-
-    expect(footholds()).toHaveLength(level.route.waypoints.length);
-    expect(footholds().every((entry) => entry.opacity !== 1)).toBe(true);
+    const notes = () => stageOf(h.attempt).notes!;
+    expect(notes().size).toBe(h.attempt.targets.length);
+    for (const art of notes().values()) {
+      expect(art.body?.assetId).toBe(ASCENT.bindings.footholdArt.body);
+      expect(art.underlay?.assetId).toBe(ASCENT.bindings.footholdArt.crag);
+    }
+    const faded = notes().get("a0-0")!.underlay!.opacity!;
 
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    expect(footholds()[0]!.opacity).toBe(1);
-    expect(footholds()[1]!.opacity).not.toBe(1);
+    expect(notes().get("a0-0")!.underlay!.opacity!).toBeGreaterThan(faded);
+    expect(notes().get("a0-1")!.underlay!.opacity!).toBe(faded);
   });
 
-  it("keeps sprite keys stable across frames, so nothing re-identifies mid-climb", () => {
+  it("puts its background behind its own measures and nothing else", () => {
+    const { attempt } = harness(1);
+    expect(stageOf(attempt).background).toBe(ASCENT.bindings.background);
+  });
+
+  it("keeps its footing after the note it stands on scrolls off screen", () => {
     const h = harness(1);
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(0.01);
-    const keysAt = (beat: number) => scene(climbIn(h.attempt), beat).sprites.map((s) => s.key);
-    // The climber advances between these two frames; its key does not change.
-    expect(keysAt(0.01)).toContain("climber");
-    expect(keysAt(0.02)).toContain("climber");
-    const first = keysAt(0.01);
-    expect(new Set(first).size).toBe(first.length);
+    // The host hands over EVERY note, including off-screen ones, precisely so
+    // this cannot happen. A climber with no anchor would have no sprite at all.
+    const climber = spriteAt(h.attempt, "climber", 15);
+    expect(Number.isFinite(climber.x)).toBe(true);
+    expect(climber.x).toBeCloseTo(noteX(h.attempt, 0), 5);
   });
 
   it("keeps climbing across all four measures with no reset", () => {
@@ -301,73 +321,27 @@ describe("ClimbMinigame progress", () => {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
       h.advanceTo(target.startBeat + 0.001);
-      seen.push(climbIn(h.attempt).progress.waypointIndex);
+      seen.push(climbIn(h.attempt).progress.noteIndex);
     }
     // Strictly increasing, one per note, right through the measure boundaries.
     expect(seen).toEqual([...Array(15).keys()]);
     expect(h.events.filter((e) => e.type === "measureComplete")).toHaveLength(3);
   });
 
-  it("maps every successful note onto its own waypoint at L4's 30 steps", () => {
+  it("maps every successful note onto its own foothold at L4's 30 notes", () => {
     const { attempt } = playFlawlessly(4);
     expect(climbIn(attempt).progress.successfulNotes).toBe(30);
-    expect(climbIn(attempt).progress.waypointCount).toBe(30);
+    expect(attempt.targets).toHaveLength(30);
   });
 
-  it("finishes at the destination when the attempt passes", () => {
+  it("takes the finish pose when the attempt passes", () => {
     const { attempt, result } = playFlawlessly(1);
     expect(result.passed).toBe(true);
     expect(climbIn(attempt).progress.finished).toBe(true);
-    const climber = climberAt(climbIn(attempt), 16);
-    expect({ x: climber.x, y: climber.y }).toEqual(ascentLevel(1).route.destination);
-    expect(climber.assetId).toBe(ASCENT.bindings.finishPose);
+    expect(spriteAt(attempt, "climber", 16).assetId).toBe(ASCENT.bindings.finishPose);
   });
 
-  it("skins its own timeline notes without being able to move one", () => {
-    const h = harness(1);
-    const climb = climbIn(h.attempt);
-    const placed = h.attempt.targets.slice(0, 3).map((target, index) => ({
-      id: `a0-${index}`,
-      opportunityIndex: target.opportunityIndex,
-      lane: target.lane,
-      duration: target.duration,
-      outcome: null,
-      rect: { x: 0.1 * index, y: 0.2, w: 0.05, h: 0.1 },
-      beatsUntilStrike: target.startBeat,
-    }));
-    const before = structuredClone(placed);
-
-    const skin = climb.renderTimeline(placed);
-    expect(skin?.notes?.size).toBe(3);
-    for (const note of placed) {
-      const art = skin!.notes!.get(note.id)!;
-      // Bound art, and only art: the crag is an underlay that bleeds outside
-      // the rect, the ledge is the body stretched to it.
-      expect(art.body?.assetId).toBe(ASCENT.bindings.timelineArt?.body);
-      expect(art.underlay?.assetId).toBe(ASCENT.bindings.timelineArt?.outcrop);
-      expect(art.underlay?.scale).toBeGreaterThan(1);
-    }
-    // The host owns geometry absolutely. A skin is handed rects and returns
-    // art; there is no path by which it could have changed one.
-    expect(placed).toEqual(before);
-  });
-
-  it("asks for no note art at all when the scenario binds none", () => {
-    const level = ascentLevel(1);
-    const bare = new ClimbMinigame({
-      route: level.route,
-      bindings: { ...ASCENT.bindings, timelineArt: undefined },
-      parameters: {
-        badNotePolicy: ASCENT.badNotePolicy,
-        showDestinationFromStart: ASCENT.showDestinationFromStart,
-      },
-      resetBetweenMeasures: level.resetBetweenMeasures,
-    });
-    // Null means "use the host's default notes", which is a complete timeline.
-    expect(bare.renderTimeline([])).toBeNull();
-  });
-
-  it("freezes at the furthest earned waypoint when the attempt fails", () => {
+  it("freezes on the furthest earned foothold when the attempt fails", () => {
     const h = harness(1);
     const target = h.attempt.targets[0]!;
     h.playAt(target.midi, target.startBeat);
@@ -378,11 +352,9 @@ describe("ClimbMinigame progress", () => {
     expect(result.passed).toBe(false);
     expect(climbIn(h.attempt).progress.finished).toBe(false);
     expect(climbIn(h.attempt).progress.frozen).toBe(true);
-    expect(climbIn(h.attempt).progress.waypointIndex).toBe(0);
-    // No bespoke failure art: it is still a climbing pose, just not the finish.
-    expect(climberAt(climbIn(h.attempt), 16).assetId).not.toBe(
-      ASCENT.bindings.finishPose
-    );
+    expect(climbIn(h.attempt).progress.noteIndex).toBe(0);
+    // No bespoke failure art: still a climbing pose, just not the finish.
+    expect(spriteAt(h.attempt, "climber", 16).assetId).not.toBe(ASCENT.bindings.finishPose);
   });
 });
 

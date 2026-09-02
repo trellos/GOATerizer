@@ -12,12 +12,17 @@
  *
  *     the minigame is code; its output is data.
  *
+ * **There is one surface: the timeline.** The player reads it to know what to
+ * play, and the minigame is what happens on it in response — a goat hopping from
+ * note bar to note bar, a tin can crushed against a forehead when its note
+ * lands. There is no separate scenario panel (GDD §11.2).
+ *
  * The host owns musical time, judgment, score, stars, run flow and every pixel
- * of geometry. The minigame owns what a judged note *means* for its scenario,
- * and answers one question each frame: what should be drawn right now. It is
- * handed events and returns values; it never calls the host, never reads a
- * clock, and cannot award itself anything — every lifecycle method returns
- * `void`, which is what makes a third-party minigame safe to run.
+ * of note geometry. The minigame owns what a judged note *means*, and answers
+ * one question each frame: what should be drawn right now. It is handed events
+ * and returns values; it never calls the host, never reads a clock, and cannot
+ * award itself anything — every lifecycle method returns `void`, which is what
+ * makes a third-party minigame safe to run.
  */
 
 /**
@@ -119,18 +124,33 @@ export type Judged = {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Coarse draw order. Within a layer, {@link Sprite.z} decides.
+ * Where a sprite sits relative to the host's own furniture.
  *
- * `front` exists because the asset catalog calls for it: several BATTLE
- * scenarios bind an arena prop described as a foreground object used for
- * staging and scale, in front of the actor.
+ * The host draws the note bars, and above everything it draws the played-note
+ * row and the current-time bar — a minigame composes around the player's own
+ * note, never over it.
  */
-export type Layer = "back" | "stage" | "actor" | "front";
+export type Layer =
+  /** Behind the note bars, in front of the background. Terrain, scenery. */
+  | "under"
+  /** In front of the note bars. Actors standing on them, effects, debris. */
+  | "over";
 
 /**
- * One drawn sprite, in normalised scenario space: x rightwards 0..1, y
- * downwards 0..1 with 0 at the top of the panel. Resolution-independent by
- * construction.
+ * One drawn sprite, in **normalised timeline space**.
+ *
+ * `x` runs rightwards across the visible playfield — the area right of the
+ * gutter — with 0 at its left edge and 1 at its right. `y` runs downwards
+ * across the **lane band**, 0 at the top lane and 1 below the bottom one.
+ *
+ * Both may go outside 0..1 and that is normal and useful: `y < 0` is above the
+ * lanes and `y > 1` below them, in the play area the background fills, which is
+ * where a goat stands when it hops onto a bar and where a knocked can falls.
+ * `x` outside 0..1 is simply off-screen, which is where a minigame's own notes
+ * are before they scroll in. Everything is clipped to the play area.
+ *
+ * To put an actor on a note, read that note's {@link PlacedNote.rect} from
+ * {@link StageView.notes} — its rect is in exactly this space.
  *
  * `key` is the sprite's identity across frames. It must be stable and unique
  * within a scene: the host uses it to cross-fade a changed `assetId` and to
@@ -158,11 +178,25 @@ export type Sprite = {
   readonly offsetY?: number;
 };
 
-/** A whole scenario panel, rebuilt each frame. Nothing else reaches the screen. */
-export type Scene = {
-  /** Drawn cover-fit behind everything. */
+/**
+ * Everything a minigame puts on the timeline this frame, rebuilt each frame.
+ *
+ * Nothing else of it reaches the screen. All three parts are optional: a
+ * minigame that returns `{}` is invisible and the timeline renders exactly as
+ * the host would draw it alone.
+ */
+export type Stage = {
+  /**
+   * The background behind **this minigame's own measures**, not the whole
+   * timeline. The host clips it to {@link StageView.span}, so around a handover
+   * the outgoing minigame's background scrolls off to the left while the
+   * incoming one's arrives from the right, meeting on a measure line.
+   */
   readonly background?: string;
-  readonly sprites: readonly Sprite[];
+  /** Actors, scenery and effects. Drawn in layer, then z, then array order. */
+  readonly sprites?: readonly Sprite[];
+  /** Note id -> art. Any note absent gets the host's default bar. */
+  readonly notes?: ReadonlyMap<string, NoteArt>;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -189,17 +223,62 @@ export type PlacedNote = {
   readonly beatsUntilStrike: number;
 };
 
-export type TimelineContext = {
-  /** Attempt-relative beat. */
-  readonly beat: number;
-  readonly laneCount: number;
+/**
+ * The surface, as it stands this frame.
+ *
+ * Everything here is host-computed and read-only. A minigame cannot move a note
+ * in time or pitch, resize one, or change where a measure falls; it is told
+ * where they are and decides what is drawn around them.
+ */
+export type StageView = {
   /**
-   * Normalised x span this attempt's notes occupy, which the host clips the
-   * backdrop to. Two attempts share the timeline around a transition — the
-   * outgoing one's notes scroll left while the incoming one's scroll in from
-   * the right — so a backdrop that ignored this would cover both.
+   * Attempt-relative beat — the same clock every other lifecycle method is
+   * given. Negative before this minigame's first measure, past
+   * {@link AttemptContext.plan.totalBeats} while its last measure scrolls away.
+   */
+  readonly beat: number;
+
+  /**
+   * **Every** note of this attempt, in order, whether or not it is on screen.
+   *
+   * Off-screen notes carry rects outside 0..1 rather than being omitted, so an
+   * actor anchored to a note always has a coordinate — a climber standing on
+   * note 3 does not lose its footing when note 3 scrolls off the left edge.
+   */
+  readonly notes: readonly PlacedNote[];
+
+  /** Lanes in the pitch band, root to root. */
+  readonly laneCount: number;
+
+  /**
+   * Normalised x of the current-time bar — where a note is played.
+   *
+   * The other anchor besides a note. Some minigames put their actor *here* and
+   * let the notes come to it: a REPEAT scenario's forehead waits at the strike
+   * line and each tin can is crushed as it arrives; a BATTLE threat closes in
+   * from the right across successive measures. Both read better than chasing a
+   * scrolling bar.
+   */
+  readonly strikeX: number;
+
+  /**
+   * Normalised x span this minigame's own measures occupy, which the host clips
+   * the background to. Two minigames share the timeline around a handover.
    */
   readonly span: { readonly from: number; readonly to: number };
+
+  /**
+   * Measure geometry. A measure is a golden rectangle (GDD §11.3), so its width
+   * is a consequence of the lane band's height rather than a free choice — a
+   * minigame that wants to place something "a beat ahead" should use
+   * `beatWidth` rather than assuming a scroll speed.
+   */
+  readonly measure: {
+    /** Normalised width of one four-beat measure. */
+    readonly width: number;
+    /** Normalised width of one beat. */
+    readonly beatWidth: number;
+  };
 };
 
 /**
@@ -219,13 +298,6 @@ export type NoteArt = {
   readonly underlay?: { assetId: string; scale?: number; opacity?: number };
   readonly body?: { assetId: string; opacity?: number };
   readonly overlay?: { assetId: string; scale?: number; opacity?: number };
-};
-
-export type TimelineSkin = {
-  /** Behind the notes, in front of the row lines. Clipped to the context span. */
-  readonly backdrop?: readonly Sprite[];
-  /** Note id → art. Any note absent gets the host default. */
-  readonly notes?: ReadonlyMap<string, NoteArt>;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -272,15 +344,18 @@ export interface Minigame {
   /** The attempt is over. `passed` is `stars >= 1`. */
   onComplete(passed: boolean, stars: number, beat: number): void;
 
-  /** The scenario panel, now. Called once per rendered panel per frame. */
-  renderScene(beat: number): Scene;
-
   /**
-   * Optional skin for this attempt's target notes on the timeline.
+   * What this minigame puts on the timeline right now.
    *
-   * Return `null` — or omit the method — for the host's default look.
+   * The single render method: there is one surface, so this is the whole of a
+   * minigame's visible output. Called once per frame while its attempt is on
+   * screen, including before its first measure arrives and while its last one
+   * scrolls away — `view.beat` says which.
+   *
+   * Must be pure with respect to the host: it may read the minigame's own state
+   * and `view`, and must not mutate anything the host owns.
    */
-  renderTimeline?(placed: readonly PlacedNote[], view: TimelineContext): TimelineSkin | null;
+  render(view: StageView): Stage;
 }
 
 /**

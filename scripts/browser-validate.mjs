@@ -382,7 +382,7 @@ try {
 
   await page.click("#pregame-play");
   await page.waitForTimeout(300);
-  check("game screen is shown", await page.isVisible("#scenario-canvas"));
+  check("game screen is shown", await page.isVisible("#game-canvas"));
 
   const gameTimelineBox = await canvasBox(page, "game-canvas");
   check(
@@ -424,25 +424,22 @@ try {
 
   // Wait for the goat to be a few footholds up rather than for a wall-clock
   // guess: the attempt starts on the next measure boundary plus a lead-in.
-  const waypointMid = await waitForDev(
-    page,
-    "waypoint",
-    (value) => Number((value ?? "0/0").split("/")[0]) >= 3
-  );
+  const footholdMid = await waitForDev(page, "foothold", (value) => Number(value ?? 0) >= 3);
   await page.screenshot({ path: path.join(SHOTS, "04-playing.png") });
 
   check(
-    "the goat advances while notes are being hit",
-    Number((waypointMid ?? "0/0").split("/")[0]) >= 3,
-    `waypoint ${waypointMid}`
+    "the goat advances along the note bars while notes are being hit",
+    Number(footholdMid ?? 0) >= 3,
+    `foothold ${footholdMid}`
   );
   check(
-    "one successful note is exactly one waypoint",
-    (await dev(page, "perfect/good/miss"))?.split("/")[0] ===
-      (waypointMid ?? "0/0").split("/")[0],
-    `${await dev(page, "perfect/good/miss")} judged, waypoint ${waypointMid}`
+    "one successful note is exactly one foothold",
+    (await dev(page, "perfect/good/miss"))?.split("/")[0] === String(footholdMid),
+    `${await dev(page, "perfect/good/miss")} judged, foothold ${footholdMid}`
   );
-  check("scenario strip is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
+  // The minigame now lives on the timeline (GDD §11.2), so "is the scenario
+  // drawing" and "is the timeline drawing" are the same question.
+  check("the minigame is drawing on the timeline", (await canvasHasInk(page, "game-canvas")) > 200);
 
   /* --- the scenario's timeline art ----------------------------------- */
 
@@ -519,7 +516,7 @@ try {
   const ROCKY_L2 = /^Rocky (Ascent|Descent)( High)? L2$/;
   await waitForDev(page, "scenario", (value) => ROCKY_L2.test(value ?? ""));
   const afterFirst = {
-    waypoint: await dev(page, "waypoint"),
+    foothold: await dev(page, "foothold"),
     scenario: await dev(page, "scenario"),
     stars: await page.textContent("#hud-stars"),
   };
@@ -570,10 +567,13 @@ try {
 
   await page.click("#results-replay");
   await page.waitForTimeout(1200);
-  check("replay same setup starts another run", await page.isVisible("#scenario-canvas"));
+  check("replay same setup starts another run", await page.isVisible("#game-canvas"));
   check(
     "replay does not duplicate the transport or the bass",
-    (await page.evaluate(() => document.querySelectorAll("canvas").length)) === 4
+    // Three canvases, not four: the scenario panel is gone (GDD §11.2). Left
+    // are the pregame timeline, the run timeline and the star overlay. A fourth
+    // would mean a replay built a second one.
+    (await page.evaluate(() => document.querySelectorAll("canvas").length)) === 3
   );
 
   const ignorableFailures = failedRequests.filter((entry) => !entry.includes("favicon"));
@@ -604,12 +604,10 @@ try {
     await shot.waitForTimeout(1500);
     await shot.click("#pregame-play");
     await shot.click("#dev-autoplay-perfect");
-    // Part way up, so the route and the goat's place on it are both visible.
-    const waypoint = await waitForDev(shot, "waypoint", (value) => {
-      const [at, of] = (value ?? "0/0").split("/").map(Number);
-      return of > 0 && at >= Math.ceil(of * 0.55);
-    });
-    routeSteps[level] = Number((waypoint ?? "0/0").split("/")[1]);
+    // Part way up, so the phrase behind the goat and the bars ahead of it are
+    // both visible.
+    await waitForDev(shot, "foothold", (value) => Number(value ?? 0) >= 3);
+    routeSteps[level] = Number(await dev(shot, "note opportunities"));
     routeScenario[level] = await dev(shot, "scenario");
     // Hide the dev panel so it does not cover the right-hand panel.
     await shot.evaluate(() => document.getElementById("dev-panel")?.setAttribute("hidden", ""));
@@ -618,15 +616,15 @@ try {
     await shot.close();
   }
 
-  note(`L1 route: ${routeScenario[1]} (${routeSteps[1]} footholds)`);
-  note(`L4 route: ${routeScenario[4]} (${routeSteps[4]} footholds)`);
+  note(`L1: ${routeScenario[1]} (${routeSteps[1]} note bars to climb)`);
+  note(`L4: ${routeScenario[4]} (${routeSteps[4]} note bars to climb)`);
   check(
-    "L1 authors a full Rocky-family route (15-16 footholds)",
+    "L1 climbs a full Rocky-family phrase (15-16 note bars)",
     routeSteps[1] >= 15 && routeSteps[1] <= 16,
     String(routeSteps[1])
   );
   check(
-    "L4 authors a full Rocky-family route (24-32 footholds)",
+    "L4 climbs a full Rocky-family phrase (24-32 note bars)",
     routeSteps[4] >= 24 && routeSteps[4] <= 32,
     String(routeSteps[4])
   );
