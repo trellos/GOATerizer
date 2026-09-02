@@ -99,11 +99,7 @@ import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import type { ActorSprites } from "../ui/timeline/actor-layer.js";
 import { NO_REPEAT_SPRITES, type RepeatSprites } from "../ui/timeline/repeat-layer.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import {
-  OVERLAY_BAND_FRACTION,
-  TimelineView,
-  type TimelineViewMode,
-} from "../ui/timeline/timeline-view.js";
+import { OVERLAY_BAND_FRACTION, TimelineView } from "../ui/timeline/timeline-view.js";
 
 const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
@@ -112,7 +108,6 @@ type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
 type Setup = {
   key: RunKey;
   tempoId: TempoId;
-  viewMode: TimelineViewMode;
   fingeringId: string;
 };
 
@@ -273,7 +268,6 @@ export class GameApp {
   #setup: Setup = {
     key: pickWeightedKey(),
     tempoId: DEFAULT_TEMPO_ID,
-    viewMode: "key",
     fingeringId: "",
   };
   #fingerings: Fingering[] = [];
@@ -560,17 +554,6 @@ export class GameApp {
       this.#showScreen("pregame");
     });
 
-    for (const button of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-      button.addEventListener("click", () => {
-        const mode = button.dataset["view"] === "tab" ? "tab" : "key";
-        this.#setup.viewMode = mode;
-        this.#pregameView?.setMode(mode);
-        this.#applyGameViewMode();
-        for (const other of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-          other.dataset["selected"] = String(other.dataset["view"] === mode);
-        }
-      });
-    }
   }
 
   /**
@@ -747,8 +730,6 @@ export class GameApp {
 
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
-    this.#pregameView?.setMode(this.#setup.viewMode);
-    this.#applyGameViewMode();
     this.#updateKeyReadouts();
 
     await inputReady;
@@ -802,18 +783,6 @@ export class GameApp {
    * The key, twice: the chart-style short name to read at a glance, and the
    * long name on the tooltip for anyone who wants it spelled out.
    */
-  /**
-   * The run screen's view mode.
-   *
-   * The overlay is Key View only: tablature's six string rows carry no pitch
-   * contour, so laid over a scenario they read as a grille rather than as a
-   * melody. Pregame still offers both, and turning the overlay off
-   * (`?overlay=0`) restores the choice in the run too.
-   */
-  #applyGameViewMode(): void {
-    this.#gameView?.setMode(this.#overlayTimeline ? "key" : this.#setup.viewMode);
-  }
-
   #updateKeyReadouts(): void {
     const short = keyShortName(this.#setup.key);
     const long = keyDisplayName(this.#setup.key);

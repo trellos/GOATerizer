@@ -750,7 +750,7 @@ The bass line is backing information, not a second target track.
 
 ---
 
-# 13. Timeline View A — Key View
+# 13. Timeline — Key View
 
 Key View prioritizes the relationship of each pitch to the current musical key.
 
@@ -842,63 +842,26 @@ If the player produces a non-diatonic note:
 
 ---
 
-# 14. Timeline View B — Tablature View
+# 14. Fingering Selection
 
-Tablature View prioritizes immediate fingering readability.
+> **Tablature View was removed.** Key View (§13) is the only timeline
+> presentation. Its string lanes, fret numbers, tab bass rendering and its
+> unresolved wrong-note presentation are all withdrawn with it; see
+> `DECISION_LOG.md` DECISION-041. Fingering selection, specified below, was
+> §14.3 and survives unchanged — it is a pregame practice choice, not a
+> timeline mode.
 
-## 14.1 String Lanes
+The player selects a one-octave fingering shape from five-fret neck diagrams in
+pregame.
 
-There are six rows:
-
-```text
-E
-A
-D
-G
-B
-e
-```
-
-## 14.2 Target Notes
-
-Target notes use conventional tablature-like fret numbers and rhythmic notation sufficient to distinguish:
-
-- half notes,
-- quarter notes,
-- eighth notes,
-- sixteenth notes,
-- sustained notes,
-- bends / expressive gestures.
-
-A bend should visibly communicate movement toward the destination pitch rather than looking like two unrelated plucks.
-
-Each string row draws a thin string line; a target or played note is a filled bar spanning that row, from halfway to the string above to halfway to the string below, with the fret number set on the bar itself. This is the same bar geometry Key View uses (§13.1), so the two views differ only in what the vertical axis means.
-
-## 14.3 Fingering Selection
-
-During pregame, the player can choose from several suggested one-octave fingerings for the selected key in different fretboard regions.
-
-Each is shown as a five-fret neck diagram, because the choice being made is *where on the neck to practise this* and that is a picture rather than a sentence. Every offered shape fits inside one five-fret hand position; a shape that would make the hand travel is not offered.
-
-The selected fingering determines how target pitches are mapped onto strings and frets in Tablature View.
+The selected fingering is shown as labels over the pitch lanes in pregame. It
+does **not** place anything on the timeline: the vertical axis is harmonic role,
+in every screen and at every moment.
 
 The fingering is a **visual convenience**, not a physical-input requirement.
 
-Tuninator judges the produced pitch / gesture. If the player reaches the correct pitch using another physically valid fingering, it still counts.
-
-## 14.4 Bass Line
-
-The bass line may be shown as darker fret positions without full rhythmic tab notation.
-
-This presentation should be tested for clarity.
-
-## 14.5 Wrong-Note Display
-
-Played notes that do not match the current target must still appear as bad input.
-
-The exact visual representation of a non-diatonic or otherwise unmappable played note in Tablature View is still a UI design detail to resolve.
-
-It must not silently disappear.
+Tuninator judges the produced pitch / gesture. If the player reaches the correct
+pitch using another physically valid fingering, it still counts.
 
 ---
 
@@ -949,23 +912,12 @@ Choose:
 
 Changing tempo should update smoothly rather than hard-resetting playback.
 
-### Timeline View
-
-Choose before the run:
-
-- **Key View**
-- **Tablature View**
-
-This selection is fixed for the run in the initial version.
-
 ### Fingering
 
 Choose one suggested one-octave scale fingering from several fretboard regions.
 
-The same selection:
-
-- provides the pregame physical reference in Key View,
-- determines target fret/string mapping in Tablature View.
+It provides the pregame physical reference over the pitch lanes. There is no
+timeline-view choice to make: Key View is the only presentation (§13).
 
 ### Play
 
@@ -1236,9 +1188,11 @@ The exact definition of which passages are streak-eligible and whether every str
 
 The harmonic/rhythmic grammar used to generate the persistent four-measure backing line is not yet specified.
 
-## Tablature Wrong-Note Rendering
+## Wrong-Note Rendering Off the Octave
 
-A bad played pitch that does not map naturally into the selected one-octave fingering must still appear in history. The exact Tablature View presentation remains to be designed.
+A played pitch outside the one-octave span must still appear in history rather
+than vanishing. Key View pins it to the edge it left through, in an
+out-of-range colour; whether that reads well enough at speed is untested.
 
 ---
 
@@ -1250,7 +1204,6 @@ START
 Pregame
     choose / reroll key + bass line
     choose tempo
-    choose Key View or Tablature View
     choose suggested fingering
     play guitar freely against live bass loop
     ↓

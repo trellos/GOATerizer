@@ -109,9 +109,8 @@ tables at the top of that script.
    the microphone; nothing before it touches a protected API.
 2. **Pregame** is a live sandbox. The bass is already looping, Tuninator is
    already listening, and the timeline shows what you play. Reroll the key,
-   pick a tempo, pick Key View or Tablature View, and pick a fingering from the
-   five-fret neck diagrams — that is where on the neck you want to practise this
-   octave. Pregame and the run are the same layout, so the timeline you warm up
+   pick a tempo, and pick a fingering from the five-fret neck diagrams — that
+   is where on the neck you want to practise this octave. Pregame and the run are the same layout, so the timeline you warm up
    on is the same rectangle you play on. None of it stops the beat.
 
    Warming up here is also what sets your input level. The detector gates on
@@ -210,7 +209,7 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
               ┌───────────────────────────────┼───────────────────────────────┐
               ▼                               ▼                               ▼
        TimelineModel ──▶ TimelineView   BackingDuck ──▶ BassPlayer   ScenarioBackdropView
-       (Key + Tab)     (notes + actor)  (how loud the backing         (background only)
+        (Key View)     (notes + actor)  (how loud the backing         (background only)
                                          is allowed to be)
 ```
 
@@ -249,8 +248,10 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
   it somewhere the next note is unreachable from. A can appears at the lane you
   *actually played*, so a wrong note says how you were wrong — see
   `DECISION_LOG.md` (DECISION-021).
-- **The timeline has one model and two views.** Key View and Tablature View
-  render the same `TimelineModel`; there is no second scoring engine.
+- **The timeline has one model and one view.** Key View is the only
+  presentation of `TimelineModel`; there is no second scoring engine. Tablature
+  View was removed (`DECISION_LOG.md`, DECISION-041) — the vertical axis is
+  harmonic role, and neck position is a pregame choice shown as a diagram.
 - **The pitch space is one octave, root to root.** Eight lanes, authored as
   `1..7` plus `b1`. Two octaves was more than a player can hold in their head
   and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).

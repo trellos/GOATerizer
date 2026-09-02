@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-041: Key View is the only timeline presentation; Tablature View is withdrawn
+* **Date:** 2026-09-02
+* **Status:** Accepted (supersedes `GOATerizer_Game_Design.md` §14 as written)
+* **Owner:** Trevor (agent-assisted)
+* **Context:** The GDD specified two timeline renderings of one model: Key View's eight diatonic pitch lanes, and Tablature View's six string rows with fret numbers set on the note bars, a tab bass presentation, and an explicitly unresolved wrong-note display for pitches the chosen fingering cannot express. Both shipped. Withdrawn at explicit request after playing it: Key View is what the player reads.
+* **Decision:** Remove Tablature View entirely — `TimelineViewMode`, `setMode`, the pregame toggle, `#drawTabFret`, `#drawPlayedTab`, `#tabPositionFor`, `#tabFontPx`, and the mode branches in `#rowCount`, `#gutterWidth`, `#rowAccent`, `#drawGutter`, `#drawTarget`, `#drawPlayed` and `#drawActor`. `#rowForLane` collapses to identity and goes with them. GDD §14 becomes Fingering Selection, which was §14.3 and is unchanged.
+* **Alternatives Considered:** (a) Keeping it behind a flag. Rejected: an unused second renderer is a second thing every timeline change has to be correct in, and this one is about to gain a per-minigame note-art seam. (b) Keeping it and giving minigames a per-view skin. Rejected as the strongest argument for removal rather than against it — a skin is built for eight diatonic lanes and is nonsense on six string rows, so every minigame would need a tablature fallback nobody would look at.
+* **Consequences:** Positive — one presentation to keep correct, and the note-art seam has one geometry to target rather than two. `timeline-view.ts` loses its mode branches entirely. Negative — the neck-position reading Tab View offered is gone from the run; it survives only as the pregame fingering diagram and the gutter labels, which is a weaker answer for a player who thinks in frets. `music/fingering.ts` and `ui/fingering-diagram.ts` stay: choosing where on the neck to practise is still a real choice, it just no longer places anything on the timeline.
+
+---
+
 #### DECISION-040: One pick is one played note, however many `Note`s the recognizer splits it into
 * **Date:** 2026-09-01
 * **Status:** Accepted

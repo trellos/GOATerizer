@@ -1,10 +1,10 @@
 /**
- * What the timeline draws — one model, both views.
+ * What the timeline draws — one model, any presentation.
  *
- * Key View and Tablature View are two presentations of *this*. Neither owns a
- * note, a judgment or a score; they read from here and place things differently
- * (`AGENTS.md` §12: do not build separate scoring engines for different
- * timeline presentations).
+ * The renderer is a presentation of *this*. It owns no note, judgment or score;
+ * it reads from here and decides placement (`AGENTS.md` §12: do not build
+ * separate scoring engines for different timeline presentations). A per-minigame
+ * skin is a further presentation of the same model, never a second model.
  *
  * Every position is in **absolute transport beats**. The renderer turns a beat
  * into an x coordinate; nothing here knows about pixels.

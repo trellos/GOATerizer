@@ -452,23 +452,19 @@ try {
   // moment the notes start counting.
   const pregameTimelineBox = await canvasBox(page, "pregame-canvas");
 
-  await page.click('#pregame-views button[data-view="tab"]');
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(SHOTS, "03-pregame-tab.png") });
-  check("tablature view draws", (await canvasHasInk(page, "pregame-canvas")) > 20);
+  // Key View is the only presentation, so what used to check that tablature
+  // drew its shape now checks the gutter it left behind: the lane labels are
+  // gameplay information, and a blank gutter is a timeline nobody can read.
   check(
-    "tablature shows the selected shape as a physical reference",
+    "the lane gutter is labelled, not blank",
     await page.evaluate(() => {
       const canvas = document.getElementById("pregame-canvas");
       const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
       if (!ctx || !(canvas instanceof HTMLCanvasElement)) return false;
-      // The gutter carries `E 2 4 5`-style rows; look for ink in it.
       const { data } = ctx.getImageData(0, 0, 96 * 2, canvas.height);
       return data.some((value, i) => i % 4 === 0 && value > 90);
     })
   );
-  await page.click('#pregame-views button[data-view="key"]');
-  await page.waitForTimeout(200);
 
   /* --- the run ------------------------------------------------------- */
 

@@ -468,10 +468,11 @@ The timeline must clearly communicate:
 
 Do not make a gameplay challenge harder because target information is visually ambiguous.
 
-Keep one underlying timeline / judgment model even when multiple views exist, such as:
-
-- Key View
-- Tablature View
+Keep one underlying timeline / judgment model however it is presented.
+Key View — eight diatonic pitch lanes, one octave root to root — is the only
+timeline presentation. Tablature View was removed (`DECISION_LOG.md`
+DECISION-041); a per-minigame visual skin is a further presentation of the same
+model, never a second model.
 
 Do not build separate scoring engines for different timeline presentations.
 
