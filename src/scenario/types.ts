@@ -26,11 +26,21 @@ import type { ScaleDegreeRef } from "../music/degrees.js";
  */
 export type { NoteDuration };
 
+/**
+ * The written length of each duration, in beats.
+ *
+ * Every value but one is a binary fraction and therefore exact in floating
+ * point. `eighthTriplet` is 1/3, which is not, and that single fact is why
+ * `load.ts` treats an authored `durationBeats` as a checksum to verify rather
+ * than a number to trust: no decimal an author can type is exactly a third, and
+ * twelve of `0.333` do not add up to a measure.
+ */
 export const DURATION_BEATS: Readonly<Record<NoteDuration, number>> = {
   whole: 4,
   half: 2,
   quarter: 1,
   eighth: 0.5,
+  eighthTriplet: 1 / 3,
   sixteenth: 0.25,
 };
 

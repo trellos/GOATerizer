@@ -143,9 +143,9 @@ bar. `hazardVisuals[]` are the family's own idea — place them at beat position
 `targetVisuals[]` are note art. Derive the A/B/C role from a note's position
 within its beat rather than from `index % 3`: authored rhythm is not uniform, and
 a rest inside the triplet would desynchronise a counter. `groupEffects[]` fire
-when all three of a group land. **This family is blocked on the content model** —
-see §6 of the authoring brief; the game can detect a triplet grid but cannot yet
-author one.
+when all three of a group land. Author the notes as `eighthTriplet` — a third of
+a beat; the drums pick the triplet grid up from the phrase and mark it an
+attempt ahead.
 
 ### `RepeatMinigame`
 

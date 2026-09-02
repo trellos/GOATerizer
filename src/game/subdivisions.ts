@@ -8,10 +8,12 @@
  * one attempt ahead is what turns "surprise, sixteenths" into "here comes the
  * sixteenth feel, get ready".
  *
- * Read off the note *positions*, not the duration names. A phrase can be
- * written in eighths and still land on the sixteenth grid (a dotted figure), and
- * a triplet has no `NoteDuration` of its own in this content model at all — so
- * position is the only description that stays true for any phrase anyone writes.
+ * Read primarily off the note *positions*, not the duration names: a phrase can
+ * be written in eighths and still land on the sixteenth grid (a dotted figure),
+ * so position is the description that stays true for any phrase anyone writes.
+ * The names are consulted only where a position cannot speak — a note long
+ * enough to be the whole grid it implies, or a triplet whose other two thirds
+ * are rests.
  *
  * Pure, and independent of the drum kit: this describes the music, and
  * `drum-pattern.ts` decides what to hit.
@@ -58,8 +60,11 @@ export function subdivisionsOf(prompt: readonly PromptEvent[]): SubdivisionSet {
     if (event.type !== "note") continue;
 
     // A note's own length puts the grid on the map even when it happens to
-    // start on a beat: four sixteenths from beat 1 are still sixteenths.
+    // start on a beat: four sixteenths from beat 1 are still sixteenths, and a
+    // lone triplet eighth on the beat is still the triplet feel — its
+    // neighbours at 1/3 and 2/3 may both be rests, leaving no position to read.
     if (event.durationBeats <= DURATION_BEATS.sixteenth + EPSILON) found.add("sixteenth");
+    if (event.duration === "eighthTriplet") found.add("triplet");
 
     const offset = event.startBeat - Math.floor(event.startBeat);
     if (isNear(offset, SIXTEENTH_OFFSETS)) found.add("sixteenth");

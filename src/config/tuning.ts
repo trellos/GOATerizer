@@ -19,6 +19,12 @@
  * marker is ours to pick.
  */
 
+// The only import in this file, and type-only: keying the window table by
+// `NoteDuration` makes a new duration a compile error here rather than an
+// `undefined` window discovered when someone plays the note. `minigame/api.ts`
+// imports nothing, so this cannot cycle.
+import type { NoteDuration } from "../minigame/api.js";
+
 /* -------------------------------------------------------------------------- */
 /* Judgment windows                                                            */
 /* -------------------------------------------------------------------------- */
@@ -33,14 +39,20 @@
  * subdivision — at exactly half, adjacent Good windows touch but never overlap,
  * so a played note is never claimable by two targets.
  *
- *   quarter  — neighbours 1 beat apart   -> good 0.5   (the GDD's own example)
- *   eighth   — neighbours 0.5 beats apart -> good 0.25
+ *   quarter  — neighbours 1 beat apart    -> good 0.5   (the GDD's own example)
+ *   eighth   — neighbours 0.5 beats apart  -> good 0.25
+ *   triplet  — neighbours 1/3 beat apart   -> good 1/6
  *   sixteenth— neighbours 0.25 beats apart -> good 0.125
  *
  * Perfect is set well inside Good and tightens with the subdivision. Measured
  * against Tuninator's own published onset error (70ms median on quarter notes,
  * ~94–124ms on triplets and sixteenths), 0.18 beats is 180ms at 60bpm and 77ms
  * at 140bpm, so Perfect stays achievable at the top tempo without being free.
+ *
+ * The triplet row is interpolated between its neighbours in length rather than
+ * measured: a third of a beat sits between an eighth and a sixteenth, and so
+ * does 0.08. It is the row most likely to want retuning by ear, because it is
+ * also the subdivision Tuninator is least accurate on.
  */
 export type SubdivisionWindows = {
   /** Absolute beat offset from the ideal attack that still counts as Perfect. */
@@ -49,17 +61,12 @@ export type SubdivisionWindows = {
   good: number;
 };
 
-export const TIMING_WINDOWS_BEATS: {
-  whole: SubdivisionWindows;
-  half: SubdivisionWindows;
-  quarter: SubdivisionWindows;
-  eighth: SubdivisionWindows;
-  sixteenth: SubdivisionWindows;
-} = {
+export const TIMING_WINDOWS_BEATS: Readonly<Record<NoteDuration, SubdivisionWindows>> = {
   whole: { perfect: 0.22, good: 0.5 },
   half: { perfect: 0.2, good: 0.5 },
   quarter: { perfect: 0.18, good: 0.5 },
   eighth: { perfect: 0.11, good: 0.25 },
+  eighthTriplet: { perfect: 0.08, good: 1 / 6 },
   sixteenth: { perfect: 0.06, good: 0.125 },
 };
 

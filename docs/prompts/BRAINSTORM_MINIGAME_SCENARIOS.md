@@ -75,13 +75,12 @@ backdrop with a sprite on top. The best ones will make the phrase's *shape*
 legible — a scale run that is visibly a staircase, a sixteenth barrage that is
 visibly a row of things to knock down.
 
-## Known blocker
+## Triplets
 
-`ThreeStepMinigame` cannot be built yet: the content model cannot express a
-triplet at all. `NoteDuration` has no member for one, the scenario loader demands
-exact duration matching against a table with no ⅓-beat value, and
-`TIMING_WINDOWS_BEATS` has no triplet row. Design for it freely — just know the
-content model needs fixing first, and say so if a proposal depends on it.
+`ThreeStepMinigame` is buildable. A triplet is `duration: "eighthTriplet"` — a
+third of a beat — and the drums mark the triplet grid an attempt ahead of the
+phrase that needs it, so a THREE-STEP scenario can count on the player hearing
+the feel before they have to play it.
 
 ## Already taken — do not duplicate
 

@@ -162,10 +162,12 @@ Derive the A/B/C role from the note's position within its beat, not from
 `index % 3` — authored rhythm is not uniform. `arc()` is shipped for exactly this
 family: two little hops and a larger leap.
 
-> **Blocked.** The content model cannot express a triplet at all today:
-> `NoteDuration` has no member for one, the loader demands exact duration
-> matching, and there is no triplet row in the timing table. Design freely, but
-> this family cannot be built until that is fixed.
+Author a triplet with `duration: "eighthTriplet"` — a third of a beat, the only
+`NoteDuration` that is not a binary fraction. Write `durationBeats` and
+`startBeat` in the file as the decimals they nearly are (`0.333`, `1.667`); the
+loader verifies them within a hair and then uses its own exact positions, so
+your notes land on the beat and on the measure boundary rather than a
+floating-point hair below either.
 
 ### `PerformMinigame` — Blues Lick — PERFORM
 Performer near `strikeX`. `audienceStates[]` are not note-anchored — place them

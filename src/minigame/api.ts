@@ -52,8 +52,19 @@ export const MINIGAME_API_VERSION = 1;
  * Part of the contract rather than the scenario schema, because a minigame
  * skinning the timeline has to be able to draw a sixteenth differently from a
  * whole note. `scenario/types.ts` re-exports this so there is one definition.
+ *
+ * `eighthTriplet` is three-in-the-space-of-two: a third of a beat, the only
+ * member that is not a binary fraction. It is named for the note it is written
+ * as, like the rest — a sixteenth triplet, if a scenario ever needs one, is the
+ * same shape at half the length and would be its own member.
  */
-export type NoteDuration = "whole" | "half" | "quarter" | "eighth" | "sixteenth";
+export type NoteDuration =
+  | "whole"
+  | "half"
+  | "quarter"
+  | "eighth"
+  | "eighthTriplet"
+  | "sixteenth";
 
 /** One note opportunity, resolved into the run's key. Read-only. */
 export type Opportunity = {

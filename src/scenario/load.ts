@@ -36,10 +36,75 @@ function duration(value: unknown, where: string): NoteDuration {
   return name as NoteDuration;
 }
 
+/**
+ * The rhythmic grid every authored position is snapped to, in ticks per beat.
+ *
+ * Twelve, because it is the smallest number divisible by both the binary
+ * subdivisions (a sixteenth is 3 ticks) and the triplet one (an eighth triplet
+ * is 4). Positions accumulate as integers on this grid and are converted to
+ * beats once, at the end, which is the only way `1/3 + 1/3 + 1/3` reaches beat 1
+ * rather than 0.9999999999999999 — and the only way the measure a note belongs
+ * to stays an integer division instead of a float comparison against a boundary
+ * it might sit a machine epsilon below.
+ *
+ * A duration that does not land on this grid is a content-model error, not an
+ * authoring one, so it throws with the duration's name rather than a file
+ * location.
+ */
+const TICKS_PER_BEAT = 12;
+
+function ticksOf(name: NoteDuration): number {
+  const beats = DURATION_BEATS[name];
+  const ticks = Math.round(beats * TICKS_PER_BEAT);
+  if (Math.abs(ticks / TICKS_PER_BEAT - beats) > 1e-12) {
+    throw new Error(
+      `duration ${name} (${beats} beats) is not on the ${TICKS_PER_BEAT}-tick grid`
+    );
+  }
+  return ticks;
+}
+
+/**
+ * How far an authored number may sit from the value it asserts.
+ *
+ * Authored `durationBeats` and `startBeat` are redundant with the duration
+ * names: the loader derives both and uses its own answers, and these fields
+ * exist so a file that disagrees with itself fails loudly. Verifying them
+ * exactly was fine while every duration was a binary fraction, but a third of a
+ * beat has no decimal an author can type — `0.333` is not 1/3 and twelve of
+ * them are not four beats.
+ *
+ * 0.01 beats is 4ms at 140bpm and 10ms at 60bpm: far below the tightest Perfect
+ * window (0.06 beats), so a slip this small cannot change how a note is judged,
+ * and far below the distance between any two written durations, so it cannot
+ * let one pass for another. It is a tolerance on *transcription*, not on
+ * rhythm.
+ */
+const AUTHORING_TOLERANCE_BEATS = 0.01;
+
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The prompt: what the player is asked to play, in order.
+ *
+ * The **duration names are the authority**. A note's length and its position
+ * are both derived here — length from the duration table, position from the
+ * running sum of the lengths before it — and the numbers the file states for
+ * them are checked against those and then discarded. That is what keeps the
+ * runtime model exact: the sum runs on an integer tick grid, so a phrase of
+ * triplets lands on beat 1 and on the measure boundary rather than a hair
+ * below either.
+ *
+ * The authored numbers are not redundant clutter. `startBeat` in the file is
+ * what catches a dropped rest — the very error a derived position would
+ * silently absorb — and it stays required for exactly that reason.
+ */
 function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEvent[] {
-  const events = arr(raw, where).map((entry, i): PromptEvent => {
+  const ticksPerMeasure = Math.round(plan.beatsPerMeasure * TICKS_PER_BEAT);
+  const events: PromptEvent[] = [];
+  let ticks = 0;
+
+  arr(raw, where).forEach((entry, i) => {
     const at = `${where}[${i}]`;
     const event = obj(entry, at);
     const type = str(event["type"], `${at}.type`);
@@ -48,15 +113,24 @@ function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEven
     }
 
     const dur = duration(event["duration"], `${at}.duration`);
-    const durationBeats = num(event["durationBeats"], `${at}.durationBeats`);
-    if (durationBeats !== DURATION_BEATS[dur]) {
+    const durationBeats = DURATION_BEATS[dur];
+    const statedDuration = num(event["durationBeats"], `${at}.durationBeats`);
+    if (Math.abs(statedDuration - durationBeats) > AUTHORING_TOLERANCE_BEATS) {
       throw new ScenarioDataError(
         `${at}.durationBeats`,
-        `${durationBeats} does not match ${dur} (${DURATION_BEATS[dur]})`
+        `${statedDuration} does not match ${dur} (${durationBeats})`
       );
     }
 
-    const startBeat = num(event["startBeat"], `${at}.startBeat`);
+    const startBeat = ticks / TICKS_PER_BEAT;
+    const statedStart = num(event["startBeat"], `${at}.startBeat`);
+    if (Math.abs(statedStart - startBeat) > AUTHORING_TOLERANCE_BEATS) {
+      throw new ScenarioDataError(
+        `${at}.startBeat`,
+        `${statedStart} but the preceding durations total ${startBeat}`
+      );
+    }
+
     const rawDegree = event["scaleDegree"];
     if (type === "note" && typeof rawDegree !== "string") {
       throw new ScenarioDataError(`${at}.scaleDegree`, "a note must carry a scale degree");
@@ -65,34 +139,26 @@ function parsePrompt(raw: unknown, where: string, plan: MeasurePlan): PromptEven
       throw new ScenarioDataError(`${at}.scaleDegree`, "a rest must not carry a scale degree");
     }
 
-    return {
+    events.push({
       index: i,
       type,
       duration: dur,
       durationBeats,
       startBeat,
-      measureIndex: Math.floor(startBeat / plan.beatsPerMeasure),
-      beatWithinMeasure: startBeat % plan.beatsPerMeasure,
+      measureIndex: Math.floor(ticks / ticksPerMeasure),
+      beatWithinMeasure: (ticks % ticksPerMeasure) / TICKS_PER_BEAT,
       degree: type === "note" ? parseDegreeToken(rawDegree as string) : null,
-    };
+    });
+
+    ticks += ticksOf(dur);
   });
 
-  // The authored file states `startBeat` explicitly; check it is actually the
-  // running sum of the durations rather than trusting two fields to agree.
-  let expected = 0;
-  for (const event of events) {
-    if (Math.abs(event.startBeat - expected) > 1e-9) {
-      throw new ScenarioDataError(
-        `${where}[${event.index}].startBeat`,
-        `${event.startBeat} but the preceding durations total ${expected}`
-      );
-    }
-    expected += event.durationBeats;
-  }
-
-  const attemptBeats = plan.attemptMeasures * plan.beatsPerMeasure;
-  if (Math.abs(expected - attemptBeats) > 1e-9) {
-    throw new ScenarioDataError(where, `durations total ${expected} beats, expected ${attemptBeats}`);
+  const attemptTicks = plan.attemptMeasures * ticksPerMeasure;
+  if (ticks !== attemptTicks) {
+    throw new ScenarioDataError(
+      where,
+      `durations total ${ticks / TICKS_PER_BEAT} beats, expected ${attemptTicks / TICKS_PER_BEAT}`
+    );
   }
   return events;
 }

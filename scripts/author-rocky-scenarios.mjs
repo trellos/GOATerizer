@@ -57,6 +57,14 @@ const POINTS_PERFECT = 10;
 const PASS_FRACTION = 0.45;
 const STAR2_FRACTION = 0.8;
 
+/**
+ * The subset of `src/scenario/types.ts`'s table this script actually writes.
+ *
+ * Deliberately missing `eighthTriplet`: Rocky's four scenarios are scale
+ * material, and the running `startBeat` sum below is a plain float, which is
+ * exact for binary fractions and would drift on thirds. A script that authors
+ * triplets needs the tick grid the loader uses, not this.
+ */
 const DURATION_BEATS = {
   whole: 4,
   half: 2,
