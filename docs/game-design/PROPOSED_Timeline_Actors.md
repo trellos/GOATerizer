@@ -1,6 +1,10 @@
 # PROPOSED — Actors on the timeline
 
-**Status: drafted on `claude/timeline-actors-draft`. Not on `main`.**
+**Status: built and on `main`.** Kept as the record of the argument, not as a
+plan. Where it differs from what shipped, the code and `DECISION_LOG.md` win —
+the four known divergences are noted inline below, and §6's loader proposal was
+superseded outright by DECISION-043 (see the note there). For how to build a
+family today, read `GOATerizer_Minigame_Authoring.md`, not this.
 
 This is the design agreed in the goat-on-the-bars conversation, scoped down to a
 rough draft: the existing scale runs, plus one easy REPEAT scenario.
@@ -290,6 +294,16 @@ actually played.
 `parseClimbBindings` unconditionally, and `parseRoute` **requires one waypoint
 per note opportunity**. The four built scenarios carry 93 hand-authored waypoint
 coordinates between them.
+
+> **Superseded — DECISION-043.** The loader does not branch on the class at all.
+> It resolves `minigameId` through the minigame registry and hands the raw JSON
+> to that family's own `parseConfig` / `parseLevel`; `parseClimbBindings`,
+> `parseRepeatBindings`, `parseRoute` and `KNOWN_CLASSES` are gone from
+> `load.ts`, and the route is validated inside `ClimbMinigame` and then
+> discarded. The last paragraph below ("If the actor model survives play, that
+> is when they go") is what happened: the actor model survived, and the
+> coordinates went — the *check* they carried stayed, because one waypoint per
+> note opportunity is a claim about the music rather than about a panel.
 
 Proposed:
 

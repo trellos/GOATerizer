@@ -97,22 +97,19 @@ import { renderFingeringDiagram } from "../ui/fingering-diagram.js";
 import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdrop.js";
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import type { ActorSprites } from "../ui/timeline/actor-layer.js";
-import { NO_REPEAT_SPRITES, type RepeatSprites } from "../ui/timeline/repeat-layer.js";
+import { requireMinigame } from "../minigame/registry.js";
+import type { RepeatVisualState } from "../scenario/minigames/repeat-minigame.js";
+import type { TimelineActorState } from "../scenario/minigames/timeline-actor.js";
+import { NO_REPEAT_SPRITES } from "../ui/timeline/repeat-layer.js";
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
-import {
-  OVERLAY_BAND_FRACTION,
-  TimelineView,
-  type TimelineViewMode,
-} from "../ui/timeline/timeline-view.js";
+import { OVERLAY_BAND_FRACTION, TimelineView } from "../ui/timeline/timeline-view.js";
 
-const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
 type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
 
 type Setup = {
   key: RunKey;
   tempoId: TempoId;
-  viewMode: TimelineViewMode;
   fingeringId: string;
 };
 
@@ -273,7 +270,6 @@ export class GameApp {
   #setup: Setup = {
     key: pickWeightedKey(),
     tempoId: DEFAULT_TEMPO_ID,
-    viewMode: "key",
     fingeringId: "",
   };
   #fingerings: Fingering[] = [];
@@ -308,8 +304,6 @@ export class GameApp {
    * picks — with more than one Rocky-family scenario authoring the same level,
    * that is no longer always Rocky Ascent.
    */
-  #actorSpriteCache: { id: string; sprites: ActorSprites } | null = null;
-  #repeatSpriteCache: { id: string; sprites: RepeatSprites } | null = null;
   #devLevel: number | null = null;
   #devScenarioId: string | null = null;
   /** `?dev=1&calibrateOffsetMs=N`. See `#scheduleCalibrationAutoplay`. */
@@ -351,8 +345,35 @@ export class GameApp {
     this.#overlayTimeline = params.get("overlay") !== "0";
     this.#applySetupParams(params);
 
-    this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
-    this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
+    this.#pregameView = new TimelineView(
+      must("pregame-canvas", HTMLCanvasElement),
+      this.#setup.key,
+      this.#overlayTimeline
+    );
+    this.#gameView = new TimelineView(
+      must("game-canvas", HTMLCanvasElement),
+      this.#setup.key,
+      this.#overlayTimeline
+    );
+    /*
+     * The note-art seam, and the last thing the host decides about a look.
+     *
+     * Placement stays here — the view computes every rect and the minigame is
+     * handed them read-only — so a skin can dress a note but never move, resize
+     * or hide one. Which attempt is asked is decided by its timeline key rather
+     * than by "the current one": two are on the timeline at once across a
+     * transition, and each must be skinned by the minigame that owns it.
+     *
+     * Pregame gets no source at all. There is no attempt yet, so there is
+     * nothing whose look a scenario could own.
+     */
+    this.#gameView.setStageSource(this.#assets, (attemptKey, view) => {
+      const attempt = [this.#current, this.#next, this.#previous].find(
+        (entry) => entry?.timelineKey === attemptKey
+      );
+      return attempt?.runtime.minigame.render(view) ?? null;
+    });
+
     this.#strip = new ScenarioBackdropView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
@@ -378,8 +399,6 @@ export class GameApp {
       "--timeline-band",
       `${OVERLAY_BAND_FRACTION * 100}%`
     );
-    this.#gameView?.setOverlay(this.#overlayTimeline);
-    this.#pregameView?.setOverlay(this.#overlayTimeline);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -560,17 +579,6 @@ export class GameApp {
       this.#showScreen("pregame");
     });
 
-    for (const button of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-      button.addEventListener("click", () => {
-        const mode = button.dataset["view"] === "tab" ? "tab" : "key";
-        this.#setup.viewMode = mode;
-        this.#pregameView?.setMode(mode);
-        this.#applyGameViewMode();
-        for (const other of document.querySelectorAll<HTMLElement>("#pregame-views button")) {
-          other.dataset["selected"] = String(other.dataset["view"] === mode);
-        }
-      });
-    }
   }
 
   /**
@@ -747,8 +755,6 @@ export class GameApp {
 
     this.#pregameView?.setShowFingeringLabels(true);
     this.#gameView?.setShowFingeringLabels(false);
-    this.#pregameView?.setMode(this.#setup.viewMode);
-    this.#applyGameViewMode();
     this.#updateKeyReadouts();
 
     await inputReady;
@@ -802,18 +808,6 @@ export class GameApp {
    * The key, twice: the chart-style short name to read at a glance, and the
    * long name on the tooltip for anyone who wants it spelled out.
    */
-  /**
-   * The run screen's view mode.
-   *
-   * The overlay is Key View only: tablature's six string rows carry no pitch
-   * contour, so laid over a scenario they read as a grille rather than as a
-   * melody. Pregame still offers both, and turning the overlay off
-   * (`?overlay=0`) restores the choice in the run too.
-   */
-  #applyGameViewMode(): void {
-    this.#gameView?.setMode(this.#overlayTimeline ? "key" : this.#setup.viewMode);
-  }
-
   #updateKeyReadouts(): void {
     const short = keyShortName(this.#setup.key);
     const long = keyDisplayName(this.#setup.key);
@@ -919,7 +913,6 @@ export class GameApp {
         ? new TestGuitarInputProvider()
         : new TuninatorGuitarInputProvider({
             audioContext: context as AudioContext,
-            workletUrl: WORKLET_URL,
             // Undefined unless the player has measured their rig, in which case
             // Tuninator's own default stands.
             ...(this.#inputRmsGate !== null ? { rmsGate: this.#inputRmsGate } : {}),
@@ -1670,62 +1663,34 @@ export class GameApp {
       this.#pregameView?.render(this.#timeline, beat);
       this.#updatePregameReadouts();
     } else if (this.#screen === "game") {
-      // PROTOTYPE: the actor belongs to the attempt being played, and its beat
-      // is that attempt's, so its hop arc is in the phrase's own time.
+      // The attempt's own minigame says what its layer needs; the host does not
+      // look at scenario data to find out. `prototypeLayer` is the last place a
+      // family is named here and goes when the actors move into `Stage`.
       const attempt = this.#current?.runtime;
+      const layer = attempt?.minigame.prototypeLayer?.() ?? null;
+      const images = (layer?.sprites ?? [])
+        .map((id) => this.#assets.get(id))
+        .filter((image): image is HTMLImageElement => image !== null);
+
       this.#gameView?.setActor(
-        attempt ? attempt.actor.state : null,
+        layer?.kind === "actor" ? (layer.state as TimelineActorState) : null,
         attempt ? attempt.toAttemptBeat(beat) : 0
       );
-      this.#gameView?.setActorSprites(this.#actorSpritesFor(attempt?.scenario ?? null));
-      this.#gameView?.setRepeatSprites(this.#repeatSpritesFor(attempt?.scenario ?? null));
-      // A repeat scenario puts its own performer on the bars instead.
-      this.#gameView?.setRepeat(attempt?.repeat ? attempt.repeat.state : null);
+      this.#gameView?.setActorSprites(layer?.kind === "actor" ? { poses: images } : EMPTY_SPRITES);
+      this.#gameView?.setRepeat(
+        layer?.kind === "repeat" ? (layer.state as RepeatVisualState) : null
+      );
+      this.#gameView?.setRepeatSprites(
+        layer?.kind === "repeat"
+          ? { can: images[0] ?? null, crushed: images[1] ?? null }
+          : NO_REPEAT_SPRITES
+      );
       this.#gameView?.render(this.#timeline, beat);
       this.#renderStrip(beat);
       this.#energy?.render(beat);
     }
 
     this.#updateDebug(beat);
-  }
-
-  /**
-   * The climber art for a scenario, resolved through the asset store.
-   *
-   * Cached on the scenario id: this runs every frame, and rebuilding an array
-   * of four image lookups sixty times a second to hand the same four images to
-   * the same view is work for nothing.
-   */
-  #actorSpritesFor(scenario: ScenarioDefinition | null): ActorSprites {
-    if (!scenario) return EMPTY_SPRITES;
-    if (this.#actorSpriteCache?.id === scenario.id) return this.#actorSpriteCache.sprites;
-    const bindings = scenario.assetBindings;
-    const poses =
-      bindings.kind === "climb"
-        ? bindings.climberPoses
-            .map((id) => this.#assets.get(id))
-            .filter((image): image is HTMLImageElement => image !== null)
-        : [];
-    const sprites: ActorSprites = { poses };
-    this.#actorSpriteCache = { id: scenario.id, sprites };
-    return sprites;
-  }
-
-  /**
-   * The can art for a repeat scenario, resolved through the asset store.
-   *
-   * Cached on the scenario id for the same reason the climber art is: this runs
-   * every frame and the answer only changes when the scenario does.
-   */
-  #repeatSpritesFor(scenario: ScenarioDefinition | null): RepeatSprites {
-    if (!scenario || scenario.assetBindings.kind !== "repeat") return NO_REPEAT_SPRITES;
-    if (this.#repeatSpriteCache?.id === scenario.id) return this.#repeatSpriteCache.sprites;
-    const sprites: RepeatSprites = {
-      can: this.#assets.get(scenario.assetBindings.repeatTarget),
-      crushed: this.#assets.get(scenario.assetBindings.targetCompletedState),
-    };
-    this.#repeatSpriteCache = { id: scenario.id, sprites };
-    return sprites;
   }
 
   #renderStrip(beat: number): void {
@@ -2017,17 +1982,9 @@ export class GameApp {
       // what you are hearing is what the code thinks it is playing.
       "drum beat": this.#drumPatternId || "—",
       "bass duck": `${this.#duck.gain.toFixed(2)} (${this.#duck.misses} missed)`,
-      "cans crushed/missed": attempt?.repeat
-        ? `${attempt.repeat.state.crushed}/${attempt.repeat.state.uncrushed}`
-        : "—",
-      "actor lane/streak": attempt
-        ? `${attempt.actor.state.lane ?? "—"}/${attempt.actor.state.streak}`
-        : "—",
-      // How heavy the actor currently is. `streak` alone does not answer that:
-      // size is its square root against a cap, so the first few notes move it
-      // far more than the last few, and it is size that drives how the landing
-      // reads (`ui/timeline/actor-layer.ts`).
-      "actor size": attempt ? attempt.actor.state.size.toFixed(2) : "—",
+      // Whatever the family playing right now thinks is worth watching. The
+      // panel does not know a can from a streak; the module says.
+      ...(attempt?.debugRows ?? {}),
       // Frame rate and *our share of it*, separately: a low rate beside a tiny
       // work figure is the paint, not the JavaScript, and they are fixed in
       // different places. See `ui/frame-meter.ts`.
@@ -2052,6 +2009,20 @@ export class GameApp {
        */
       "unreleased played": String(this.#timeline.unreleasedPruned),
       "assets failed": this.#assets.failed.join(",") || "none",
+      // Three facts that together say whether the scenario art can possibly be
+      // seen. They disagree only when something is wrong, and each failure mode
+      // looks identical from the outside: a black timeline with grey lane bands.
+      overlay: `view ${this.#gameView?.overlay ?? "?"} / dom ${
+        document.getElementById("screen-game")?.dataset["overlay"] ?? "?"
+      }`,
+      backdrop: (() => {
+        const scenario = this.#current?.runtime.scenario;
+        const id = scenario
+          ? requireMinigame(scenario.minigameId, "debug").backgroundId(scenario.config)
+          : null;
+        if (!id) return "—";
+        return `${id} ${this.#assets.get(id) ? "loaded" : "MISSING"}`;
+      })(),
     });
   }
 

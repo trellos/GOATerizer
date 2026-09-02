@@ -123,7 +123,28 @@ export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindow
     let good = base.good;
     if (previous) good = Math.min(good, (target.startBeat - previous.startBeat) / 2);
     if (next) good = Math.min(good, (next.startBeat - target.startBeat) / 2);
-    good = Math.max(good, GOOD_WINDOW_FLOOR_BEATS);
+
+    /*
+     * The floor, but never past the neighbour it is protecting the player from.
+     *
+     * A flat 0.5 was right for everything that ships -- half, quarter and
+     * eighth material, whose nearest neighbour is never closer than half a beat
+     * -- and wrong for anything denser. An eighth triplet's neighbours are a
+     * third of a beat away, so a flat floor reaches half a beat past its own
+     * target and a third of a beat past the *next* one's ideal attack. On
+     * one-pitch triplet material, which is exactly what a THREE-STEP scenario
+     * is, pitch filtering cannot disambiguate that.
+     *
+     * Stated as a rule: a Good window may reach as far as the next target's own
+     * attack, but never past it. Identical to the flat floor on every duration
+     * authored today -- verified against all five scenario files -- and it
+     * degrades rather than breaks for the ones that are not.
+     */
+    const nearestGap = Math.min(
+      previous ? target.startBeat - previous.startBeat : Infinity,
+      next ? next.startBeat - target.startBeat : Infinity
+    );
+    good = Math.max(good, Math.min(GOOD_WINDOW_FLOOR_BEATS, nearestGap));
 
     return { perfect: Math.min(base.perfect, good), good };
   });

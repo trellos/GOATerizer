@@ -28,7 +28,15 @@
  * option and is noted in `DECISION_LOG.md` (DECISION-023).
  */
 
+import { requireMinigame } from "../minigame/registry.js";
 import type { ScenarioDefinition } from "../scenario/types.js";
+
+/** Which image sits behind a scenario. Its own family answers. */
+function backgroundIdOf(scenario: ScenarioDefinition): string {
+  return requireMinigame(scenario.minigameId, `scenario ${scenario.id}`).backgroundId(
+    scenario.config
+  );
+}
 import type { AssetStore } from "./assets.js";
 
 export type BackdropPanel = {
@@ -69,7 +77,6 @@ export class ScenarioBackdropView {
   #width = 0;
   #height = 0;
   /** What the canvas currently shows. See {@link render}. */
-  #painted = "";
 
   constructor(canvas: HTMLCanvasElement, assets: AssetStore) {
     const ctx = canvas.getContext("2d");
@@ -85,23 +92,21 @@ export class ScenarioBackdropView {
   }
 
   /**
-   * Paints, but only when something actually changed.
+   * Paints. Every frame, unconditionally.
    *
-   * A backdrop is a still image for almost the whole run: it moves during the
-   * one-beat transition between minigames, and the star meter over it fills as
-   * thresholds are crossed. Everything else — the background, the label — is
-   * unchanged from frame to frame. Repainting it anyway meant a full-viewport
-   * upscale and a full-viewport scrim sixty times a second to produce the
-   * identical pixels, which at 4K is most of the frame's fill.
+   * It used to skip when a signature of everything the paint depends on was
+   * unchanged, which is a web page's instinct — draw once, idle while nothing
+   * happens — and the wrong one for a game. It made "painted" a state that
+   * could drift from "correct": anything that cleared or covered this canvas
+   * without changing the signature left it stale until something else moved,
+   * and there is no shortage of things that clear a canvas.
    *
-   * The signature covers everything the paint depends on, including the canvas
-   * size, because resizing the canvas clears it.
+   * What is worth caching is the *asset*, not the act of drawing. The decoded
+   * images already live in `AssetStore`; this is one `drawImage` and a few
+   * fills over them.
    */
   render(state: BackdropRender): void {
     this.#resize();
-    const signature = this.#signatureOf(state);
-    if (signature === this.#painted) return;
-    this.#painted = signature;
 
     const ctx = this.#ctx;
     ctx.fillStyle = GROUND;
@@ -120,21 +125,6 @@ export class ScenarioBackdropView {
 
     // The meter goes on last and unscrimmed: it is HUD, not scenery.
     if (state.current) this.#drawStarMeter(state.current, offset, width);
-  }
-
-  #signatureOf(state: BackdropRender): string {
-    const panel = (p: BackdropPanel | null) =>
-      p === null
-        ? "-"
-        : `${p.scenario?.id ?? "?"}/${p.difficulty}/${p.label}/${p.stars}/${p.starProgress.toFixed(3)}`;
-    return [
-      this.#width,
-      this.#height,
-      state.slide.toFixed(4),
-      panel(state.previous),
-      panel(state.current),
-      panel(state.next),
-    ].join("|");
   }
 
   #drawPanel(panel: BackdropPanel | null, x: number, width: number): void {
@@ -168,7 +158,7 @@ export class ScenarioBackdropView {
   }
 
   #drawBackground(scenario: ScenarioDefinition, x: number, width: number): void {
-    const image = this.#assets.get(scenario.assetBindings.background);
+    const image = this.#assets.get(backgroundIdOf(scenario));
     const ctx = this.#ctx;
     if (!image) {
       ctx.fillStyle = "#141a22";

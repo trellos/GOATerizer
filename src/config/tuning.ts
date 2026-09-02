@@ -11,7 +11,19 @@
  * Star thresholds are NOT here: they are per-level authored scenario data and
  * live in `docs/scenarios/rocky-ascent/rocky_ascent.scenario.json`. What lives
  * here is the *metric* those thresholds are denominated in.
+ *
+ * A few values here are not free choices at all: they MIRROR an internal
+ * threshold of Tuninator's, and go stale if the library retunes. Those carry a
+ * `MIRRORS Tuninator <path> = <value>` marker, so `grep -rn "MIRRORS Tuninator"`
+ * lists everything to re-check when the library moves. Everything without that
+ * marker is ours to pick.
  */
+
+// The only import in this file, and type-only: keying the window table by
+// `NoteDuration` makes a new duration a compile error here rather than an
+// `undefined` window discovered when someone plays the note. `minigame/api.ts`
+// imports nothing, so this cannot cycle.
+import type { NoteDuration } from "../minigame/api.js";
 
 /* -------------------------------------------------------------------------- */
 /* Judgment windows                                                            */
@@ -73,17 +85,16 @@ export type SubdivisionWindows = {
  */
 export const GOOD_WINDOW_FLOOR_BEATS = 0.5;
 
-export const TIMING_WINDOWS_BEATS: {
-  whole: SubdivisionWindows;
-  half: SubdivisionWindows;
-  quarter: SubdivisionWindows;
-  eighth: SubdivisionWindows;
-  sixteenth: SubdivisionWindows;
-} = {
+export const TIMING_WINDOWS_BEATS: Readonly<Record<NoteDuration, SubdivisionWindows>> = {
   whole: { perfect: 0.22, good: 0.5 },
   half: { perfect: 0.2, good: 0.5 },
   quarter: { perfect: 0.18, good: 0.5 },
   eighth: { perfect: 0.11, good: 0.25 },
+  // Interpolated between its neighbours in length rather than measured: a third
+  // of a beat sits between an eighth and a sixteenth, and so does 0.08. The row
+  // most likely to want retuning by ear, because it is also the subdivision
+  // Tuninator is least accurate on (~94-124ms published onset error).
+  eighthTriplet: { perfect: 0.08, good: 1 / 6 },
   sixteenth: { perfect: 0.06, good: 0.125 },
 };
 
@@ -198,7 +209,14 @@ export const JUDGMENT_POINTS = {
  */
 export const EXTRA_INPUT_LATENCY_MS = 0;
 
-/** Ignore detections below this confidence entirely. Tuninator gates at 0.35. */
+/**
+ * Ignore detections below this confidence entirely.
+ *
+ * Deliberately just under the library's own gate, so the adapter never becomes
+ * the stricter of the two by accident.
+ *
+ * MIRRORS Tuninator pitch confidence gate = 0.35
+ */
 export const MIN_ATTACK_CONFIDENCE = 0.3;
 
 /**
@@ -421,9 +439,17 @@ export const AUTOPLAY_PLUCK_PEAK_GAIN = 0.5;
  */
 export const AUTOPLAY_PLUCK_BODY_FLOOR_GAIN = 0.05;
 export const AUTOPLAY_PLUCK_RELEASE_SECONDS = 0.025;
-/** Silence guaranteed after the release, before the next attack. > 90ms. */
+/**
+ * Silence guaranteed after the release, before the next attack.
+ *
+ * MIRRORS Tuninator tracking.releaseGraceMs = 90 (must exceed it)
+ */
 export const AUTOPLAY_PLUCK_GAP_SECONDS = 0.1;
-/** Sounding floor, comfortably above `minStableMs`. */
+/**
+ * Sounding floor: a note shorter than this is never announced at all.
+ *
+ * MIRRORS Tuninator tracking.minStableMs = 55 (must exceed it)
+ */
 export const AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS = 0.08;
 /** Cap, so a whole note at 60bpm does not drone for four seconds. */
 export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;

@@ -16,7 +16,13 @@ import type { RunKey } from "../src/music/keys.js";
 import { MAX_PILE, RepeatMinigame } from "../src/scenario/minigames/repeat-minigame.js";
 import { CAN_CRUSHING, ROCKY_ASCENT } from "../src/scenario/registry.js";
 import { loadScenario } from "../src/scenario/load.js";
-import type { RepeatAssetBindings, RepeatClassParameters } from "../src/scenario/types.js";
+import { climbConfig } from "../src/scenario/minigames/climb-minigame.js";
+import {
+  repeatConfig,
+  repeatLevel,
+  repeatState,
+  type RepeatConfig,
+} from "../src/scenario/minigames/repeat-module.js";
 import canCrushingJson from "../docs/scenarios/can-crushing/can_crushing.scenario.json";
 
 const LEVELS = [1, 2, 3, 4] as const;
@@ -24,19 +30,13 @@ const LEVELS = [1, 2, 3, 4] as const;
 /** difficulty -> note opportunities, from scripts/author-can-crushing.mjs. */
 const EXPECTED_OPPORTUNITIES: Record<number, number> = { 1: 12, 2: 16, 3: 24, 4: 28 };
 
-const CRUSHER_BINDINGS: RepeatAssetBindings = (() => {
-  const bindings = CAN_CRUSHING.assetBindings;
-  if (bindings.kind !== "repeat") throw new Error("Can Crushing must bind RepeatMinigame slots");
-  return bindings;
-})();
-
-const CRUSHER_PARAMETERS: RepeatClassParameters = (() => {
-  const parameters = CAN_CRUSHING.classParameters;
-  if (parameters.kind !== "repeat") {
-    throw new Error("Can Crushing must carry RepeatMinigame parameters");
-  }
-  return parameters;
-})();
+/**
+ * `config` is `unknown` on the scenario model: the host carries it and only
+ * `RepeatMinigame` knows its shape. A test asserting on a can or a swing is a
+ * repeat test and has to say so.
+ */
+const CRUSHER_BINDINGS: RepeatConfig = repeatConfig(CAN_CRUSHING.config);
+const CRUSHER_PARAMETERS: RepeatConfig = CRUSHER_BINDINGS;
 
 describe("the repeat performer", () => {
   const crusher = () => new RepeatMinigame({ performerLane: 3 });
@@ -132,14 +132,17 @@ describe("the repeat performer", () => {
 describe("Can Crushing scenario", () => {
   it("is a RepeatMinigame supporting exactly L1-L4", () => {
     expect(CAN_CRUSHING.id).toBe("can_crushing");
-    expect(CAN_CRUSHING.minigameClass).toBe("RepeatMinigame");
+    expect(CAN_CRUSHING.minigameId).toBe("RepeatMinigame");
     expect([...CAN_CRUSHING.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...CAN_CRUSHING.levels.keys()]).toEqual([1, 2, 3, 4]);
   });
 
   it("authors no route, because its performer stands still", () => {
+    // The climb validates one waypoint per note opportunity; this family has no
+    // path at all, so `RepeatMinigame.parseLevel` never looks for one and a
+    // scenario that authored one would simply be carrying dead data.
     for (const difficulty of LEVELS) {
-      expect(CAN_CRUSHING.levels.get(difficulty)?.route).toBeNull();
+      expect(repeatLevel(CAN_CRUSHING.levels.get(difficulty)!.data)).not.toHaveProperty("route");
     }
   });
 
@@ -214,7 +217,7 @@ describe("Can Crushing scenario", () => {
   });
 
   it("declares the canonical 1m visual span and a stationary performer", () => {
-    expect(CRUSHER_PARAMETERS.visualSpanMeasures).toBe(1);
+    expect(repeatLevel(CAN_CRUSHING.levels.get(1)!.data).visualSpanMeasures).toBe(1);
     expect(CRUSHER_PARAMETERS.repeatMode).toBe("sequence");
     expect(CRUSHER_PARAMETERS.performerMovesBetweenMeasures).toBe(false);
   });
@@ -254,13 +257,13 @@ describe("Can Crushing, played", () => {
 
   it("builds a repeat performer", () => {
     const { attempt } = harness(1);
-    expect(attempt.repeat).not.toBeNull();
+    expect(repeatState(attempt.minigame)).not.toBeNull();
   });
 
   it("stations the performer on the lane the material repeats on", () => {
     const { attempt } = harness(1);
     // Every target is the root, so the modal lane is the root's lane.
-    expect(attempt.repeat!.performerLane).toBe(attempt.targets[0]!.lane);
+    expect(repeatState(attempt.minigame)!.performerLane).toBe(attempt.targets[0]!.lane);
   });
 
   it("swings at a rate the authored grid actually lands on", () => {
@@ -268,7 +271,7 @@ describe("Can Crushing, played", () => {
     // arrive, so the period has to divide the tightest gap in the material.
     for (const difficulty of LEVELS) {
       const { attempt } = harness(difficulty);
-      const period = attempt.repeat!.strikePeriodBeats;
+      const period = repeatState(attempt.minigame)!.strikePeriodBeats;
       expect(period).toBeGreaterThan(0);
       for (const target of attempt.targets) {
         const swings = target.startBeat / period;
@@ -285,8 +288,8 @@ describe("Can Crushing, played", () => {
       h.advanceTo(target.startBeat + 0.001);
     }
     h.advanceTo(ATTEMPT_BEATS);
-    expect(h.attempt.repeat!.state.crushed).toBe(h.attempt.targets.length);
-    expect(h.attempt.repeat!.state.uncrushed).toBe(0);
+    expect(repeatState(h.attempt.minigame).crushed).toBe(h.attempt.targets.length);
+    expect(repeatState(h.attempt.minigame).uncrushed).toBe(0);
     expect(h.attempt.result?.stars).toBe(3);
   });
 
@@ -298,10 +301,10 @@ describe("Can Crushing, played", () => {
     h.playAt(target.midi + 7, target.startBeat);
     h.advanceTo(target.startBeat + 0.001);
 
-    const can = h.attempt.repeat!.state.cans.at(-1)!;
+    const can = repeatState(h.attempt.minigame).cans.at(-1)!;
     expect(can.fate).toBe("wrong");
     expect(can.wobbly).toBe(false);
-    expect(can.lane).toBeGreaterThan(h.attempt.repeat!.performerLane);
+    expect(can.lane).toBeGreaterThan(repeatState(h.attempt.minigame)!.performerLane);
   });
 
   it("wobbles a can the player's pitch cannot be placed by", () => {
@@ -313,16 +316,20 @@ describe("Can Crushing, played", () => {
     h.playAt(target.midi + 4, target.startBeat);
     h.advanceTo(target.startBeat + 0.001);
 
-    expect(h.attempt.repeat!.state.cans.at(-1)).toMatchObject({ wobbly: true, fate: "wrong" });
+    expect(repeatState(h.attempt.minigame).cans.at(-1)).toMatchObject({ wobbly: true, fate: "wrong" });
   });
 });
 
 describe("the loader holds two classes without mixing them", () => {
-  it("gives each scenario only its own class's slots and parameters", () => {
-    expect(ROCKY_ASCENT.assetBindings.kind).toBe("climb");
-    expect(ROCKY_ASCENT.classParameters.kind).toBe("climb");
-    expect(CAN_CRUSHING.assetBindings.kind).toBe("repeat");
-    expect(CAN_CRUSHING.classParameters.kind).toBe("repeat");
+  it("gives each scenario only its own family's slots and parameters", () => {
+    // There is no discriminant to check any more: each family parses its own
+    // config and a scenario physically cannot end up holding another's, because
+    // no other parser ever sees it. What is observable is that each carries
+    // what its own family asked for and nothing of the other's.
+    expect(climbConfig(ROCKY_ASCENT.config).badNotePolicy).toBe("Wobble");
+    expect(climbConfig(ROCKY_ASCENT.config)).not.toHaveProperty("repeatMode");
+    expect(repeatConfig(CAN_CRUSHING.config).repeatMode).toBe("sequence");
+    expect(repeatConfig(CAN_CRUSHING.config)).not.toHaveProperty("badNotePolicy");
   });
 
   it("refuses a repeat scenario that binds climb slots", () => {

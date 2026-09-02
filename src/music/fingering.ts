@@ -5,10 +5,13 @@
  * Tuninator judges the pitch that was produced; a player who reaches the right
  * note somewhere else on the neck is right. What the fingering decides is:
  *
- *   - the physical reference shown over the pitch lanes in pregame,
- *   - which string and fret a target is drawn on in Tablature View, and
+ *   - the physical reference shown over the pitch lanes in pregame, and
  *   - the five-fret diagram the player picks from, which is how they choose
  *     *where on the neck* to practise this run.
+ *
+ * It places nothing on the timeline. That was Tablature View's job, and Tab
+ * View is gone (`DECISION_LOG.md` DECISION-041); the vertical axis is harmonic
+ * role on every screen.
  *
  * Every shape offered fits inside a five-fret window, so the fretting hand
  * stays in one position for the whole exercise. A shape that would make the

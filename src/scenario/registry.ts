@@ -10,6 +10,9 @@
  * 16 slots and the real difficulty sequence.
  */
 
+import { registerMinigame } from "../minigame/registry.js";
+import { climbNoteArtIds, CLIMB_MINIGAME } from "./minigames/climb-minigame.js";
+import { REPEAT_MINIGAME } from "./minigames/repeat-module.js";
 import canCrushingJson from "../../docs/scenarios/can-crushing/can_crushing.scenario.json";
 import rockyAscentJson from "../../docs/scenarios/rocky-ascent/rocky_ascent.scenario.json";
 import rockyAscentHighJson from "../../docs/scenarios/rocky-ascent-high/rocky_ascent_high.scenario.json";
@@ -24,6 +27,18 @@ import type { ScenarioDefinition } from "./types.js";
  */
 const BASE_URL: string = import.meta.env?.BASE_URL ?? "/";
 
+/*
+ * The composition root for minigames.
+ *
+ * Registration lives here, with the content, rather than inside
+ * `minigame/registry.ts`: the registry must not import a family, or the generic
+ * half of the game would name a specific one again. This module already knows
+ * which scenarios this build ships, so it is the honest place to say which
+ * families it ships too.
+ */
+registerMinigame(CLIMB_MINIGAME);
+registerMinigame(REPEAT_MINIGAME);
+
 /**
  * Placeholder art lives in the project's own asset tree, never hotlinked.
  * Provenance for every file is recorded in `docs/assets/ASSET_SOURCES.md`.
@@ -35,14 +50,12 @@ function assetUrls(scenarioDir: string, ids: readonly string[]): Record<string, 
 }
 
 /**
- * The ten `ClimbMinigame` asset ids every Rocky-family scenario binds, derived
- * from the scenario id rather than retyped per scenario: background, four
- * advance poses, a finish pose, a foothold, a destination, and two effects.
- * Every Rocky scenario's `assetBindings` follows this exact naming convention,
- * so generating it once removes a per-scenario chance to typo an id that
- * `loadScenario` would otherwise only catch at runtime.
+ * The ids each Rocky-family scenario binds, derived from the scenario id rather
+ * than retyped per scenario. `assetIds()` on the module decides *which* ids a
+ * family needs; this only says where they live on disk.
  */
 function climbAssetIds(scenarioId: string): readonly string[] {
+  const art = climbNoteArtIds(scenarioId);
   return [
     `bg_${scenarioId}`,
     `goat_${scenarioId}_advance_01`,
@@ -54,6 +67,8 @@ function climbAssetIds(scenarioId: string): readonly string[] {
     `prop_${scenarioId}_goal`,
     `fx_${scenarioId}_dust`,
     `fx_${scenarioId}_tick`,
+    art.body,
+    art.crag,
   ];
 }
 

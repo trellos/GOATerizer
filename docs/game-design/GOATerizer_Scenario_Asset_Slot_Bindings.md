@@ -3856,6 +3856,28 @@ AssetBindings
     BattleAssetBindings
 ```
 
+> **As built, this union is gone.** `MinigameClassId` was a compile-time union
+> of the six families and `AssetBindings` a discriminated union of their binding
+> types; both meant the host had to name every family it could ever load, which
+> is the opposite of "six stable classes plus data". What ships instead:
+> `minigameId` is an **open string** resolved through the minigame registry, and
+> a scenario's bindings and class parameters are `unknown` to everything outside
+> the family that declared them — each module's `parseConfig` / `parseLevel`
+> reads its own slots and throws on anything it cannot map. The slot *names*
+> below are unchanged and remain the contract; what changed is who knows them
+> (`DECISION_LOG.md` DECISION-043).
+>
+> Two consequences for authoring, both in the Climb section above:
+>
+> - **`footholdArt.{body,crag}` is derived from the scenario id** —
+>   `note_<id>_ledge` and `note_<id>_crag` — rather than bound per scenario, so
+>   a new Rocky scenario gets its ledges without binding anything extra.
+>   Binding `assetBindings.footholdArt` explicitly still overrides it.
+> - **`route` is validated and discarded.** Its coordinates addressed a scenario
+>   panel that no longer exists. `ClimbMinigame.parseLevel` still enforces one
+>   waypoint per note opportunity — an invariant about the *music*, not the
+>   layout — and reads nothing else from it. Do not author new routes.
+
 The central production rule remains:
 
 > **Six stable behavior classes + scenario data + reusable static assets.**

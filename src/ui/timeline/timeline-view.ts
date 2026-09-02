@@ -1,11 +1,10 @@
 /**
- * The timeline canvas — Key View and Tablature View.
+ * The timeline canvas — Key View.
  *
- * Both modes render the same {@link TimelineModel}. Only the vertical axis
- * differs: Key View has eight diatonic pitch lanes — one octave, root to root —
- * and Tablature View has six string rows. Time, duration, the strike line,
- * judgment colouring and the played-note overlay are shared, so the two views
- * cannot disagree about what happened.
+ * Renders {@link TimelineModel} onto eight diatonic pitch lanes: one octave,
+ * root to root. The vertical axis is harmonic role, which is what the game is
+ * teaching; the physical neck position is a pregame choice shown as a fingering
+ * diagram, not a second way to read the same notes.
  *
  * Type size is derived from the row height rather than fixed, because the
  * labels are gameplay information read at a glance while both hands are busy
@@ -27,12 +26,13 @@ import {
   BEATS_PER_MEASURE,
 } from "../../config/tuning.js";
 import type { Fingering } from "../../music/fingering.js";
-import { formatFretPosition, OPEN_STRING_MIDI, STRING_NAMES } from "../../music/fingering.js";
+import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
-import { midiToName } from "../../music/pitch.js";
+import type { NoteArt, PlacedNote, Stage, StageView } from "../../minigame/api.js";
 import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
+import type { AssetStore } from "../assets.js";
 import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
 import { drawRepeatPerformer, NO_REPEAT_SPRITES, type RepeatSprites } from "./repeat-layer.js";
 import type {
@@ -42,10 +42,29 @@ import type {
   TimelineSnapshot,
 } from "./timeline-model.js";
 
-export type TimelineViewMode = "key" | "tab";
+/**
+ * Resolves the skin for one attempt's target notes.
+ *
+ * Keyed by attempt because two are on the timeline at once around a transition:
+ * the outgoing scenario's notes scroll out to the left while the incoming one's
+ * scroll in from the right, so each is skinned by the minigame that owns it and
+ * they never contend for the same pixels.
+ *
+ * Returning `null` — which is also what happens when no source is installed at
+ * all — gives the host's default look.
+ */
+export type StageSource = (attemptKey: string, view: StageView) => Stage | null;
 
 /** One monospace stack for every label the timeline draws. */
 const MONO = 'ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
+
+/**
+ * How strongly a skinned note is washed with its own colour.
+ *
+ * Enough that upcoming, Perfect, Good and Miss stay tellable apart across any
+ * art a scenario supplies; light enough that the art still reads under it.
+ */
+const JUDGMENT_WASH = 0.62;
 
 /**
  * How much of an overlay canvas the eight lanes occupy, centred vertically.
@@ -134,9 +153,17 @@ const ROW_TEXT: Readonly<Record<RowAccent, string>> = {
 export class TimelineView {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
-  #mode: TimelineViewMode = "key";
-  /** Drawn over the scenario rather than in a pane of its own. */
-  #overlay = false;
+  /**
+   * Drawn over the scenario rather than in a pane of its own.
+   *
+   * Required at construction rather than defaulted and set later. It was `false`
+   * by default and assigned afterwards, which made "nobody called `setOverlay`"
+   * indistinguishable from "the two-pane layout was asked for" — and the
+   * consequence of guessing wrong is total: the non-overlay path fills the whole
+   * canvas with an opaque ground colour, so a backdrop drawn perfectly behind it
+   * is never seen and the failure looks exactly like art that did not load.
+   */
+  readonly #overlay: boolean;
   /** PROTOTYPE: the actor standing on the note bars, or null when off. */
   #actor: TimelineActorState | null = null;
   #actorBeat = 0;
@@ -148,34 +175,30 @@ export class TimelineView {
   #key: RunKey;
   #fingering: Fingering | null = null;
   #showFingeringLabels = false;
+  #assets: AssetStore | null = null;
+  #stageFor: StageSource | null = null;
   #width = 0;
   #height = 0;
 
-  constructor(canvas: HTMLCanvasElement, key: RunKey) {
+  constructor(canvas: HTMLCanvasElement, key: RunKey, overlay: boolean) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
     this.#canvas = canvas;
     this.#ctx = ctx;
     this.#key = key;
-  }
-
-  get mode(): TimelineViewMode {
-    return this.#mode;
-  }
-
-  setMode(mode: TimelineViewMode): void {
-    this.#mode = mode;
+    this.#overlay = overlay;
   }
 
   /**
-   * Draw over the scenario instead of beside it.
+   * Whether the lanes are a band over the scenario, or the whole pane.
    *
-   * The player has to watch the timeline to know what note is coming, so in a
-   * two-pane layout their eyes never reach the scenario and the payoff is
-   * invisible. Overlaid, one gaze covers both.
+   * Reported in the dev panel, because the DOM carries a `data-overlay`
+   * attribute that is supposed to agree with this and is set separately. When
+   * they disagree the timeline canvas fills itself opaque and hides a backdrop
+   * that is drawn perfectly, which looks like art that failed to load.
    */
-  setOverlay(overlay: boolean): void {
-    this.#overlay = overlay;
+  get overlay(): boolean {
+    return this.#overlay;
   }
 
   /**
@@ -226,6 +249,17 @@ export class TimelineView {
     this.#showFingeringLabels = show;
   }
 
+  /**
+   * Installs per-minigame note art. Without this every note gets the default.
+   *
+   * The pregame timeline never sets one: there is no attempt yet, so there is
+   * nothing whose look a scenario could own.
+   */
+  setStageSource(assets: AssetStore | null, stageFor: StageSource | null): void {
+    this.#assets = assets;
+    this.#stageFor = stageFor;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Geometry                                                            */
   /* ------------------------------------------------------------------ */
@@ -247,16 +281,6 @@ export class TimelineView {
   }
 
   /**
-   * Fret-number type size in Tablature View.
-   *
-   * Larger than a Key View label: in tablature the number *is* the note, so it
-   * carries the same weight a coloured bar does in Key View.
-   */
-  get #tabFontPx(): number {
-    return Math.round(Math.max(14, Math.min(28, this.#rowHeight * 0.48)));
-  }
-
-  /**
    * A note bar's thickness: the full row, less a hairline.
    *
    * Adjacent rows are exactly `rowHeight` apart, so a bar this tall stops two
@@ -273,11 +297,8 @@ export class TimelineView {
   }
 
   get #gutterWidth(): number {
-    // Sized from the widest label each mode actually draws: `b3 (Bb)` in Key
-    // View, and in Tablature the string name plus the whole selected shape
-    // (`A  5  7  9`), which is what gives the player a physical reference
-    // before the run starts.
-    const columns = this.#mode === "key" ? 9 : 12;
+    // Sized from the widest label actually drawn: `b3 (Bb)`.
+    const columns = 9;
     return Math.min(Math.round(columns * this.#labelCharPx) + 12, Math.round(this.#width * 0.3));
   }
 
@@ -302,7 +323,7 @@ export class TimelineView {
   }
 
   get #rowCount(): number {
-    return this.#mode === "key" ? LANE_COUNT : STRING_NAMES.length;
+    return LANE_COUNT;
   }
 
   /** Height of the block of rows. Overlaid, that is a band; otherwise the pane. */
@@ -336,14 +357,7 @@ export class TimelineView {
    * the note the player actually saw.
    */
   pointFor(lane: number, beat: number, nowBeat: number): { x: number; y: number } {
-    return { x: this.#x(beat, nowBeat), y: this.#rowY(this.#rowForLane(lane)) };
-  }
-
-  /** Pitch lane -> the row it is drawn on, in whichever mode is active. */
-  #rowForLane(lane: number): number {
-    if (this.#mode === "key") return lane;
-    const index = Math.max(0, Math.min(LANE_COUNT - 1, Math.round(lane)));
-    return this.#fingering?.positions[index]?.stringIndex ?? Math.min(5, Math.floor(index / 3));
+    return { x: this.#x(beat, nowBeat), y: this.#rowY(lane) };
   }
 
   /* ------------------------------------------------------------------ */
@@ -363,11 +377,17 @@ export class TimelineView {
     }
 
     const snapshot = model.snapshot(nowBeat, TIMELINE_FUTURE_BEATS, TIMELINE_HISTORY_BEATS);
+    // Asked once per frame, before anything is drawn: a minigame answers with
+    // art for every note of its own attempt at once, so two attempts sharing
+    // the timeline across a transition cannot see each other's rects.
+    const stages = this.#resolveStages(model, nowBeat);
 
     this.#drawBeatGrid(nowBeat);
     this.#drawRows();
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
-    for (const note of snapshot.targets) this.#drawTarget(note, nowBeat);
+    for (const note of snapshot.targets) {
+      this.#drawTarget(note, nowBeat, stages.get(note.attemptKey)?.notes?.get(note.id));
+    }
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawActor(snapshot, nowBeat);
     this.#drawStrikeLine();
@@ -375,12 +395,109 @@ export class TimelineView {
   }
 
   /**
-   * PROTOTYPE: whichever character this scenario puts on the bars. Key View
-   * only — tablature's string rows carry no pitch contour, so a character
-   * hopping them would be hopping nothing meaningful.
+   * Places every visible target, then asks each attempt's minigame what it
+   * wants drawn on its own notes.
+   *
+   * Placement is entirely the host's: a minigame receives rects it cannot
+   * change, so a skin can never move a note in time or pitch, resize it, or
+   * make a challenge harder through visual ambiguity (`AGENTS.md` §12).
+   *
+   * `Stage.background` is deliberately not read here yet. The scenario backdrop
+   * is still its own canvas behind this one, so a background clipped to
+   * `span` would be a second, disagreeing answer to where the art goes; that
+   * seam closes when the backdrop folds onto this canvas.
+   */
+  #resolveStages(model: TimelineModel, nowBeat: number): Map<string, Stage> {
+    const resolved = new Map<string, Stage>();
+    const stageFor = this.#stageFor;
+    if (!stageFor) return resolved;
+
+    const band = this.#bandHeight;
+    const top = this.#bandTop;
+    for (const attemptKey of model.attemptKeys) {
+      const targets = model.targetsFor(attemptKey);
+      const first = targets[0];
+      const last = targets[targets.length - 1];
+      if (!first || !last) continue;
+
+      // EVERY note of the attempt, not just the visible ones: an actor anchored
+      // to a note needs a coordinate after that note has scrolled off, or a
+      // climber loses its footing at the left edge.
+      const placed: PlacedNote[] = targets.map((note) => {
+        const rect = this.#targetRect(note, nowBeat);
+        return {
+          id: note.id,
+          opportunityIndex: note.opportunityIndex,
+          lane: note.lane,
+          duration: note.duration,
+          outcome: note.outcome,
+          // Normalised to the PLAYFIELD across and the LANE BAND down, so a
+          // note's rect and a sprite's y are in the same space and an actor can
+          // stand on a bar. Both may leave 0..1; only the playfield clips.
+          rect: {
+            x: (rect.x - this.#playLeft) / this.#playWidth,
+            y: (rect.y - top) / band,
+            w: rect.w / this.#playWidth,
+            h: rect.h / band,
+          },
+          beatsUntilStrike: note.startBeat - nowBeat,
+        };
+      });
+
+      // The attempt's own measures, rounded out to measure lines, which is what
+      // lets two backgrounds meet on one rather than overlap mid-bar.
+      const fromBeat = Math.floor(first.startBeat / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const toBeat =
+        Math.ceil((last.startBeat + last.durationBeats) / BEATS_PER_MEASURE) * BEATS_PER_MEASURE;
+      const measureWidth = (BEATS_PER_MEASURE * this.#pixelsPerBeat) / this.#playWidth;
+
+      const stage = stageFor(attemptKey, {
+        beat: nowBeat - model.attemptStartBeat(attemptKey),
+        notes: placed,
+        laneCount: LANE_COUNT,
+        strikeX: (this.#strikeX - this.#playLeft) / this.#playWidth,
+        span: {
+          from: (this.#x(fromBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+          to: (this.#x(toBeat, nowBeat) - this.#playLeft) / this.#playWidth,
+        },
+        measure: { width: measureWidth, beatWidth: measureWidth / BEATS_PER_MEASURE },
+      });
+      if (stage) resolved.set(attemptKey, stage);
+    }
+    return resolved;
+  }
+
+  /**
+   * A skin's `underlay` or `overlay`: natural proportions, centred on the
+   * note's rect, free to bleed outside it.
+   *
+   * `scale` 1 means "as tall as a row", so a glow at 1.6 spills into the rows
+   * above and below by design. Only the playfield clips it, which is what keeps
+   * ornament off the gutter labels.
+   */
+  #drawNoteArt(
+    art: { assetId: string; scale?: number; opacity?: number },
+    x: number,
+    y: number,
+    width: number
+  ): void {
+    const image = this.#assets?.get(art.assetId);
+    if (!image) return;
+    const ctx = this.#ctx;
+    const h = this.#rowHeight * (art.scale ?? 1);
+    const w = image.width * (h / image.height);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1));
+    ctx.drawImage(image, x + width / 2 - w / 2, y - h / 2, w, h);
+    ctx.restore();
+  }
+
+  /**
+   * PROTOTYPE: whichever character this scenario puts on the bars. It hops
+   * pitch lanes, so it only means anything on an axis that is pitch — which
+   * Key View, now the only presentation, always is.
    */
   #drawActor(snapshot: TimelineSnapshot, nowBeat: number): void {
-    if (this.#mode !== "key") return;
     const repeat = this.#repeat;
     const actor = this.#actor;
     if (!repeat && !actor) return;
@@ -496,7 +613,6 @@ export class TimelineView {
    * exactly why lane index rather than pitch is the right thing to test.
    */
   #rowAccent(row: number): "root" | "third" | "fifth" | null {
-    if (this.#mode !== "key") return null;
     switch (row % 7) {
       case 0:
         return "root";
@@ -557,40 +673,23 @@ export class TimelineView {
       // Centred on the row line, where the notes are, rather than floating in
       // the space above it.
       const y = this.#rowY(row);
-      if (this.#mode === "key") {
-        const accent = this.#rowAccent(row);
-        const label = laneLabel(row, this.#key);
-        const fingering = this.#fingering?.positions[row];
-        ctx.fillStyle = accent ? ROW_TEXT[accent] : THEME.laneText;
-        // Bold marks the root only — it stays the one landmark you can find
-        // without reading colour at all. The third and fifth are colour-only,
-        // which is what keeps them reading as accents under it rather than as
-        // three equal landmarks.
-        ctx.font = `${accent === "root" ? "700 " : "500 "}${font}px ${MONO}`;
-        ctx.textAlign = "left";
-        // Scale degree first, note name retained: the player should be able to
-        // read the note but is being taught the harmonic role.
-        const text =
-          this.#showFingeringLabels && fingering
-            ? `${label.degree.padEnd(2)} ${formatFretPosition(fingering)}`
-            : `${label.degree.padEnd(2)} (${label.note})`;
-        ctx.fillText(text, 8, y);
-      } else {
-        // String name, then every fret of the selected shape on that string —
-        // the one-octave scale laid out the way a hand would find it.
-        const frets = (this.#fingering?.positions ?? [])
-          .filter((position) => position.stringIndex === row)
-          .map((position) => String(position.fret));
-        ctx.textAlign = "left";
-        ctx.fillStyle = frets.length > 0 ? THEME.laneTextRoot : THEME.laneText;
-        ctx.font = `700 ${font}px ${MONO}`;
-        ctx.fillText(STRING_NAMES[row] ?? "", 8, y);
-        // Dimmed, never hidden: a string the shape does not use still has to
-        // read as a string, so the six rows stay countable.
-        ctx.fillStyle = THEME.laneText;
-        ctx.font = `600 ${font}px ${MONO}`;
-        ctx.fillText(frets.join(" ") || "·", 8 + this.#labelCharPx * 2.4, y);
-      }
+      const accent = this.#rowAccent(row);
+      const label = laneLabel(row, this.#key);
+      const fingering = this.#fingering?.positions[row];
+      ctx.fillStyle = accent ? ROW_TEXT[accent] : THEME.laneText;
+      // Bold marks the root only — it stays the one landmark you can find
+      // without reading colour at all. The third and fifth are colour-only,
+      // which is what keeps them reading as accents under it rather than as
+      // three equal landmarks.
+      ctx.font = `${accent === "root" ? "700 " : "500 "}${font}px ${MONO}`;
+      ctx.textAlign = "left";
+      // Scale degree first, note name retained: the player should be able to
+      // read the note but is being taught the harmonic role.
+      const text =
+        this.#showFingeringLabels && fingering
+          ? `${label.degree.padEnd(2)} ${formatFretPosition(fingering)}`
+          : `${label.degree.padEnd(2)} (${label.note})`;
+      ctx.fillText(text, 8, y);
     }
   }
 
@@ -657,7 +756,7 @@ export class TimelineView {
     const ctx = this.#ctx;
     const x = this.#x(note.startBeat, nowBeat);
     const width = Math.max(3, note.durationBeats * this.#pixelsPerBeat - 3);
-    const y = this.#rowY(this.#rowForLane(note.lane));
+    const y = this.#rowY(note.lane);
     const height = Math.max(3, this.#rowHeight * 0.16);
 
     if (x + width < this.#playLeft) return;
@@ -682,65 +781,83 @@ export class TimelineView {
    * small for the same reason: rounded ends would open a visible gap exactly
    * where the eye is tracking the line.
    *
-   * Tablature draws its fret number on top of that bar rather than instead of
-   * it, so the two views differ only in what the vertical axis means.
+   * A minigame's note art composes around this bar rather than replacing it:
+   * the body stretches to the rect exactly, so duration stays honest whatever
+   * is drawn over and under it.
    */
-  #drawTarget(note: TargetNote, nowBeat: number): void {
+  /**
+   * Where one target's bar goes, in canvas pixels.
+   *
+   * Computed once and used twice — to draw the bar, and as the rect handed to
+   * the minigame. Two computations could drift, and a skin anchored to a rect
+   * the host does not actually draw on is exactly the visual ambiguity the
+   * host-owned-geometry rule exists to prevent.
+   */
+  #targetRect(note: TargetNote, nowBeat: number): { x: number; y: number; w: number; h: number } {
+    const h = this.#noteHeight;
+    return {
+      x: this.#x(note.startBeat, nowBeat),
+      y: this.#rowY(note.lane) - h / 2,
+      w: Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2),
+      h,
+    };
+  }
+
+  #drawTarget(note: TargetNote, nowBeat: number, art?: NoteArt): void {
     const ctx = this.#ctx;
-    const x = this.#x(note.startBeat, nowBeat);
-    const width = Math.max(6, note.durationBeats * this.#pixelsPerBeat - 2);
-    const height = this.#noteHeight;
-    const y = this.#rowY(this.#rowForLane(note.lane));
+    const rect = this.#targetRect(note, nowBeat);
+    const { x, w: width, h: height } = rect;
+    // The vertical centre of the row, which is what the art slots are centred
+    // on — a crag wider than its bar hangs off both ends of it symmetrically.
+    const y = rect.y + height / 2;
     const colour = this.#outcomeColour(note);
 
     ctx.save();
+    // The one clip a skin cannot escape. Ornament may bleed past the note as
+    // far as it likes and still never reach the gutter labels.
     this.#clipPlayfield();
 
-    ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
-    ctx.fillStyle = colour;
-    this.#roundRect(x, y - height / 2, width, height, 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
-    ctx.lineWidth = 1;
-    this.#roundRect(x + 0.5, y - height / 2 + 0.5, width - 1, height - 1, 2);
-    ctx.stroke();
+    if (art?.underlay) this.#drawNoteArt(art.underlay, x, y, width);
 
-    if (this.#mode === "tab") {
-      this.#drawTabFret(note, x, width, y, colour);
+    const body = art?.body ? this.#assets?.get(art.body.assetId) : null;
+    if (body) {
+      // Stretched to the rect exactly, so note duration stays honest whatever
+      // is drawn around it.
+      ctx.save();
+      ctx.globalAlpha =
+        Math.max(0, Math.min(1, art?.body?.opacity ?? 1)) * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.drawImage(body, x, rect.y, width, height);
+      ctx.restore();
+    } else {
+      ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
+      ctx.fillStyle = colour;
+      this.#roundRect(x, rect.y, width, height, 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
+      ctx.lineWidth = 1;
+      this.#roundRect(x + 0.5, rect.y + 0.5, width - 1, height - 1, 2);
+      ctx.stroke();
     }
+
+    // The colour language survives any skin.
+    //
+    // Applied whether or not the note has been judged, because "an upcoming
+    // target" is a state the player reads at a glance too — a skin that turned
+    // every note to stone and left only the judged ones coloured would make the
+    // thing you are about to play the *least* visible object on the timeline.
+    // A minigame that wants full control supplies an opaque body per outcome
+    // and paints over this.
+    if (body) {
+      ctx.globalAlpha = JUDGMENT_WASH * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.fillStyle = colour;
+      ctx.fillRect(x, rect.y, width, height);
+      ctx.globalAlpha = 1;
+    }
+
+    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
 
     ctx.restore();
-  }
-
-  /**
-   * The fret number, on the target's own bar.
-   *
-   * Dark ink on the bright bar while it fits; a short note whose bar is
-   * narrower than its digits gets them alongside in the note's own colour
-   * instead. Never abbreviated and never dropped — in tablature the number *is*
-   * the note.
-   */
-  #drawTabFret(note: TargetNote, x: number, width: number, y: number, colour: string): void {
-    const ctx = this.#ctx;
-    const position = this.#fingering?.positions[note.lane];
-    const text = position ? String(position.fret) : "?";
-    const size = this.#tabFontPx;
-
-    ctx.font = `800 ${size}px ${MONO}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.globalAlpha = note.outcome === "miss" ? 0.55 : 1;
-
-    const textWidth = ctx.measureText(text).width;
-    if (textWidth + 8 <= width) {
-      ctx.fillStyle = THEME.ground;
-      ctx.fillText(text, x + 4, y);
-    } else {
-      ctx.fillStyle = colour;
-      ctx.fillText(text, x + width + 3, y);
-    }
-    ctx.globalAlpha = 1;
   }
 
   #drawPlayed(note: PlayedNote, nowBeat: number): void {
@@ -753,7 +870,7 @@ export class TimelineView {
     ctx.save();
     this.#clipPlayfield();
 
-    if (this.#mode === "key" && note.lanePosition !== null) {
+    if (note.lanePosition !== null) {
       const y = this.#rowY(note.lanePosition);
       const height = this.#playedHeight;
       if (note.diatonic) {
@@ -777,8 +894,6 @@ export class TimelineView {
         ctx.fillRect(x, y - 1, width, 2);
         ctx.globalAlpha = 1;
       }
-    } else if (this.#mode === "tab") {
-      this.#drawPlayedTab(note, x, width, colour);
     } else {
       // Off the octave entirely: pinned to the edge it left through,
       // in a colour that says "out of range" rather than vanishing.
@@ -788,66 +903,6 @@ export class TimelineView {
     }
 
     ctx.restore();
-  }
-
-  /**
-   * The player's own note in tablature: an inset bar on the string they
-   * actually sounded, matching Key View's treatment exactly.
-   *
-   * No fret number on a note that hit its target — the target's own number
-   * already says which fret, and two numbers in one row is noise. A *wrong*
-   * note gets one, because that is precisely the case where "what did I just
-   * play?" is the question and there is no target underneath answering it.
-   */
-  #drawPlayedTab(note: PlayedNote, x: number, width: number, colour: string): void {
-    const ctx = this.#ctx;
-    const size = Math.round(this.#tabFontPx * 0.72);
-    const mapped = this.#tabPositionFor(note.midi);
-    ctx.font = `700 ${size}px ${MONO}`;
-    ctx.textAlign = "left";
-
-    if (mapped) {
-      const y = this.#rowY(mapped.stringIndex);
-      const height = this.#playedHeight;
-      ctx.fillStyle = colour;
-      ctx.fillRect(x, y - height / 2, width, height);
-      // A dark hairline, so a white bar inside a coloured target still reads as
-      // two separate things at a glance.
-      ctx.strokeStyle = "rgba(8,10,14,0.85)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y - height / 2 + 0.5, Math.max(1, width - 1), height - 1);
-
-      if (note.wrong) {
-        ctx.fillStyle = colour;
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(mapped.fret), x + width + 3, y);
-      }
-      return;
-    }
-    // A pitch the chosen shape cannot express still has to appear. It is drawn
-    // above the stave with its note name, rather than silently dropped.
-    ctx.fillStyle = THEME.wrong;
-    ctx.textBaseline = "top";
-    ctx.fillText(midiToName(note.midi), x, 3);
-    ctx.fillRect(x, 3 + size * 1.15, Math.max(4, width), 2);
-  }
-
-  /**
-   * Nearest playable string/fret for an arbitrary played pitch, preferring the
-   * region the chosen fingering sits in.
-   */
-  #tabPositionFor(midi: number): { stringIndex: number; fret: number } | null {
-    const anchor = this.#fingering?.lowestFret ?? 0;
-    let best: { stringIndex: number; fret: number; distance: number } | null = null;
-    for (let stringIndex = 0; stringIndex < OPEN_STRING_MIDI.length; stringIndex += 1) {
-      const open = OPEN_STRING_MIDI[stringIndex];
-      if (open === undefined) continue;
-      const fret = midi - open;
-      if (fret < 0 || fret > 20) continue;
-      const distance = Math.abs(fret - anchor);
-      if (!best || distance < best.distance) best = { stringIndex, fret, distance };
-    }
-    return best ? { stringIndex: best.stringIndex, fret: best.fret } : null;
   }
 
   #edgeYFor(midi: number): number {

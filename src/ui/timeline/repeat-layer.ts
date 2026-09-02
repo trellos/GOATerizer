@@ -449,7 +449,27 @@ function ease(t: number): number {
  */
 const FIGURE = {
   hip: 0.46,
-  shoulder: 0.8,
+  /**
+   * Low enough that the working arm folds instead of doubling over.
+   *
+   * It was 0.8, which put the shoulder six pixels under the head's centre —
+   * and his palm at contact is on his own brow, so shoulder and hand were
+   * almost the same point. A two-bone solve given 33.6px of arm and 5.8px to
+   * cross has only one shape available, a hairpin, and it threw the elbow
+   * nearly sixteen pixels clear of the line between them. Whichever way that
+   * broke, the elbow ended up the highest thing on the character: above his own
+   * head, at every phase of the swing.
+   *
+   * Dropping the shoulder is what fixes it, not the pole below. At 0.70 the
+   * hand is far enough from the shoulder for the arm to bend like an arm, and
+   * the outward solution and the downward one become the same solution — at
+   * this height the elbow sits below the head through the whole loop for any
+   * pole direction worth having, so the choice stops being delicate.
+   *
+   * It also gives him a neck, which he did not have: the head used to sit into
+   * the shoulders.
+   */
+  shoulder: 0.7,
   headCentre: 0.875,
   /**
    * The head is an ellipse, not a circle. A circular head wide enough not to be
@@ -579,6 +599,13 @@ function drawCrusher(
   ctx.lineTo(-h * FIGURE.hipHalf, hipY);
   ctx.closePath();
   ctx.fill();
+
+  // Neck, bridging the daylight the lowered shoulder opened between his jaw and
+  // the vest. Drawn from the head's own centre so its top is always behind the
+  // ellipse whatever the two heights are, and before the head so the jaw laps
+  // over the join rather than butting against it.
+  ctx.fillStyle = CRUSHER.skinShade;
+  ctx.fillRect(-headRX * 0.45, headY, headRX * 0.9, shoulderY - headY + h * 0.02);
 
   // Head, headband, hair.
   ctx.fillStyle = CRUSHER.skin;

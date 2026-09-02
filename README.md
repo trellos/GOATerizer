@@ -109,9 +109,8 @@ tables at the top of that script.
    the microphone; nothing before it touches a protected API.
 2. **Pregame** is a live sandbox. The bass is already looping, Tuninator is
    already listening, and the timeline shows what you play. Reroll the key,
-   pick a tempo, pick Key View or Tablature View, and pick a fingering from the
-   five-fret neck diagrams — that is where on the neck you want to practise this
-   octave. Pregame and the run are the same layout, so the timeline you warm up
+   pick a tempo, and pick a fingering from the five-fret neck diagrams — that
+   is where on the neck you want to practise this octave. Pregame and the run are the same layout, so the timeline you warm up
    on is the same rectangle you play on. None of it stops the beat.
 
    Warming up here is also what sets your input level. The detector gates on
@@ -210,7 +209,7 @@ AudioEngine ── one AudioContext ──┬── Transport ──────
               ┌───────────────────────────────┼───────────────────────────────┐
               ▼                               ▼                               ▼
        TimelineModel ──▶ TimelineView   BackingDuck ──▶ BassPlayer   ScenarioBackdropView
-       (Key + Tab)     (notes + actor)  (how loud the backing         (background only)
+        (Key View)     (notes + actor)  (how loud the backing         (background only)
                                          is allowed to be)
 ```
 
@@ -249,8 +248,10 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
   it somewhere the next note is unreachable from. A can appears at the lane you
   *actually played*, so a wrong note says how you were wrong — see
   `DECISION_LOG.md` (DECISION-021).
-- **The timeline has one model and two views.** Key View and Tablature View
-  render the same `TimelineModel`; there is no second scoring engine.
+- **The timeline has one model and one view.** Key View is the only
+  presentation of `TimelineModel`; there is no second scoring engine. Tablature
+  View was removed (`DECISION_LOG.md`, DECISION-041) — the vertical axis is
+  harmonic role, and neck position is a pregame choice shown as a diagram.
 - **The pitch space is one octave, root to root.** Eight lanes, authored as
   `1..7` plus `b1`. Two octaves was more than a player can hold in their head
   and answer on a guitar in real time — see `DECISION_LOG.md` (DECISION-012).
@@ -259,13 +260,27 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 - **Scenario data drives content.** Adding another scenario of a class that
   already exists means a JSON file, art, and one line in
   `src/scenario/registry.ts`.
+- **The host does not know which minigame is playing.** A family is a
+  `MinigameModule` registered at the composition root; its `config` and level
+  `data` are `unknown` to everything outside it, and it is the module that says
+  what its asset slots are, what a judged note does to it, and what is drawn on
+  its note bars. Adding a family touches `src/scenario/registry.ts` and nothing
+  else in the host (`DECISION_LOG.md`, DECISION-043).
+- **The host owns every note rect.** A minigame is handed each note's rect
+  read-only and answers with art to draw under, on and over it, so a skin can
+  dress a note but never move, resize or hide one — a challenge can never be
+  made harder through visual ambiguity (`DECISION_LOG.md`, DECISION-044).
 
 ### Adding a scenario
 
 1. Author `docs/scenarios/<id>/<id>.scenario.json` — supported levels, prompts
    in scale-degree tokens, star thresholds, asset bindings, and whatever else
-   the declared `minigameClass` requires (a climb authors a route; a repeat
-   scenario authors none, and the loader refuses one).
+   the minigame named in `minigameClass` requires. The loader does not know what
+   that is: it resolves the id through the minigame registry and hands the raw
+   JSON to that family's own `parseConfig` / `parseLevel`, which throw on
+   anything they cannot map (`DECISION_LOG.md`, DECISION-043). The authored key
+   is still `minigameClass`; it reaches the model as `ScenarioDefinition.minigameId`,
+   which is an open string rather than the closed union the old name implies.
 2. Drop art in `public/assets/scenarios/<id>/`, and record its provenance in
    `docs/assets/ASSET_SOURCES.md`.
 3. Add one entry to `src/scenario/registry.ts`.

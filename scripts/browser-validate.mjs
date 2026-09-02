@@ -160,6 +160,46 @@ async function launchBrowser(args) {
  * covers the right-hand third of the frame, and its buttons are still needed
  * after the shot.
  */
+/**
+ * Is the scenario backdrop actually on screen, or merely painted?
+ *
+ * `canvasHasInk` reads the bitmap, so it passes just as happily when the
+ * backdrop is drawn and then covered by something opaque -- which is a real,
+ * reachable state: the whole overlay layout rests on
+ * `#screen-game[data-overlay="true"]` making `.timeline-pane` transparent,
+ * while `.timeline-pane`'s own rule paints it `var(--panel)`. Lose either and
+ * the backdrop is drawn perfectly and seen by nobody.
+ *
+ * The computed background is what binds this. `elementFromPoint` alone does
+ * not: the pane carries `pointer-events: none` in overlay mode, so hit testing
+ * passes straight through an opaque pane to the canvas underneath. The point
+ * sampling is the second half, for a covering element that thinking about one
+ * CSS rule would not anticipate.
+ */
+async function backdropIsVisible(page) {
+  return page.evaluate(() => {
+    const screen = document.getElementById("screen-game");
+    const pane = document.querySelector("#screen-game .timeline-pane");
+    const canvas = document.getElementById("scenario-canvas");
+    if (!screen || !pane || !(canvas instanceof HTMLCanvasElement)) return false;
+    if (screen.dataset["overlay"] !== "true") return false;
+
+    const background = getComputedStyle(pane).backgroundColor;
+    if (!/^(transparent$|rgba\(0, 0, 0, 0\)$)/.test(background)) return false;
+
+    // The dev panel legitimately covers the right-hand edge, so sample the left
+    // two thirds.
+    const box = canvas.getBoundingClientRect();
+    for (let fy = 0.2; fy < 0.9; fy += 0.15) {
+      for (let fx = 0.1; fx < 0.65; fx += 0.15) {
+        const top = document.elementFromPoint(box.x + box.width * fx, box.y + box.height * fy);
+        if (!top || top.id !== "scenario-canvas") return false;
+      }
+    }
+    return true;
+  });
+}
+
 async function shotWithoutDevPanel(page, file) {
   const panel = page.locator("#dev-panel");
   await panel.evaluate((element) => element.setAttribute("hidden", ""));
@@ -299,6 +339,45 @@ async function canvasBox(page, id) {
     const box = document.getElementById(canvasId)?.getBoundingClientRect();
     return box ? { x: box.x, y: box.y, width: box.width, height: box.height } : null;
   }, id);
+}
+
+/**
+ * How many pixels of a scenario's note art reached the timeline canvas.
+ *
+ * The probe is the moss green in Rocky's crag sprite. Nothing else on this
+ * timeline is green: the note colours are cyan and gold, the bass and grid are
+ * blue-grey, and the labels are neutral. It tests *greenness* rather than
+ * nearness to one RGB triple, because an antialiased grey label pixel lands
+ * close to the moss triple by distance while never being green at all. The
+ * Good-note colour is green, but a flawless autoplay never produces one.
+ *
+ * Counting a colour says exactly where the art did and did not reach, and
+ * unlike hashing a strip of pixels it does not care that the timeline is
+ * scrolling the whole time.
+ *
+ * `region` is "gutter" for the labels down the left, or "notes" for everything
+ * right of them.
+ */
+async function countNoteArt(page, region) {
+  return page.evaluate((where) => {
+    const canvas = document.getElementById("game-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return -1;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return -1;
+    // The gutter is at most 30% of the width; 15% is safely inside it.
+    const gutter = Math.round(canvas.width * 0.15);
+    const x = where === "gutter" ? 0 : gutter;
+    const w = where === "gutter" ? gutter : canvas.width - gutter;
+    const { data } = ctx.getImageData(x, 0, w, canvas.height);
+    let moss = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (g - r > 12 && g - b > 20 && g > 95 && g < 165) moss += 1;
+    }
+    return moss;
+  }, region);
 }
 
 /** True when the canvas has drawn anything other than its ground colour. */
@@ -452,23 +531,19 @@ try {
   // moment the notes start counting.
   const pregameTimelineBox = await canvasBox(page, "pregame-canvas");
 
-  await page.click('#pregame-views button[data-view="tab"]');
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(SHOTS, "03-pregame-tab.png") });
-  check("tablature view draws", (await canvasHasInk(page, "pregame-canvas")) > 20);
+  // Key View is the only presentation, so what used to check that tablature
+  // drew its shape now checks the gutter it left behind: the lane labels are
+  // gameplay information, and a blank gutter is a timeline nobody can read.
   check(
-    "tablature shows the selected shape as a physical reference",
+    "the lane gutter is labelled, not blank",
     await page.evaluate(() => {
       const canvas = document.getElementById("pregame-canvas");
       const ctx = canvas instanceof HTMLCanvasElement ? canvas.getContext("2d") : null;
       if (!ctx || !(canvas instanceof HTMLCanvasElement)) return false;
-      // The gutter carries `E 2 4 5`-style rows; look for ink in it.
       const { data } = ctx.getImageData(0, 0, 96 * 2, canvas.height);
       return data.some((value, i) => i % 4 === 0 && value > 90);
     })
   );
-  await page.click('#pregame-views button[data-view="key"]');
-  await page.waitForTimeout(200);
 
   /* --- the run ------------------------------------------------------- */
 
@@ -531,6 +606,67 @@ try {
     `${await dev(page, "perfect/good/miss")} judged, lane/streak ${actorMid}`
   );
   check("the scenario backdrop is drawing", (await canvasHasInk(page, "scenario-canvas")) > 200);
+  /*
+   * ...and that it actually reaches the screen.
+   *
+   * `canvasHasInk` reads the bitmap, so it passes just as happily when the
+   * backdrop is painted and then covered by something opaque -- which is a
+   * real, reachable state: the whole overlay layout rests on
+   * `#screen-game[data-overlay="true"]` making `.timeline-pane` transparent,
+   * and `.timeline-pane`'s own rule paints it `var(--panel)`. Lose the
+   * attribute and the backdrop is drawn perfectly and seen by nobody, with
+   * every existing check still green.
+   *
+   * The computed background is what binds this. `elementFromPoint` alone does
+   * not: the pane carries `pointer-events: none` in overlay mode, so hit
+   * testing passes straight through an opaque pane to the canvas underneath.
+   * It is kept as the second half because it catches a covering element that
+   * the first half would not think to look at.
+   */
+  check("the backdrop is visible, not merely painted", await backdropIsVisible(page));
+
+  /*
+   * The scenario's note art, and the two properties that make skinning safe.
+   *
+   * Deliberately not `canvasHasInk`: the host inks this canvas — grid, lanes,
+   * notes, gutter — whether or not a minigame draws a single pixel, so that
+   * would pass over a dead seam. It did: the contract sat in the tree for
+   * fifteen commits with nothing calling `render()` and every check still
+   * green.
+   *
+   * The control is Can Crushing, below, which returns no note art at all and
+   * must therefore count zero. Two families, one product difference — a
+   * stronger differential than a debug toggle, because it is the shipped
+   * behaviour being compared.
+   */
+  const artOnNotes = await countNoteArt(page, "notes");
+  const artInGutter = await countNoteArt(page, "gutter");
+  check(
+    "the scenario's note art actually reaches the timeline",
+    artOnNotes > 0,
+    `${artOnNotes} px of scenario art`
+  );
+  check(
+    "note art never reaches the gutter, however far it bleeds past a note",
+    artInGutter === 0,
+    `${artInGutter} px in the gutter`
+  );
+  /*
+   * The lane geometry the canvas drew and the layout the stylesheet applied,
+   * agreeing.
+   *
+   * They come from one value now, but they are consumed by two systems that
+   * cannot see each other, and disagreement is silent and total: the
+   * non-overlay path fills the whole timeline canvas with an opaque ground
+   * colour, so a backdrop drawn perfectly behind it is never seen. From the
+   * outside that is indistinguishable from art that failed to load, which is
+   * why it is asserted rather than trusted.
+   */
+  check(
+    "the canvas and the stylesheet agree about the overlay",
+    (await dev(page, "overlay")) === "view true / dom true",
+    `overlay ${await dev(page, "overlay")}`
+  );
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
@@ -648,6 +784,27 @@ try {
       `crushed/missed ${crushed}`
     );
 
+    /*
+     * The control for Rocky's note art, and it has to be measured HERE.
+     *
+     * This family returns no note art — the can IS the note, and it is a sprite
+     * knocked off the bar rather than paint on it — so its bars are the host's
+     * default and the green probe finds nothing. A skin leaking across families
+     * would show up here and nowhere else.
+     *
+     * Measured under the flawless tier, exactly as Rocky's is. The Good-note
+     * colour is green; at full strength it is too bright for the probe, but
+     * dimmed by the judgment wash it lands squarely inside it. Reading this
+     * after the 25% tier below therefore counts a handful of Good notes as
+     * scenario art — which it did, at five pixels, until this moved up here.
+     */
+    const crusherArt = await countNoteArt(crush, "notes");
+    check(
+      "a family that skins nothing gets the host's default bars",
+      crusherArt === 0,
+      `${crusherArt} px of note art on a scenario that asks for none`
+    );
+
     // The 25% tier fumbles most of its notes as audible wrong pitches, which
     // is exactly the input this needs: a can placed somewhere he cannot reach.
     await crush.click("#dev-autoplay-25");
@@ -663,6 +820,11 @@ try {
       `crushed/missed ${wrong}`
     );
     check("the timeline is still drawing the performer", (await canvasHasInk(crush, "game-canvas")) > 200);
+    check("the beach backdrop is drawing", (await canvasHasInk(crush, "scenario-canvas")) > 200);
+    // Asserted per family, not once: the overlay layout is shared, but a
+    // screenshot of one scenario is no evidence about another, and mistaking a
+    // stale render of this screen for a real regression cost an hour.
+    check("the beach backdrop is visible, not merely painted", await backdropIsVisible(crush));
     await crush.close();
   }
 
