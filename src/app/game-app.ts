@@ -101,7 +101,6 @@ import { NO_REPEAT_SPRITES, type RepeatSprites } from "../ui/timeline/repeat-lay
 import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import { OVERLAY_BAND_FRACTION, TimelineView } from "../ui/timeline/timeline-view.js";
 
-const WORKLET_URL = `${import.meta.env?.BASE_URL ?? "/"}assets/tuninator-worklet.js`;
 
 type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
 
@@ -894,7 +893,6 @@ export class GameApp {
         ? new TestGuitarInputProvider()
         : new TuninatorGuitarInputProvider({
             audioContext: context as AudioContext,
-            workletUrl: WORKLET_URL,
             // Undefined unless the player has measured their rig, in which case
             // Tuninator's own default stands.
             ...(this.#inputRmsGate !== null ? { rmsGate: this.#inputRmsGate } : {}),
