@@ -146,6 +146,26 @@ pages could be opened and verified**, and per `AGENTS.md` §11 none of the files
 ship. The rows record what the search results claimed; verify on the source
 page before downloading.
 
+**A second session in a second environment reached the same wall.** See
+`ART_SOURCING_FINDINGS.md`: seven art hosts, two tool paths, all refused by
+policy, so the rows below have now been reproduced from search results twice
+and verified zero times. Reproduction is not verification. Until someone with a
+browser opens these pages, or the network policy is widened, the generated
+placeholders are what ships — which is a licensing decision, not an art one.
+
+One route that *is* open from the environment this scenario was built in, and
+worth recording because it is not obvious: `raw.githubusercontent.com` is
+reachable there (though not from the second environment), so CC0 libraries
+mirrored on GitHub can be fetched by exact path. Kenney's library is mirrored
+that way and its CC0 status is stated in the mirrors' own licence files. That
+is still second-hand provenance — `kenney.nl` itself is blocked from both
+environments — so it clears the "can I download it" bar and not the "did I
+verify the source page" one. Kenney's 2D library was surveyed through such a
+mirror and contains no side-profile goat, no crowd, and no stage: its only goat
+is a vector cartoon, and its pixel farm animals are 16×16 top-down tiles with
+heavy outlines that do not sit beside the Rocky family's art. So even with that
+route open, nothing there fills the slots this scenario actually needs.
+
 | Source id | Title | Author | Claimed licence | Source page | Intended use |
 |---|---|---|---|---|---|
 | `spring_goat_ram` | Pixel Art Enemies — Axe Throwing Goat or Ram… | Spring Spring | CC0 option available | https://opengameart.org/content/pixel-art-enemies-axe-throwing-goat-or-ram-axe-throwing-monkey-or-ape-walking-pig | `goat_goat_frontman_perform_*` and `react_goat_frontman_*` — the same strip the Rocky family names, recoloured/scaled; one frame each |

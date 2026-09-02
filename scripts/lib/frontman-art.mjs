@@ -39,6 +39,16 @@ export const FRONTMAN_PALETTE = {
   fur: [44, 38, 52],
   furShade: [30, 26, 36],
   furDark: [12, 10, 16],
+  /**
+   * A rim light along the top edge, and the reason the flourishes read at all.
+   *
+   * The frontman's coat is nearly black, so his internal drawing is invisible
+   * and only his outline carries the pose — and an outline in `furDark` against
+   * a dark stage is barely an outline. A lit top edge is what a spotlit figure
+   * actually has, and it separates the arch of his back from the hall behind
+   * him without lightening the coat and losing the rock-star silhouette.
+   */
+  furRim: [126, 116, 148],
   horn: [236, 196, 84],
   eye: [250, 70, 70],
   // The crowd is the ordinary white Rocky goat, unchanged.
@@ -75,60 +85,93 @@ export function frontmanFinish(C = FRONTMAN_PALETTE) {
 }
 
 /**
- * The bend flourish: the goat rears backward like a stadium-rock singer, head
- * thrown back, one hoof in the air. 24x18, `f` fur, `s` shade, `d` dark,
- * `h` horn, `e` eye.
+ * The two flourish poses, 24x18, facing right, in the same idiom and on the
+ * same grid as `rocky-art.mjs`'s goat: `.` transparent, `f` fur, `s` fur
+ * shade, `d` dark (outline, hooves, muzzle), `h` horn, `e` eye.
+ *
+ * These are the only two drawings in the scenario that have to carry a *pose*
+ * rather than a creature — the performer's normal cycle is the Rocky goat
+ * recoloured, and a pose cycle reads from the legs alone. A flourish has to
+ * read at a glance, against a lit backdrop, while the player is looking at the
+ * notes: so each one is built around a silhouette that is unmistakable with the
+ * detail thrown away — a vertical goat, and a goat bent double.
+ *
+ * The first attempt at both was drawn as a horizontal mass, like the standing
+ * body, and both read as a dark blob: a goat lying down, and a lump. The fix is
+ * not more pixels but a different outline.
+ */
+
+/**
+ * The bend: reared up on the hind legs, head thrown back, front hooves pawing
+ * the air — the stadium-rock singer's backbend.
+ *
+ * The silhouette is **vertical**, which is the whole point: it is the only
+ * thing on the timeline taller than it is wide, so it reads as a change of
+ * posture even at the edge of vision. The horns sweep back over the neck rather
+ * than forward, because a head thrown back is what says "singing" instead of
+ * "charging".
  */
 const FLOURISH_BEND = [
-  "hh......................",
-  "hhh.....................",
-  "..hhh...................",
-  "...ddff.................",
-  "..dfffff................",
-  "..deffff................",
-  "..ddffffd...............",
-  "...dffffdd..ddddd.......",
-  "...dfffffffdffffdd......",
-  "....dffffffffffffd......",
-  "....dsfffffffffffsd.....",
-  ".....dssffffffffssd.....",
-  "......dsssssssssssd.....",
-  "....ff...d.f......f.d...",
-  "...ff....d.f......f.d...",
-  "..ff.....d.f......f.d...",
-  ".dd......dd.d....dd.d...",
-  "........................",
+  "...........hh...........",
+  "..........hh.hh.........",
+  "..........h...hhd.......",
+  ".............dllffd.....",
+  "............dlfffffd....",
+  "............dfffeffdd...",
+  "............dffffffd....",
+  ".........ff..dffffd.....",
+  "........ff...dffffd.....",
+  ".......ff...dlfffffd....",
+  "......dd....dlffffffd...",
+  "..........ddlffffffd....",
+  ".........dslfffffffd....",
+  ".........dssffffffdd....",
+  ".........dsssffffd......",
+  ".........dssssssd.......",
+  "..........d.f.f.d.......",
+  "..........dd.d.dd.......",
 ];
 
 /**
- * The slur flourish: the headbang. Head down between the front legs, horns
- * forward, back arched. 24x18.
+ * The slur: the headbang. Back arched high, head driven down and forward,
+ * horns pointing at the floor.
+ *
+ * The opposite silhouette to the bend — a low, humped mass with the head *below*
+ * the body — so the two flourishes never read as the same event, which matters
+ * because they alternate.
  */
 const FLOURISH_HEADBANG = [
   "........................",
-  "........................",
-  ".....ddddddd............",
-  "...ddfffffffdd..........",
-  "..dffffffffffffd........",
-  ".dfffffffffffffffd......",
-  ".dsffffffffffffffffd....",
-  ".dssfffffffffffffffdd...",
-  "..dsssfffffffffffffffd..",
-  "...ddsssssssssdffffffd..",
-  "......d.f.....dffffefd..",
-  "......d.f.....dffffddd..",
-  "......d.f......dddd.h...",
-  "......dd.d....dd.d.hh...",
-  ".................hhh....",
-  "........................",
-  "........................",
-  "........................",
+  "....llll................",
+  "..llffffll..............",
+  ".dffffffffdd............",
+  ".dsffffffffffd..........",
+  ".dssfffffffffffd........",
+  "..dsssffffffffffd.......",
+  "...ddsssssfffffffd......",
+  "...d.f...dsssffffd......",
+  "...d.f......ddffdd......",
+  "...d.f........dfd.......",
+  "...dd.d.......dfd.......",
+  "..............dllfd.....",
+  ".............dlffffd....",
+  ".............dfffefd....",
+  ".............ddfffdh....",
+  "..............dddhh.....",
+  "................hh......",
 ];
 
 export function frontmanFlourish(kind, C = FRONTMAN_PALETTE) {
   const image = new Pixels(24, 18);
   const rows = kind === "bend" ? FLOURISH_BEND : FLOURISH_HEADBANG;
-  image.stamp(0, 0, rows, { f: C.fur, s: C.furShade, d: C.furDark, h: C.horn, e: C.eye });
+  image.stamp(0, 0, rows, {
+    f: C.fur,
+    s: C.furShade,
+    d: C.furDark,
+    l: C.furRim,
+    h: C.horn,
+    e: C.eye,
+  });
   return image;
 }
 
