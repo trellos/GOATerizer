@@ -130,8 +130,17 @@ const ROW_TEXT: Readonly<Record<RowAccent, string>> = {
 export class TimelineView {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
-  /** Drawn over the scenario rather than in a pane of its own. */
-  #overlay = false;
+  /**
+   * Drawn over the scenario rather than in a pane of its own.
+   *
+   * Required at construction rather than defaulted and set later. It was `false`
+   * by default and assigned afterwards, which made "nobody called `setOverlay`"
+   * indistinguishable from "the two-pane layout was asked for" — and the
+   * consequence of guessing wrong is total: the non-overlay path fills the whole
+   * canvas with an opaque ground colour, so a backdrop drawn perfectly behind it
+   * is never seen and the failure looks exactly like art that did not load.
+   */
+  readonly #overlay: boolean;
   /** PROTOTYPE: the actor standing on the note bars, or null when off. */
   #actor: TimelineActorState | null = null;
   #actorBeat = 0;
@@ -146,23 +155,25 @@ export class TimelineView {
   #width = 0;
   #height = 0;
 
-  constructor(canvas: HTMLCanvasElement, key: RunKey) {
+  constructor(canvas: HTMLCanvasElement, key: RunKey, overlay: boolean) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("2D canvas context unavailable");
     this.#canvas = canvas;
     this.#ctx = ctx;
     this.#key = key;
+    this.#overlay = overlay;
   }
 
   /**
-   * Draw over the scenario instead of beside it.
+   * Whether the lanes are a band over the scenario, or the whole pane.
    *
-   * The player has to watch the timeline to know what note is coming, so in a
-   * two-pane layout their eyes never reach the scenario and the payoff is
-   * invisible. Overlaid, one gaze covers both.
+   * Reported in the dev panel, because the DOM carries a `data-overlay`
+   * attribute that is supposed to agree with this and is set separately. When
+   * they disagree the timeline canvas fills itself opaque and hides a backdrop
+   * that is drawn perfectly, which looks like art that failed to load.
    */
-  setOverlay(overlay: boolean): void {
-    this.#overlay = overlay;
+  get overlay(): boolean {
+    return this.#overlay;
   }
 
   /**

@@ -345,8 +345,16 @@ export class GameApp {
     this.#overlayTimeline = params.get("overlay") !== "0";
     this.#applySetupParams(params);
 
-    this.#pregameView = new TimelineView(must("pregame-canvas", HTMLCanvasElement), this.#setup.key);
-    this.#gameView = new TimelineView(must("game-canvas", HTMLCanvasElement), this.#setup.key);
+    this.#pregameView = new TimelineView(
+      must("pregame-canvas", HTMLCanvasElement),
+      this.#setup.key,
+      this.#overlayTimeline
+    );
+    this.#gameView = new TimelineView(
+      must("game-canvas", HTMLCanvasElement),
+      this.#setup.key,
+      this.#overlayTimeline
+    );
     this.#strip = new ScenarioBackdropView(must("scenario-canvas", HTMLCanvasElement), this.#assets);
     this.#energy = new EnergyLayer(must("energy-canvas", HTMLCanvasElement));
 
@@ -372,8 +380,6 @@ export class GameApp {
       "--timeline-band",
       `${OVERLAY_BAND_FRACTION * 100}%`
     );
-    this.#gameView?.setOverlay(this.#overlayTimeline);
-    this.#pregameView?.setOverlay(this.#overlayTimeline);
 
     this.#buildStartScreen();
     this.#buildPregameControls();
@@ -2021,6 +2027,17 @@ export class GameApp {
        */
       "unreleased played": String(this.#timeline.unreleasedPruned),
       "assets failed": this.#assets.failed.join(",") || "none",
+      // Three facts that together say whether the scenario art can possibly be
+      // seen. They disagree only when something is wrong, and each failure mode
+      // looks identical from the outside: a black timeline with grey lane bands.
+      overlay: `view ${this.#gameView?.overlay ?? "?"} / dom ${
+        document.getElementById("screen-game")?.dataset["overlay"] ?? "?"
+      }`,
+      backdrop: (() => {
+        const id = this.#current?.runtime.scenario.assetBindings.background;
+        if (!id) return "—";
+        return `${id} ${this.#assets.get(id) ? "loaded" : "MISSING"}`;
+      })(),
     });
   }
 

@@ -585,6 +585,22 @@ try {
    * the first half would not think to look at.
    */
   check("the backdrop is visible, not merely painted", await backdropIsVisible(page));
+  /*
+   * The lane geometry the canvas drew and the layout the stylesheet applied,
+   * agreeing.
+   *
+   * They come from one value now, but they are consumed by two systems that
+   * cannot see each other, and disagreement is silent and total: the
+   * non-overlay path fills the whole timeline canvas with an opaque ground
+   * colour, so a backdrop drawn perfectly behind it is never seen. From the
+   * outside that is indistinguishable from art that failed to load, which is
+   * why it is asserted rather than trusted.
+   */
+  check(
+    "the canvas and the stylesheet agree about the overlay",
+    (await dev(page, "overlay")) === "view true / dom true",
+    `overlay ${await dev(page, "overlay")}`
+  );
   check(
     "score is climbing",
     Number(await page.textContent("#hud-score")) > 0,
