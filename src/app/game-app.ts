@@ -563,11 +563,55 @@ export class GameApp {
     this.#previewing = true;
     this.#devScenarioId = options.scenario.id;
     this.#devLevel = options.difficulty;
+    this.#showPreviewExit(true);
     // A scenario created in this session has art nothing has loaded yet.
     await this.#assets.load(options.scenario.assetUrls);
     await this.#enterPregame();
     await this.#setAutoplayMode(options.accuracy);
     this.#beginRun();
+  }
+
+  /**
+   * Ends a preview and goes back to the editor.
+   *
+   * Reached two ways and it has to be the same way out of both: the attempt
+   * running out, and the Exit button, which exists because a preview is a real
+   * attempt of real length and the thing you wanted to see is usually in the
+   * first bar. So this tears the run down itself rather than letting the run
+   * shell finish — there is no result to record, nothing to put on the shelf,
+   * and no results screen to show.
+   */
+  #leavePreview(): void {
+    if (!this.#previewing) return;
+    this.#previewing = false;
+    this.#showPreviewExit(false);
+
+    this.#run = null;
+    this.#current = null;
+    this.#next = null;
+    this.#previous = null;
+    this.#slideStartBeat = null;
+    this.#devPinSwapBeat = null;
+    this.#devScenarioId = null;
+    this.#devLevel = null;
+    this.#timeline.clearTargets();
+    this.#timeline.clearPlayed();
+    this.#energy?.clear();
+    this.#cancelAutoplay();
+    void this.#setAutoplayMode("off");
+    // Back to the bare pulse before it is stopped, so the id the guard reads
+    // matches the silence rather than the phrase that was playing.
+    this.#refreshDrumBeat();
+    this.#bass?.stop();
+    this.#drums?.stop();
+
+    this.#editor?.enter();
+    this.#showScreen("editor");
+  }
+
+  #showPreviewExit(visible: boolean): void {
+    const button = document.getElementById("preview-exit");
+    if (button instanceof HTMLElement) button.hidden = !visible;
   }
 
   #buildHistory(containerId: string): void {
@@ -692,6 +736,7 @@ export class GameApp {
     must("pregame-calibrate-reset", HTMLButtonElement).addEventListener("click", () =>
       this.#resetCalibration()
     );
+    must("preview-exit", HTMLButtonElement).addEventListener("click", () => this.#leavePreview());
     must("pregame-play", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-replay", HTMLButtonElement).addEventListener("click", () => this.#beginRun());
     must("results-new", HTMLButtonElement).addEventListener("click", () => {
@@ -1713,14 +1758,7 @@ export class GameApp {
     // A preview ends where it started, and before anything is recorded: the
     // high score table is for people with guitars.
     if (this.#previewing) {
-      this.#previewing = false;
-      this.#devScenarioId = null;
-      this.#devLevel = null;
-      void this.#setAutoplayMode("off");
-      this.#bass?.stop();
-      this.#drums?.stop();
-      this.#editor?.enter();
-      this.#showScreen("editor");
+      this.#leavePreview();
       return;
     }
 

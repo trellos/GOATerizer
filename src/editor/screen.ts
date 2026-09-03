@@ -33,7 +33,7 @@ import {
   notesOverrunningLoop,
   tileToPhrase,
 } from "./grid.js";
-import { EditorPlayback } from "./playback.js";
+import { EditorPlayback, type Program } from "./playback.js";
 import { TimelineEditorView } from "./timeline-editor.js";
 
 type Json = Record<string, unknown>;
@@ -299,7 +299,6 @@ export class EditorScreen {
     const raw = this.#library.get(id);
     if (!raw) return;
     this.#stash();
-    this.#playback.pause();
     const supported = Array.isArray(raw["supportedLevels"]) ? (raw["supportedLevels"] as number[]) : [];
     this.#document = new EditorDocument(raw, supported[0] ?? 1);
     this.#view.setDocument(this.#document);
@@ -397,25 +396,31 @@ export class EditorScreen {
     this.#refresh();
   }
 
+  /**
+   * What the loop should be playing right now.
+   *
+   * Read fresh every time rather than captured when Play was pressed: the whole
+   * point of hearing it is to hear the edit.
+   */
+  #program(): Program {
+    return {
+      notes: tileToPhrase(this.#document.notes, this.#document.loopMeasures),
+      vocabulary: this.#document.vocabulary,
+      difficulty: this.#document.difficulty,
+    };
+  }
+
   async #togglePlay(): Promise<void> {
     if (this.#playback.playing) {
       this.#playback.pause();
       this.#refresh();
       return;
     }
-    const level = this.#document.levelAt(this.#document.difficulty);
-    const definition = this.#validate();
     const started = await this.#playback.play({
-      notes: tileToPhrase(this.#document.notes, this.#document.loopMeasures),
-      vocabulary: this.#document.vocabulary,
-      difficulty: this.#document.difficulty,
-      // The kit follows the level the game would play, when there is one to
-      // read; an unsaved timeline that does not load yet gets the bare pulse.
-      prompt: definition?.levels.get(this.#document.difficulty)?.prompt ?? [],
+      ...this.#program(),
       bpm: tempoById(this.#tempoId).bpm,
     });
     if (!started) this.#status = "the browser would not start audio";
-    else if (!level) this.#status = "";
     this.#refresh();
   }
 
@@ -514,6 +519,10 @@ export class EditorScreen {
 
   #paint(): void {
     const document_ = this.#document;
+    // Every edit, level switch, scenario switch and loop change comes through
+    // here, so this is the one place the running loop has to be told. It costs
+    // nothing when the notes did not actually change (`programSignature`).
+    if (this.#playback.playing) this.#playback.setProgram(this.#program());
     const raw = document_.raw;
 
     const family = must("editor-family", HTMLSelectElement);

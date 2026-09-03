@@ -313,8 +313,8 @@ produces is a diff you commit.
 | **Move** | Drag from anywhere else. A ghost shows where it will land; drag off the timeline and nothing moves. Ctrl-drag duplicates instead |
 | **Select** | Click, ctrl-click to add, or drag a marquee from empty space. Dragging one selected note drags them all. Ctrl-C/V, Delete, Ctrl-Z |
 | **Loop** | Drag the ▼ handle. One bar, two bars or the whole phrase; the rest is shaded and shows the repetition it will be saved as. Notes outside the loop are remembered, not deleted — widen it and they come back |
-| **Play** | Loops the timeline with the game's own kit and a synth for the notes. The beat is the one this level would get in a run |
-| **Preview** | Hands the scenario — saved or not — to the real game for one attempt, autoplayed at 0/25/50/75/100%. Nothing is scored |
+| **Play** | Loops the timeline with the game's own kit and a synth for the notes. The beat is the one this level would get in a run, and both follow the edit: moving a note or switching difficulty changes what is playing without stopping the loop |
+| **Preview** | Hands the scenario — saved or not — to the real game for one attempt, autoplayed at 0/25/50/75/100%. Nothing is scored, and **Exit preview** comes straight back |
 | **Levels** | 1–7. A difficulty the scenario has not authored is dimmed; selecting it starts one, with the scenario data of the nearest level it does author |
 | **Scenarios** | New… copies the open scenario (same class, same art, same notes) under a new name; ✎ renames; 🗑 deletes the file |
 

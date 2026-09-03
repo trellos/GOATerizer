@@ -206,6 +206,14 @@
 
         <canvas id="energy-canvas" class="energy-overlay"></canvas>
         <div class="input-warning" id="game-input-warning" hidden></div>
+        <!--
+          Only while the editor is previewing. A preview is a real attempt and
+          runs its full length, which is a long time to watch something you have
+          already seen the problem with.
+        -->
+        <button class="secondary preview-exit" id="preview-exit" type="button" hidden>
+          Exit preview
+        </button>
       </section>
 
       <!-- ---------------------------------------------------------------- -->

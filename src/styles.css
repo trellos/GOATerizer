@@ -959,6 +959,21 @@ button.chip[data-selected="true"] {
   }
 }
 
+/*
+ * The editor's way out of a preview. Top right, clear of the HUD's score and
+ * of the timeline, and above both canvases — a preview is the real game, so it
+ * has the real game's layers underneath it.
+ */
+.preview-exit {
+  position: absolute;
+  top: calc(var(--topbar-height) + 0.6rem);
+  right: 0.8rem;
+  z-index: 5;
+  font-size: 0.85rem;
+  font-family: var(--mono);
+  background: rgba(15, 20, 26, 0.9);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Minigame editor                                                             */
 /* -------------------------------------------------------------------------- */

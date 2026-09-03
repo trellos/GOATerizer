@@ -102,6 +102,25 @@ export class PluckVoicePool {
     }
   }
 
+  /**
+   * Drops everything queued but not yet begun, leaving sounding notes to ring.
+   *
+   * What re-programming a running loop needs, and the difference from
+   * {@link cancelFrom} is the whole point: the note under the player's ear when
+   * they moved a bar somewhere else is not the note they edited, and cutting it
+   * short is an artefact they would hear on every edit.
+   */
+  dropUnstarted(contextTime: number): void {
+    for (const voice of this.#voices) {
+      if (voice.startTime < contextTime) continue;
+      try {
+        voice.osc.stop(contextTime);
+      } catch {
+        // Already stopped; nothing to do.
+      }
+    }
+  }
+
   dispose(): void {
     this.cancelFrom(this.#context.currentTime);
     this.#voices = [];
