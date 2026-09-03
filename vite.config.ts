@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -83,9 +83,112 @@ function copyWorkletPlugin(): Plugin {
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* The minigame editor's file API                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where the editor's Save button lands. `src/editor/api-client.ts` is the only
+ * caller; the path is shared by hand rather than through an import, because one
+ * side of it is Node and the other is the browser.
+ */
+const SCENARIO_API = "/__goaterizer/scenario/";
+const SCENARIOS_DIR = path.join(here, "docs", "scenarios");
+/** A scenario id, as every authored file spells one. Also the file name. */
+const SCENARIO_ID = /^[a-z][a-z0-9_]{0,63}$/;
+/** Generous for a scenario file — the largest in the repo is ~85 kB. */
+const MAX_SCENARIO_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Lets the minigame editor write scenario files to disk.
+ *
+ * **Dev server only**, and that is the whole design: the editor is a local
+ * authoring tool whose output is committed to git (`README.md`), and a browser
+ * page cannot write to a repository any other way. `configureServer` is not
+ * called for `vite build` or `vite preview`, so nothing here reaches a deployed
+ * site — the built game has no route that writes a file, and the editor's own
+ * save reports that plainly when the route is not there.
+ *
+ * The id is validated against the same shape every authored file uses and the
+ * path is rebuilt from it rather than taken from the URL, so there is no
+ * traversal to defend against: `..` is not a scenario id.
+ */
+function scenarioFilesPlugin(): Plugin {
+  return {
+    name: "goaterizer-scenario-files",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        const url = request.url ?? "";
+        if (!url.startsWith(SCENARIO_API)) return next();
+
+        const reply = (status: number, body: Record<string, unknown>): void => {
+          response.statusCode = status;
+          response.setHeader("content-type", "application/json");
+          response.end(JSON.stringify(body));
+        };
+
+        const id = decodeURIComponent(url.slice(SCENARIO_API.length).split("?")[0] ?? "");
+        if (!SCENARIO_ID.test(id)) {
+          return reply(400, { error: `${JSON.stringify(id)} is not a scenario id` });
+        }
+        const file = path.join(SCENARIOS_DIR, `${id}.scenario.json`);
+
+        if (request.method === "DELETE") {
+          if (!existsSync(file)) return reply(404, { error: `no scenario ${id} on disk` });
+          rmSync(file);
+          server.config.logger.info(`[goaterizer] editor deleted docs/scenarios/${id}.scenario.json`);
+          return reply(200, { deleted: id });
+        }
+
+        if (request.method !== "PUT") {
+          response.statusCode = 405;
+          return response.end();
+        }
+
+        const chunks: Buffer[] = [];
+        let bytes = 0;
+        let aborted = false;
+        request.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes > MAX_SCENARIO_BYTES) {
+            aborted = true;
+            reply(413, { error: "scenario too large" });
+            request.destroy();
+            return;
+          }
+          chunks.push(chunk);
+        });
+        request.on("end", () => {
+          if (aborted) return;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          } catch (error) {
+            return reply(400, { error: `not JSON: ${(error as Error).message}` });
+          }
+          // The file is named after the id it declares. Anything else would put
+          // a scenario on disk that the library discovers under another name.
+          const declared = (parsed as { id?: unknown })?.id;
+          if (declared !== id) {
+            return reply(400, {
+              error: `body declares id ${JSON.stringify(declared)} but the URL says ${id}`,
+            });
+          }
+          mkdirSync(SCENARIOS_DIR, { recursive: true });
+          writeFileSync(file, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+          server.config.logger.info(`[goaterizer] editor wrote docs/scenarios/${id}.scenario.json`);
+          reply(200, { saved: id, path: `docs/scenarios/${id}.scenario.json` });
+        });
+        return undefined;
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: process.env["BASE_PATH"] || "/",
-  plugins: [copyWorkletPlugin()],
+  plugins: [copyWorkletPlugin(), scenarioFilesPlugin()],
   resolve: {
     alias: [{ find: /^tuninator$/, replacement: LIB_ENTRY }],
   },

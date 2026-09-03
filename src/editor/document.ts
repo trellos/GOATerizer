@@ -144,11 +144,15 @@ export class EditorDocument {
    * asking a designer to retype them to add a level would be the editor getting
    * in the way.
    */
-  selectLevel(difficulty: number): void {
-    if (difficulty === this.#difficulty) return;
-    this.#stashLevel();
+  selectLevel(difficulty: number): readonly string[] {
+    if (difficulty === this.#difficulty) return [];
+    // A timeline that cannot be written down does not stop you leaving it — but
+    // it does not silently vanish either: the level keeps whatever is on disk
+    // and the reasons come back for the screen to show.
+    const problems = this.#stashLevel();
     this.#difficulty = difficulty;
     this.#readLevel(difficulty);
+    return problems;
   }
 
   /** The authored level for a difficulty, or null. */

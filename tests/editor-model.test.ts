@@ -259,6 +259,50 @@ describe("reading and writing authored levels", () => {
   );
 });
 
+describe("a timeline that cannot be written down", () => {
+  const diatonic = laneVocabularyOf({
+    runTransposition: { promptRepresentation: "diatonic_scale_degree" },
+  });
+
+  it("says so when a triplet and a sixteenth leave a gap no rest can spell", () => {
+    // A sixteenth ending on tick 6, then a triplet starting on tick 8.
+    const built = promptFromNotes(
+      [note(0, 0, "sixteenth", 1), note(3, 0, "sixteenth", 2), note(8, 1, "eighthTriplet", 3)],
+      4,
+      diatonic
+    );
+    expect(built.events).toEqual([]);
+    expect(built.problems[0]).toMatch(/no rest can spell/);
+  });
+
+  it("says so when two notes would sound at once", () => {
+    const built = promptFromNotes([note(0, 0, "half", 1), note(6, 4, "quarter", 2)], 4, diatonic);
+    expect(built.events).toEqual([]);
+    expect(built.problems[0]).toMatch(/two notes sound at once/);
+  });
+
+  it("reads a prompt written in a vocabulary this timeline has no lane for", () => {
+    // A pentatonic scenario read against diatonic lanes: `p3` is not a lane
+    // here, and which one it would be depends on a mode nobody has rolled yet.
+    const read = notesFromPrompt(
+      [
+        { type: "note", duration: "whole", scaleDegree: "p3" },
+        { type: "rest", duration: "whole" },
+        { type: "rest", duration: "whole" },
+        { type: "rest", duration: "whole" },
+      ],
+      diatonic
+    );
+    expect(read.notes).toEqual([]);
+    expect(read.problems[0]).toMatch(/not a lane/);
+  });
+
+  it("reads a prompt that is not four measures long", () => {
+    const read = notesFromPrompt([{ type: "note", duration: "quarter", scaleDegree: "1" }], diatonic);
+    expect(read.problems[0]).toMatch(/1 beats long/);
+  });
+});
+
 function promptShape(event: {
   startBeat: number;
   duration: string;

@@ -90,6 +90,8 @@ import {
   writeLatencyTrimMs,
 } from "../persistence/latency.js";
 import { SCENARIOS, scenarioById } from "../scenario/registry.js";
+import { EditorPlayback } from "../editor/playback.js";
+import { EditorScreen, type EditorHost } from "../editor/screen.js";
 import type { ScenarioDefinition } from "../scenario/types.js";
 import { AssetStore } from "../ui/assets.js";
 import { DebugPanel } from "../ui/debug-panel.js";
@@ -107,7 +109,7 @@ import { TimelineModel } from "../ui/timeline/timeline-model.js";
 import { OVERLAY_BAND_FRACTION, TimelineView } from "../ui/timeline/timeline-view.js";
 
 
-type Screen = "start" | "calibrate" | "pregame" | "game" | "results";
+type Screen = "start" | "calibrate" | "pregame" | "game" | "results" | "editor";
 
 type Setup = {
   key: RunKey;
@@ -346,6 +348,22 @@ export class GameApp {
    */
   #devPlayOffsetMs = 0;
   #autoplay: AutoplayMode = "off";
+  /**
+   * The minigame editor, built the first time it is opened. Dev-only, and null
+   * in every other build — it is the one screen that writes to the repository.
+   */
+  #editor: EditorScreen | null = null;
+  #editorPlayback: EditorPlayback | null = null;
+  /** `?dev=1&editor=1`: open the editor once the screens exist. */
+  #openEditorOnBoot = false;
+  /**
+   * True while the game is running one attempt on the editor's behalf.
+   *
+   * A preview is a real run of the real scenario — that is the point of it —
+   * but it is one slot long, it scores nothing, and it ends back in the editor
+   * rather than on the results screen.
+   */
+  #previewing = false;
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
   /**
@@ -427,6 +445,7 @@ export class GameApp {
     );
 
     this.#buildStartScreen();
+    this.#buildEditorEntry(params);
     this.#buildPregameControls();
     this.#buildHistory("hud-history");
     this.#buildHistory("results-history");
@@ -434,6 +453,7 @@ export class GameApp {
     this.#setupDebugPanel(params);
 
     this.#showScreen("start");
+    if (this.#openEditorOnBoot) this.#openEditor();
     requestAnimationFrame(() => this.#frame());
   }
 
@@ -443,7 +463,7 @@ export class GameApp {
 
   #showScreen(screen: Screen): void {
     this.#screen = screen;
-    for (const id of ["start", "calibrate", "pregame", "game", "results"] as const) {
+    for (const id of ["start", "calibrate", "pregame", "game", "results", "editor"] as const) {
       const element = document.getElementById(`screen-${id}`);
       if (element) element.dataset["active"] = String(id === screen);
     }
@@ -474,6 +494,80 @@ export class GameApp {
           ? "Timing not measured yet — the check takes about 20 seconds."
           : `Timing measured: ${stored >= 0 ? "+" : "−"}${Math.abs(stored)} ms of your own.`;
     }
+  }
+
+  /**
+   * The editor's way in. `?dev=1` shows the button; `?dev=1&editor=1` opens it
+   * outright, which is what a save's own page reload comes back to.
+   */
+  #buildEditorEntry(params: URLSearchParams): void {
+    const button = document.getElementById("start-editor");
+    if (!(button instanceof HTMLButtonElement)) return;
+    button.hidden = !this.#devMode;
+    if (!this.#devMode) return;
+    button.addEventListener("click", () => this.#openEditor());
+    // Opened after `start()` has shown the start screen, not here: this runs
+    // while the screens are still being built, and the start screen would come
+    // up over the top of it.
+    this.#openEditorOnBoot = params.get("editor") === "1";
+  }
+
+  /**
+   * Opens the editor, silencing the game's own backing first.
+   *
+   * The editor has its own kit on the same transport and the same bus, and two
+   * kits playing one beat is a flam, not a pulse (`AGENTS.md` §13). The
+   * transport itself keeps running: the beat does not stop.
+   */
+  #openEditor(): void {
+    this.#bass?.stop();
+    this.#drums?.stop();
+    this.#editorPlayback ??= new EditorPlayback(this.#audio, this.#transport);
+    if (!this.#editor) {
+      const host: EditorHost = {
+        preview: (options) => this.#previewScenario(options),
+        exit: () => {
+          this.#debug?.setEnabled(this.#devMode);
+          this.#showScreen("start");
+        },
+      };
+      this.#editor = new EditorScreen(host, this.#editorPlayback, this.#setup.tempoId);
+    }
+    // So a save's page reload comes back here rather than to the start screen.
+    const url = new URL(window.location.href);
+    url.searchParams.set("dev", "1");
+    url.searchParams.set("editor", "1");
+    window.history.replaceState(null, "", url);
+
+    // The dev panel is a fixed overlay in the top-right, which is exactly where
+    // the editor keeps its loop handle and its Back button.
+    this.#debug?.setEnabled(false);
+    this.#editor.enter();
+    this.#showScreen("editor");
+  }
+
+  /**
+   * One attempt of the scenario the editor is holding, autoplayed.
+   *
+   * The real run shell, the real scenario, the real judgment — the editor
+   * installed its (possibly unsaved) scenario into the library, and everything
+   * from here is the game. Nothing is scored: `#finishRun` returns to the
+   * editor before a high score is recorded, because a fake guitarist's run at
+   * 100% is not somebody's best shot.
+   */
+  async #previewScenario(options: {
+    scenario: ScenarioDefinition;
+    difficulty: number;
+    accuracy: AutoplayMode;
+  }): Promise<void> {
+    this.#previewing = true;
+    this.#devScenarioId = options.scenario.id;
+    this.#devLevel = options.difficulty;
+    // A scenario created in this session has art nothing has loaded yet.
+    await this.#assets.load(options.scenario.assetUrls);
+    await this.#enterPregame();
+    await this.#setAutoplayMode(options.accuracy);
+    this.#beginRun();
   }
 
   #buildHistory(containerId: string): void {
@@ -1337,9 +1431,13 @@ export class GameApp {
       bpm: tempoById(this.#setup.tempoId).bpm,
       // Dev-only. Normal play always uses the design's fixed difficulty curve
       // and random scenario selection.
-      ...(this.#devLevel !== null
-        ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
-        : {}),
+      // A preview is one slot: the editor asked to see this level, not to grind
+      // sixteen of it.
+      ...(this.#previewing && this.#devLevel !== null
+        ? { difficultySequence: [this.#devLevel] }
+        : this.#devLevel !== null
+          ? { difficultySequence: Array.from({ length: 16 }, () => this.#devLevel as number) }
+          : {}),
       ...(this.#devScenarioId !== null ? { pinnedScenarioId: this.#devScenarioId } : {}),
     });
     this.#current = null;
@@ -1612,6 +1710,20 @@ export class GameApp {
     // Back to the bare pulse: there is no upcoming phrase to warn about.
     this.#refreshDrumBeat();
 
+    // A preview ends where it started, and before anything is recorded: the
+    // high score table is for people with guitars.
+    if (this.#previewing) {
+      this.#previewing = false;
+      this.#devScenarioId = null;
+      this.#devLevel = null;
+      void this.#setAutoplayMode("off");
+      this.#bass?.stop();
+      this.#drums?.stop();
+      this.#editor?.enter();
+      this.#showScreen("editor");
+      return;
+    }
+
     const summary = run.summary;
     const tempo = tempoById(this.#setup.tempoId);
     recordHighScore(tempo.id, summary.totalScore);
@@ -1664,6 +1776,9 @@ export class GameApp {
   #frame(): void {
     this.#frameMeter.begin(performance.now());
     try {
+      // Before `#tick`, which returns early with no transport: the editor draws
+      // whether or not a beat is running, because it is a document, not a game.
+      this.#editor?.frame();
       this.#tick();
     } catch (error) {
       console.error("[goaterizer] frame failed", error);

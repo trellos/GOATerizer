@@ -351,7 +351,7 @@ export const AUTOPLAY_DEFAULT_SEED = 1;
  * recognizer drops the occasional onset, so the achieved rate runs a little
  * under. The deterministic test provider hits them exactly.
  */
-export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25 } as const;
+export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25, "0": 0 } as const;
 
 /**
  * Of the opportunities a tier does *not* hit, the share played as an audible
@@ -362,6 +362,16 @@ export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25
  * mode is to make failure legible.
  */
 export const AUTOPLAY_WRONG_SHARE = 0.7;
+
+/**
+ * The share at the 0% tier, which is all of them.
+ *
+ * At every other tier a fumble is sometimes just silence, because that is what
+ * a real player's bad run sounds like. The 0% tier exists to make a minigame
+ * fail audibly — it is what the editor's Preview offers as its worst case — and
+ * a bar of silence shows nothing.
+ */
+export const AUTOPLAY_WRONG_SHARE_AT_ZERO = 1;
 
 /**
  * Timing jitter on a hit, as a fraction of that target's *clamped Good* window.

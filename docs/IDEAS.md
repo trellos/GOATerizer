@@ -72,6 +72,39 @@ than as the clipper working harder.
 
 ---
 
+## Open — left behind by the minigame editor
+
+**The `scripts/author-*.mjs` tools are now the second way to author notes, and
+one of them is broken.** `author-rocky-scenarios.mjs` throws partway through:
+it knows four difficulties per Rocky scenario and the files have six, so it
+rewrites Rocky Ascent's L5/L6 with its own stale idea of them and then dies on
+Rocky Descent L2 (14 waypoints for 24 opportunities). It was already broken
+before the editor existed. Now that notes are authored in a GUI, the scripts'
+remaining value is the *non-note* content they generate — asset bindings,
+placeholder-source prose, and in Rocky's case the `ROUTES` specs that shaped its
+waypoint paths, which is the only record of how those curves were made. Deciding
+what to keep of that is its own change: either fix the level ranges, or cut the
+scripts down to the parts the editor does not cover.
+
+**The editor cannot widen a scenario's `degreeVocabulary`.** Lanes outside it
+are locked, which is right — Can Crushing declares `["1"]` because its performer
+stands at one lane — but changing that declaration means editing the file by
+hand. If it turns out authors do that often, it wants a control.
+
+**A scenario created in the editor shares the art of the one it was copied
+from** (`assetDirectory` + `assetScenarioId`). That is what makes a new scenario
+playable immediately, and it is also a thing an author can forget they are still
+doing. There is nothing that warns when a scenario ships pointing at another
+scenario's art.
+
+**Where a level's `visual` prose no longer matches its notes.** The editor keeps
+every authored string in a level — `levelCharacter`, `routeCharacter`, the
+`variants` line that spells the phrase out in a private notation — and updates
+none of them, because they are somebody's writing. After an edit they can
+describe a level that no longer exists.
+
+---
+
 ## Open — design decisions parked
 
 ### The G string can only ever offer one hand position

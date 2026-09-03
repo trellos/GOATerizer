@@ -83,6 +83,22 @@ export function assetDirectoryOf(raw: unknown): string {
   return id.replace(/_/g, "-");
 }
 
+/**
+ * Whose art a scenario uses, for the ids a family derives by convention.
+ *
+ * The companion to {@link assetDirectoryOf}: one says where the art lives, this
+ * says what it is called. Both default to the scenario's own id and are only
+ * ever set on a scenario the editor cloned from another.
+ */
+export function assetScenarioIdOf(raw: unknown): string {
+  const root = raw as Record<string, unknown>;
+  const declared = root["assetScenarioId"];
+  if (typeof declared === "string" && declared !== "") return declared;
+  const id = root["id"];
+  if (typeof id !== "string" || id === "") throw new Error("scenario has no id");
+  return id;
+}
+
 /** Placeholder art lives in the project's own asset tree, never hotlinked. */
 export function assetUrlResolver(raw: unknown): (assetId: string) => string {
   const directory = assetDirectoryOf(raw);

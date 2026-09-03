@@ -533,6 +533,27 @@ Never silently claim live guitar input is active when it is not.
 
 Use existing project conventions for dev-only tooling.
 
+### The minigame editor
+
+`src/editor/` is a dev-only GUI for authoring the note content of
+`docs/scenarios/*.scenario.json` (`?dev=1&editor=1`; `README.md` has the
+gestures, `DECISION_LOG.md` DECISION-052 the reasoning). Two rules govern
+changes to it:
+
+- **It derives, it does not invent.** Positions, rest spelling,
+  `noteOpportunityCount` and the star ladder are computed from the notes. A
+  family's own level data is fixed by that family through
+  `MinigameAuthoring.reconcileLevel` — never by the editor, which does not know
+  a waypoint from a flourish.
+- **It refuses rather than repairs.** A timeline that cannot be written down as
+  a prompt is reported in the author's terms and not saved. Save is gated on
+  `loadScenario`, so the editor cannot write a file the game would reject, and
+  it restates none of the loader's or a family's rules.
+
+It writes files only through the Vite dev server (`vite.config.ts`,
+`configureServer`). Do not add a path that writes scenario content from a built
+site.
+
 Useful debug information includes:
 
 - key

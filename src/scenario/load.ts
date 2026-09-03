@@ -279,10 +279,26 @@ export function loadScenario(
 
   // The minigame validates its own half. A scenario is free to carry whatever
   // shape its family asks for; this loader never looks inside either blob.
+  /*
+   * Which scenario this one's ART is named after.
+   *
+   * Normally itself. A family may derive asset ids from the scenario id by
+   * convention rather than making every scenario bind them by hand — CLIMB does
+   * exactly that for its two note-bar pieces — and that convention is what makes
+   * a *copy* of a scenario point at art that does not exist. So a scenario may
+   * say whose art it uses, exactly as `assetDirectory` says where that art
+   * lives, and the two together are what let the editor create a scenario that
+   * is playable before anybody has drawn anything for it.
+   */
+  const artId =
+    typeof root["assetScenarioId"] === "string" && root["assetScenarioId"] !== ""
+      ? root["assetScenarioId"]
+      : id;
+
   const config = minigame.parseConfig({
     classParameters: root["classParameters"],
     assetBindings: root["assetBindings"],
-    scenarioId: id,
+    scenarioId: artId,
   });
 
   const supportedLevels = arr(root["supportedLevels"], "scenario.supportedLevels").map((entry, i) =>

@@ -958,3 +958,219 @@ button.chip[data-selected="true"] {
     display: none;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Minigame editor                                                             */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * A three-row grid: the bar, the timeline, and the scenario's own data. The
+ * timeline takes whatever is left, because it is the thing being edited and
+ * the controls under it are a fixed list.
+ */
+#screen-editor[data-active="true"] {
+  display: grid;
+  grid-template-rows: var(--topbar-height) minmax(0, 1fr) auto;
+}
+
+/* The play screens get their inset from `.play-screen`; this one is its own
+   layout, so it states the same inset itself. */
+.editor-topbar {
+  border-bottom: 1px solid var(--line);
+  padding: 0 0.8rem;
+}
+
+/*
+ * The row is `minmax(0, 1fr)` rather than left to `auto` on purpose: a canvas
+ * with `height: 100%` inside an auto-height row resolves its height from its
+ * own `height` attribute, which `TimelineEditorView` sets from the laid-out
+ * size — a feedback loop that grows the canvas a little every frame until it is
+ * behind the controls.
+ */
+.editor-stage {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  padding: 0.6rem 0.8rem;
+  gap: 0.6rem;
+}
+
+#editor-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  /* The editor's gestures are drags; a text selection under one is noise. */
+  user-select: none;
+  touch-action: none;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-content: start;
+}
+
+.palette-chip {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  text-align: left;
+  cursor: grab;
+}
+
+.palette-chip[data-selected="true"] {
+  border-color: var(--accent-strong);
+  background: var(--panel-raised);
+}
+
+/*
+ * The swatch is the note as the timeline draws it: same shade, and a width
+ * proportional to the written duration. It is the palette's whole job to make
+ * a sixteenth and a triplet — three ticks and four — tell themselves apart.
+ */
+.palette-bar {
+  display: block;
+  height: 0.7rem;
+  border-radius: 2px;
+}
+
+.palette-bar[data-duration="whole"] {
+  width: 100%;
+  background: #bdeef9;
+}
+.palette-bar[data-duration="half"] {
+  width: 62%;
+  background: #8be5f7;
+}
+.palette-bar[data-duration="quarter"] {
+  width: 40%;
+  background: #5cc9e2;
+}
+.palette-bar[data-duration="eighth"] {
+  width: 26%;
+  background: #3fb9d6;
+}
+.palette-bar[data-duration="eighthTriplet"] {
+  width: 20%;
+  background: #7f9f5e;
+}
+.palette-bar[data-duration="sixteenth"] {
+  width: 14%;
+  background: #2b8ba4;
+}
+
+.editor-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem 0.8rem;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.editor-row {
+  display: flex;
+  gap: 1.2rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editor-field > span:first-child {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.editor-field-wide {
+  flex: 1 1 18rem;
+}
+
+.editor-scenario-row,
+.editor-tempo {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.editor-tempo b {
+  font-family: var(--mono);
+  min-width: 2.4rem;
+  text-align: center;
+}
+
+.editor-tempo em {
+  color: var(--text-dim);
+  font-style: normal;
+  font-size: 0.8rem;
+}
+
+#editor-family,
+#editor-scenario,
+#editor-accuracy {
+  font: inherit;
+  font-size: 0.9rem;
+  background: var(--panel-raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+}
+
+#editor-scenario {
+  flex: 1 1 auto;
+  min-width: 8rem;
+}
+
+/* A difficulty this scenario has not authored yet: still selectable — that is
+   how a level is started — but plainly not there yet. */
+#editor-levels button[data-authored="false"] {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.editor-premise textarea {
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  resize: vertical;
+  width: 100%;
+}
+
+.editor-problems {
+  margin: 0;
+  padding: 0.4rem 0.6rem 0.4rem 1.6rem;
+  border: 1px solid var(--bad);
+  border-radius: var(--radius);
+  background: rgba(255, 91, 91, 0.08);
+  color: var(--text);
+  font-size: 0.82rem;
+  max-height: 6rem;
+  overflow-y: auto;
+}
+
+#editor-status {
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
