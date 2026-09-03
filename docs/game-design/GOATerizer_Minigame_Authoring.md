@@ -85,13 +85,15 @@ onto the play area's. So `scale: 1` draws a sprite at the size it would be in a
 scene that tall: a 47px ram stands about a fifth of it, and a 15x60 accent flash
 stays tall and thin next to a 37x37 burst.
 
-The frame is a host convention rather than a measurement of any file — Rocky's
-backdrops were redrawn at 768x288 for detail without their sprites changing
-scale — so art drawn against a different scene wants a family-level `scale`
-rather than a new frame. Butt-Butt-BONK has one: its pack is drawn nearly three
-times larger than the generated art, and one constant brings the ram, the wolf
-and their impact effects down together, keeping the proportion they were drawn
-in.
+The frame is a host convention rather than a measurement of any file. Every
+shipped scenario composes into it today, but a backdrop is not a statement about
+the art in front of it — an art pass that briefly shipped Rocky's backdrops at
+768x288 with its sprites unchanged, since reverted, would have halved every
+actor in the game had the unit been read from that file. So art drawn against a
+different scene wants a family-level `scale`, not a new frame. Butt-Butt-BONK
+has one: its pack is drawn nearly three times larger than the generated art, and
+one constant brings the ram, the wolf and their impact effects down together,
+keeping the proportion they were drawn in.
 
 Sizing is from the frame's height alone, never its width, so it does not move
 with the window's aspect ratio. That is what lets a family place an actor by

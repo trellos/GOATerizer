@@ -24,11 +24,14 @@
  * be if it had been painted into a scene that tall — a 47px ram stands about a
  * fifth of the scene, which is what it was drawn as.
  *
- * The frame is a **host convention, not a measurement**: it is the size the
- * generated backdrops and both sprite-drawing families' art are drawn against,
- * but Rocky's backdrops were later redrawn at 768x288 for detail without their
- * sprites changing scale, so no file is authoritative for it. Pinning it here
- * is what keeps a redrawn backdrop from silently resizing every actor.
+ * The frame is a **host convention, not a measurement**. Every shipped scenario
+ * composes into it today, backdrop and sprites alike, so it could just as well
+ * be read from the scenario's own background image — but a backdrop is not a
+ * statement about the art standing in front of it. An art pass that briefly
+ * shipped Rocky's backdrops at 768x288 with its sprites unchanged (since
+ * reverted) is the demonstration: had the unit come from that file, every actor
+ * in the game would have halved without a line of code changing. It is pinned
+ * here instead, where changing it is a decision.
  *
  * Two alternatives were rejected. Sizing from the row height (what note art
  * does, where `scale: 1` means one row tall) throws the art's own proportions

@@ -72,7 +72,7 @@ const LEAP_HEIGHT = 0.55;
  * A sprite at `scale: 1` is the size it was drawn at, against the nominal scene
  * in `ui/timeline/stage-layer.ts`. This family's art came out of a third-party
  * pack drawn much larger than the generated art the other families use — the ram
- * is 47 art pixels tall where a Rocky goat is 26 — so at 1 it stands three and a
+ * is 47 art pixels tall where a Rocky goat is 18 — so at 1 it stands three and a
  * half lanes tall and swallows the wolf it is supposed to be butting. Both are
  * scaled together, keeping the proportion they were drawn in, into the roughly
  * two-lane range every other actor in the game occupies.
