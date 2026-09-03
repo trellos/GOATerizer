@@ -1,23 +1,24 @@
 #!/usr/bin/env node
 /**
- * Generates placeholder pixel art for every built scenario: the four "Rocky"
- * `ClimbMinigame` scenarios, the one `RepeatMinigame` scenario (Can Crushing),
- * and the one `PerformMinigame` scenario (Goat Frontman).
+ * Generates placeholder pixel art for the assets that don't yet have real
+ * art: the destination cairn, dust and tick effects for the four "Rocky"
+ * `ClimbMinigame` scenarios; everything for the one `RepeatMinigame`
+ * scenario, Can Crushing; and everything but the crowd goat for the one
+ * `PerformMinigame` scenario, Goat Frontman.
  *
- * ## Why generated rather than downloaded
+ * ## Why some of this is still generated
  *
- * Each scenario file names third-party CC0 sources (karsiori's mountains and
- * rock piles, Spring Spring's goat strip and dust, CodeManu's effects pack).
- * They are the right *kind* of placeholder and are recorded in
- * `docs/assets/ASSET_SOURCES.md` as the intended swap-in. They are not what
- * ships today: the environment Rocky Ascent was first built in could not reach
- * itch.io or opengameart.org, so the honest options were to ship unverified art
- * or to draw substitutes.
- *
- * These are the substitutes: original work for this repository, CC0, no
- * third-party rights involved. Every one fills exactly the slot the scenario
- * binds, at the same pixel scale, so swapping the real sources in later is a
- * file replacement and nothing else.
+ * Each Rocky scenario file names third-party CC0/CC-BY sources (karsiori's
+ * mountains and rock piles, Spring Spring's goat strip and dust, CodeManu's
+ * effects pack). An environment that could reach itch.io and opengameart.org
+ * opened every one of them and verified licence and fit on the actual source
+ * page (`docs/assets/ASSET_SOURCES.md` has the full record). Three ids per
+ * family now ship that real art instead of being generated: the goat pose
+ * cycle, the background, and the foothold. The destination cairn had no
+ * matching shape in the rock-pile pack (it wants a tall stacked cairn; the
+ * pack only has wide flat rubble piles), and the dust/tick sources were
+ * rejected on fit — so those three ids per family are still drawn here:
+ * original work for this repository, CC0, no third-party rights involved.
  *
  * ## Why one script for six scenarios
  *
@@ -25,10 +26,9 @@
  * same `ClimbMinigame` shapes — a goat, a foothold, a cairn, dust, a tick, a
  * mountain backdrop — wearing different route and register data. Each
  * scenario's own file says the placeholder source families may be reused from
- * the normal version, so the drawing functions live once in
- * `scripts/lib/rocky-art.mjs` and this script just points them at four
- * directories and four id prefixes, with a distinct RNG seed per family so the
- * backgrounds and dust are not byte-identical across scenarios.
+ * the normal version, so the drawing functions for what's still generated
+ * live once in `scripts/lib/rocky-art.mjs` and this script just points them
+ * at four directories and four id prefixes.
  *
  * Can Crushing shares none of those shapes — it is a different class, a
  * different theme and a different palette — so its drawing functions live in
@@ -53,7 +53,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { background, dust, goal, goatFinish, goatPose, GOAT_LEGS, step, tick } from "./lib/rocky-art.mjs";
+import { dust, goal, tick } from "./lib/rocky-art.mjs";
 import {
   beachBackground,
   broAction,
@@ -68,16 +68,12 @@ import * as frontman from "./lib/frontman-art.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SCENARIOS_ROOT = path.resolve(here, "..", "public", "assets", "scenarios");
 
-/**
- * One entry per scenario directory. `seed` only varies the background/dust
- * noise pattern — same palette, same shapes, so the four families read as one
- * consistent visual set while not being literal duplicate files.
- */
+/** One entry per scenario directory that still gets generated assets. */
 const FAMILIES = [
-  { dir: "rocky-ascent", idPrefix: "rocky_ascent", seed: 0x60a7 },
-  { dir: "rocky-ascent-high", idPrefix: "rocky_ascent_high", seed: 0x60a7 + 1 },
-  { dir: "rocky-descent", idPrefix: "rocky_descent", seed: 0x60a7 + 2 },
-  { dir: "rocky-descent-high", idPrefix: "rocky_descent_high", seed: 0x60a7 + 3 },
+  { dir: "rocky-ascent", idPrefix: "rocky_ascent" },
+  { dir: "rocky-ascent-high", idPrefix: "rocky_ascent_high" },
+  { dir: "rocky-descent", idPrefix: "rocky_descent" },
+  { dir: "rocky-descent-high", idPrefix: "rocky_descent_high" },
 ];
 
 /** Writes one scenario directory. `assets` is asset id -> a factory for it. */
@@ -95,15 +91,17 @@ function writeScenarioAssets(dir, assets) {
   );
 }
 
-for (const { dir, idPrefix, seed } of FAMILIES) {
+// Three ids per family are intentionally NOT generated here any more: the
+// climber pose cycle (`goat_<idPrefix>_advance_01..04`, `_finish`), the
+// background (`bg_<idPrefix>`) and the foothold (`prop_<idPrefix>_step`) all
+// now ship real art (Mountain Goat Sprites by Sevarihk CC-BY 4.0, and
+// karsiori's mountains/rock-pile CC0 packs — see
+// docs/assets/ASSET_SOURCES.md) in all four directories below. Re-running
+// this generator must not clobber any of it. The destination cairn and the
+// two effects stay generated: no equivalent cairn shape was found in the
+// rock-pile pack, and the dust/tick sources were rejected on fit.
+for (const { dir, idPrefix } of FAMILIES) {
   writeScenarioAssets(dir, {
-    [`bg_${idPrefix}`]: () => background(undefined, seed),
-    [`goat_${idPrefix}_advance_01`]: () => goatPose(GOAT_LEGS[0]),
-    [`goat_${idPrefix}_advance_02`]: () => goatPose(GOAT_LEGS[1]),
-    [`goat_${idPrefix}_advance_03`]: () => goatPose(GOAT_LEGS[2]),
-    [`goat_${idPrefix}_advance_04`]: () => goatPose(GOAT_LEGS[3]),
-    [`goat_${idPrefix}_finish`]: () => goatFinish(),
-    [`prop_${idPrefix}_step`]: () => step(),
     [`prop_${idPrefix}_goal`]: () => goal(),
     // Dust keeps its own default seed regardless of family: it is a small,
     // generic effect, unlike the background, so there is no reason to vary it

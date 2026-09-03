@@ -6,6 +6,16 @@ repository's docs. Full provenance for every asset — including the CC0 ones,
 which do not require this file but are recorded anyway — lives in
 docs/assets/ASSET_SOURCES.md.
 
+Rocky Ascent (and its companions: Rocky Ascent High, Rocky Descent, Rocky
+Descent High) — climber pose cycle (goat_*_advance_01..04.png,
+goat_*_finish.png):
+
+  "Mountain Goat Sprites" by Sevarihk
+  https://opengameart.org/content/mountain-goat-sprites
+  License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  Used cropped, mirrored and downsampled from bergschaf-laufanimation-f.png
+  and bergschaf-bocksprung-f.png; no colour was changed.
+
 Goat Frontman — crowd goat (react_goat_frontman_neutral.png,
 react_goat_frontman_impressed.png):
 
@@ -13,3 +23,17 @@ react_goat_frontman_impressed.png):
   https://opengameart.org/content/mountain-goat-sprites
   License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
   Used cropped and downsampled; no colour was changed.
+
+Rocky Ascent (and its companions) — background (bg_*.png):
+
+  "FREE Pixel Art Mountains Tileset and Backgrounds" by karsiori
+  https://karsiori.itch.io/free-pixel-art-mountains-tileset-and-backgrounds
+  License: CC0
+  Composited from Mountains 1-4.png and Red Sky.png; no colour was changed.
+
+Rocky Ascent (and its companions) — foothold (prop_*_step.png):
+
+  "FREE Pixel Art Rock Pile Pack" by karsiori
+  https://karsiori.itch.io/pixel-art-rock-pile-pack
+  License: CC0
+  Used as downloaded, no edits.
