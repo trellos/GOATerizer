@@ -172,29 +172,43 @@ export type Layer =
  * To put an actor on a note, read that note's {@link PlacedNote.rect} from
  * {@link StageView.notes} — its rect is in exactly this space.
  *
- * `key` is the sprite's identity across frames. It must be stable and unique
- * within a scene: the host uses it to cross-fade a changed `assetId` and to
- * fade out a sprite that disappears. A minigame that regenerates keys every
- * frame simply loses those, and draws exactly as it asked to.
+ * `key` is the sprite's identity across frames, and must be stable and unique
+ * within a scene. The host draws what it is handed, frame by frame, and does
+ * not yet tween or cross-fade between two frames' answers — motion is the
+ * minigame's (see **Motion**, below). Keys are required now so that a fade on
+ * a changed `assetId`, or on a sprite that disappears, can be added later
+ * without every shipped family having to be rewritten to earn it.
  */
 export type Sprite = {
   readonly key: string;
   readonly assetId: string;
   readonly x: number;
   readonly y: number;
-  /** Multiplier on the sprite's natural size. Default 1. */
+  /**
+   * Multiplier on the sprite's natural size. Default 1.
+   *
+   * Natural size is the size the art was drawn at. Scenario art is small pixel
+   * art the runtime scales up, so one art pixel is fixed against a nominal
+   * 384x216 scene whose height is mapped onto the play area's: `scale: 1` is
+   * the size the sprite would be in a scene that tall, so a character drawn
+   * 47px tall stands about a fifth of it, here as in the art file. Art drawn
+   * against a different scene wants a `scale`, not a different frame.
+   */
   readonly scale?: number;
-  /** Default 0. */
+  /**
+   * Default 0. Turned about the anchor, so a `"bottom"`-anchored actor leans
+   * on its feet rather than swinging around its middle.
+   */
   readonly rotationDeg?: number;
   /** 0..1. Default 1. */
   readonly opacity?: number;
-  /** Default `"stage"`. */
+  /** Default `"over"`. */
   readonly layer?: Layer;
-  /** Order within a layer. Default 0. */
+  /** Order within a layer. Default 0. Ties break on array order. */
   readonly z?: number;
   /** Which point of the sprite sits at `(x, y)`. Default `"center"`. */
   readonly anchor?: "center" | "bottom";
-  /** Registration nudge in normalised panel units. Default 0. */
+  /** Registration nudge, added to `y` in the same units. Default 0. */
   readonly offsetY?: number;
 };
 
