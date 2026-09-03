@@ -97,6 +97,13 @@ playable immediately, and it is also a thing an author can forget they are still
 doing. There is nothing that warns when a scenario ships pointing at another
 scenario's art.
 
+**The editor has no browser-validation coverage.** `scripts/browser-validate.mjs`
+drives the real game in Chromium and asserts on what it finds; the editor was
+verified the same way by hand (placing, dragging, the loop handle, Save writing
+a file, Preview at 0%, New/rename/delete) but none of that is in the suite. The
+model underneath it is unit-tested in `tests/editor-model.test.ts`; what is
+uncovered is the canvas and the gestures.
+
 **Where a level's `visual` prose no longer matches its notes.** The editor keeps
 every authored string in a level — `levelCharacter`, `routeCharacter`, the
 `variants` line that spells the phrase out in a private notation — and updates

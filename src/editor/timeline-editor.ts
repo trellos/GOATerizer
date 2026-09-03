@@ -600,13 +600,20 @@ export class TimelineEditorView {
         style: remembered ? "remembered" : "live",
         selected: document.selection.has(note.id),
         hovered: this.#hoverNoteId === note.id,
+        grip: this.#hoverNoteId === note.id && this.#hoverResize,
       });
     }
   }
 
   #drawNote(
     note: EditorNote,
-    options: { style: "live" | "remembered" | "repeat" | "ghost"; selected?: boolean; hovered?: boolean }
+    options: {
+      style: "live" | "remembered" | "repeat" | "ghost";
+      selected?: boolean;
+      hovered?: boolean;
+      /** The pointer is on this note's right edge, where a drag resizes it. */
+      grip?: boolean;
+    }
   ): void {
     const ctx = this.#ctx;
     const x = this.#xOfTick(note.startTick);
@@ -640,13 +647,19 @@ export class TimelineEditorView {
     ctx.lineWidth = options.selected ? 2 : 1;
     ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(width), Math.round(height));
 
-    // The resize grip, shown only on the note under the pointer: `<>` centred
-    // on the right edge, as the mockup draws it.
-    if (options.hovered && this.#gesture.kind === "none") {
-      ctx.fillStyle = COLORS.selected;
-      ctx.font = `${Math.min(11, height)}px ui-monospace, monospace`;
+    // The resize grip: `<>` centred on the right edge, as the mockup draws it,
+    // and shown exactly when a drag from here would resize rather than move —
+    // the same moment the cursor becomes a resize arrow.
+    if (options.grip && this.#gesture.kind === "none") {
+      ctx.font = `bold ${Math.max(11, Math.min(15, height * 0.4))}px ui-monospace, monospace`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      // Outlined, because it is drawn straddling the note's own edge: half of
+      // it lands on the bar and half on the lane behind it.
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = COLORS.ground;
+      ctx.strokeText("<>", x + width, y + height / 2);
+      ctx.fillStyle = COLORS.selected;
       ctx.fillText("<>", x + width, y + height / 2);
     }
     ctx.restore();
