@@ -99,62 +99,43 @@ const DURATION_BEATS = { whole: 4, half: 2, quarter: 1, eighth: 0.5, sixteenth: 
 /* The designer's variants, verbatim                                           */
 /* -------------------------------------------------------------------------- */
 
-const VARIANTS = {
-  1: {
-    // Call and answer around the root: the step below the octave, home, the
-    // step above, home again.
-    1: "5Q 1Q 2Q 1QF",
-    // The same shape with a doubled eighth-note pickup.
-    2: "5E 5E 1Q 2Q 1QF",
-    // Wider: a third above, home, a fourth above, home.
-    3: "3Q 1Q 4Q 1QF",
-    // The one variant that never touches the root — it climbs and steps back.
-    4: "3Q 4Q 5Q 4Q",
-  },
-  3: {
-    // L1 v1 with the pickup in eighths and the resolution held for a half.
-    1: "5E 1E 2Q 1HF",
-    // L1 v2 in eighths, with a rest and the flourish moved off the beat.
-    2: "5E 5E 1E 2E 1Q RE 2EF",
-    // L1 v3 in eighths, resolving up onto the octave root instead of home.
-    3: "3E 1E 4E 1Q RE 6Q",
-    // A run up and back down, resolving onto the root.
-    4: "2E 3E 4Q 3E 2E 1Q",
-  },
-};
-
 /**
- * Which variants each level plays, measure by measure.
+ * The designer's full four-measure phrases, verbatim, one per level.
  *
- * L1 and L3 repeat one variant; L2 and L4 pick two. L2 plays them AABB so the
- * switch happens once, L4 plays them ABAB so the player changes lick every
- * bar — that is the extra difficulty the pick order can carry, and the only
- * thing "in any order" is allowed to mean once it is written down.
+ * Each is written as six pentatonic steps (p1..p6, root to octave root) —
+ * the lower half of the octave (1 2 3 4) for L1/L2, the upper half (4 5 6)
+ * for L3, and both halves back to back for L4. `F` marks the flourish: the
+ * note the goat rears back on. Every phrase totals 16 beats on its own, so
+ * nothing here is repeated by the builder — what is written is what plays.
  */
-const PICKS = {
-  1: { library: 1, order: [1, 1, 1, 1] },
-  2: { library: 1, order: [2, 2, 3, 3] },
-  3: { library: 3, order: [1, 1, 1, 1] },
-  4: { library: 3, order: [2, 3, 2, 3] },
+const LEVEL_PHRASES = {
+  // The full run root-to-root, twice, each capped by a two-beat breath.
+  1: "1Q 2Q 3Q 4Q 5Q 6QF RH 1Q 2Q 3Q 4Q 5Q 6QF RH",
+  // A tighter three-note cell (root, second, third) cycled and resolved, twice.
+  2: "1Q 2Q 3Q 1Q 2Q 3Q 1QF RQ 1Q 2Q 3Q 1Q 2Q 3Q 1QF RQ",
+  // The same run-and-breath shape as L1, transposed to the octave's upper half.
+  3: "4Q 5Q 6Q 4Q 5Q 6QF RH 4Q 5Q 6Q 4Q 5Q 6QF RH",
+  // The upper-half run once, then the tighter three-note cell once — the two
+  // hardest phrases, back to back rather than repeated.
+  4: "4Q 5Q 6Q 4Q 5Q 6QF RH 1Q 2Q 3Q 1Q 2Q 3Q 1QF RQ",
 };
 
 /**
  * How many crowd goats one flourish summons. The designer's rule is "the
- * higher the difficulty level, the more goats"; this is the per-flourish
- * count, and the totals it produces over a phrase are 4 / 8 / 12 / 12. L4 has
- * half as many flourishes as L3, so it summons twice as many per flourish
- * rather than ending with a thinner crowd than the level below it.
+ * higher the difficulty level, the more goats"; every level now authors the
+ * same two flourishes per phrase, so the escalation lives entirely in this
+ * per-flourish count. The totals it produces over a phrase are 4 / 8 / 12 / 16.
  */
-const GOATS_PER_FLOURISH = { 1: 1, 2: 2, 3: 3, 4: 6 };
+const GOATS_PER_FLOURISH = { 1: 1, 2: 2, 3: 3, 4: 4 };
 
 /** How many goats fit in the wings. Drawn from one sprite, transform-varied. */
 const CROWD_CAPACITY = 24;
 
 const LEVEL_CHARACTER = {
-  1: "one lick, four times over; a flourish on every downbeat-to-be, and one goat wanders in for each",
-  2: "two licks, each twice — eighths first, then the wide leap to the fourth",
-  3: "the lick in eighths with a held flourish at the end of every bar",
-  4: "the two hardest licks alternating every bar, with a rest and an off-beat flourish to land",
+  1: "the run up the octave, root to root, twice over, each capped by a two-beat breath",
+  2: "a tighter three-note cell cycled into a resolving flourish, twice",
+  3: "the same run-and-breath shape as L1, transposed to the octave's upper half",
+  4: "the upper-half run once, then the tighter three-note cell once — the two hardest phrases back to back",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -172,18 +153,8 @@ function parseToken(word) {
   return [duration, degree === "R" ? null : `p${degree}`, flourish === "F"];
 }
 
-function parseVariant(text) {
-  const events = text.split(/\s+/).map(parseToken);
-  const beats = events.reduce((sum, [duration]) => sum + DURATION_BEATS[duration], 0);
-  if (beats !== BEATS_PER_MEASURE) {
-    throw new Error(`variant ${JSON.stringify(text)} totals ${beats} beats, expected ${BEATS_PER_MEASURE}`);
-  }
-  return events;
-}
-
 function buildPrompt(difficulty) {
-  const pick = PICKS[difficulty];
-  const phrase = pick.order.flatMap((variant) => parseVariant(VARIANTS[pick.library][variant]));
+  const phrase = LEVEL_PHRASES[difficulty].split(/\s+/).map(parseToken);
 
   let beat = 0;
   const events = phrase.map(([duration, token, flourish], index) => {
@@ -215,7 +186,6 @@ function buildLevel(difficulty) {
   const maxPoints = notes.length * POINTS_PERFECT;
   const attemptMax = maxPoints * ATTEMPT_REPEATS;
   const flourishBeats = prompt.filter((event) => event.flourish).map((event) => event.startBeat);
-  const pick = PICKS[difficulty];
 
   return {
     difficulty,
@@ -232,7 +202,7 @@ function buildLevel(difficulty) {
     authoredBeatCount: ATTEMPT_BEATS,
     visual: {
       levelCharacter: LEVEL_CHARACTER[difficulty],
-      variants: pick.order.map((variant) => `L${pick.library} variant ${variant}: ${VARIANTS[pick.library][variant]}`),
+      variants: [`L${difficulty}: ${LEVEL_PHRASES[difficulty]}`],
       visualSpanMeasures: 4,
       resetBetweenMeasures: false,
       flourishBeats,
@@ -258,8 +228,8 @@ function buildLevel(difficulty) {
     scoring: {
       streakBonusEligible: false,
       note:
-        "Blues Lick material is quarters, eighths and a held half, not the sixteenth material " +
-        "GDD §9.2 makes streak-eligible. The streak is still tracked.",
+        "Blues Lick material is quarters, not the sixteenth material GDD §9.2 makes streak-eligible. " +
+        "The streak is still tracked.",
     },
   };
 }
@@ -370,26 +340,22 @@ const scenario = {
     },
   ],
   variantLibrary: Object.fromEntries(
-    Object.entries(VARIANTS).map(([library, variants]) => [
-      `L${library}`,
-      Object.fromEntries(Object.entries(variants).map(([n, text]) => [`variant ${n}`, text])),
-    ])
+    Object.entries(LEVEL_PHRASES).map(([level, text]) => [`L${level}`, { phrase: text }])
   ),
   productionNotes: [
     "Authored from the designer's pentatonic notation; see scripts/author-goat-frontman.mjs for the notation and the level rules.",
     "The canonical catalogue lists Goat Frontman at L2–6. The designer's authoring brief for this scenario specifies L1–4, which wins (AGENTS.md §20); L5–7 are unauthored.",
-    "L2 and L4 pick two variants each from the previous library. The picks are fixed here, not rolled per attempt: the game does not procedurally choose exercises. The unpicked variants stay in `variantLibrary`.",
+    "Each level authors its own full four-measure phrase directly, rather than picking measures from a shared variant library: L1/L3 repeat one six-note run twice, L2 repeats one three-note cell twice, and L4 plays the L3 run once followed by the L2 cell once.",
     "The flourish `F` is authored per note (`prompt[].flourish`) and mirrored into `visual.flourishBeats`, which is what the runtime reads. A test keeps the two equal.",
-    "Every authored note sits inside the timeline's one-octave span, root to root, so nothing is folded, clamped or moved to be drawn. The first draft was written around a middle root with material below it; the two licks that dipped below the root were rewritten rather than displayed an octave up.",
+    "Every authored note sits inside the timeline's one-octave span, root to root, so nothing is folded, clamped or moved to be drawn.",
     "The phrase tables and star thresholds are regenerable via scripts/author-goat-frontman.mjs.",
   ],
   designerReview: {
     blockingIssues: [],
     nonBlockingTBD: [
       "Star thresholds are authored but PROVISIONAL — see each level's `stars.note`.",
-      "L1 variant 4 and L3 variant 4 are authored but unpicked; variant 4 is the only lick in either library that never lands on the root, which is why it is not the one a level repeats.",
-      "The licks resolve to the root rather than around it, because the timeline has no lanes below the root. If it ever spans two octaves, the middle-root versions in this scenario's history are the better material and worth restoring.",
-      "Timing windows are the global per-subdivision ones; 'harder timing at higher levels' is carried by the material (eighths, a rest, an off-beat flourish), not by scenario-specific windows.",
+      "goatsPerFlourish (1/2/3/4) is the only escalation across levels now that every level authors exactly two flourishes per phrase; not yet playtested against the previous flourish-count-driven ramp.",
+      "Timing windows are the global per-subdivision ones; all four levels are now quarter-note material, so 'harder timing at higher levels' is currently carried only by the wider melodic span (L3/L4 reach the upper half of the octave), not by rhythm. Worth revisiting if L1-L4 end up feeling too similar in difficulty.",
     ],
   },
   levels: Object.fromEntries([1, 2, 3, 4].map((level) => [String(level), buildLevel(level)])),

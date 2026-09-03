@@ -11,9 +11,8 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
-
 import goatFrontmanJson from "../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
 import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/game/attempt.js";
 import { RunState } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
@@ -151,18 +150,20 @@ describe("Goat Frontman scenario data", () => {
   it("is written in the designer's pentatonic notation, verbatim", () => {
     const tokens = (difficulty: number) =>
       level(difficulty).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "R")).join(" ");
-    // L1: variant 1 (5Q 1Q 2Q 1QF), four times.
-    expect(tokens(1)).toBe(Array(4).fill("p5 p1 p2 p1").join(" "));
-    // L3: variant 1 (5E 1E 2Q 1HF), four times.
-    expect(tokens(3)).toBe(Array(4).fill("p5 p1 p2 p1").join(" "));
+    // L1: the run root to root, twice.
+    expect(tokens(1)).toBe(Array(2).fill("p1 p2 p3 p4 p5 p6 R").join(" "));
+    expect(level(1).prompt.map((e) => e.duration)).toEqual(
+      Array(2).fill(["quarter", "quarter", "quarter", "quarter", "quarter", "quarter", "half"]).flat()
+    );
+    // L2: the tighter three-note cell, cycled and resolved, twice.
+    expect(tokens(2)).toBe(Array(2).fill("p1 p2 p3 p1 p2 p3 p1 R").join(" "));
+    // L3: the same run-and-breath shape as L1, transposed to the upper half.
+    expect(tokens(3)).toBe(Array(2).fill("p4 p5 p6 p4 p5 p6 R").join(" "));
     expect(level(3).prompt.map((e) => e.duration)).toEqual(
-      Array(4).fill(["eighth", "eighth", "quarter", "half"]).flat()
+      Array(2).fill(["quarter", "quarter", "quarter", "quarter", "quarter", "quarter", "half"]).flat()
     );
-    // L2: two L1 variants, each twice. L4: two L3 variants, alternating.
-    expect(tokens(2)).toBe("p5 p5 p1 p2 p1 p5 p5 p1 p2 p1 p3 p1 p4 p1 p3 p1 p4 p1");
-    expect(tokens(4)).toBe(
-      "p5 p5 p1 p2 p1 R p2 p3 p1 p4 p1 R p6 p5 p5 p1 p2 p1 R p2 p3 p1 p4 p1 R p6"
-    );
+    // L4: L3's run once, then L2's cell once.
+    expect(tokens(4)).toBe("p4 p5 p6 p4 p5 p6 R p1 p2 p3 p1 p2 p3 p1 R");
   });
 
   it("authors nothing outside the timeline's own octave, in either mode", () => {
@@ -196,8 +197,8 @@ describe("Goat Frontman scenario data", () => {
     expect([...performLevelData(level(difficulty).data).flourishBeats]).toEqual(marked);
   });
 
-  it("puts one flourish in every L1 measure, on the last beat", () => {
-    expect([...performLevelData(level(1).data).flourishBeats]).toEqual([3, 7, 11, 15]);
+  it("puts a flourish on the top note of each of L1's two runs", () => {
+    expect([...performLevelData(level(1).data).flourishBeats]).toEqual([5, 13]);
   });
 
   it("draws a bigger crowd per flourish the higher the level", () => {
@@ -226,8 +227,8 @@ describe("Goat Frontman scenario data", () => {
   it("transposes into a major key and a minor key as different lanes for the same lick", () => {
     const minor = harness(1, G_MINOR).attempt.targets.slice(0, 4).map((t) => t.lane);
     const major = harness(1, D_MAJOR).attempt.targets.slice(0, 4).map((t) => t.lane);
-    expect(minor).toEqual([6, 0, 2, 0]); // b7 1 b3 1
-    expect(major).toEqual([5, 0, 1, 0]); // 6  1 2  1
+    expect(minor).toEqual([0, 2, 3, 4]); // 1 b3 4 5
+    expect(major).toEqual([0, 1, 2, 4]); // 1 2  3 5
   });
 });
 
@@ -254,7 +255,7 @@ describe("PerformMinigame on the timeline", () => {
       if (flourishes.has(index)) expect(art.overlay?.assetId).toBe(FRONTMAN.bindings.noteArt.flourish);
       else expect(art.overlay).toBeUndefined();
     }
-    expect(flourishes.size).toBe(4 * ATTEMPT_REPEATS);
+    expect(flourishes.size).toBe(2 * ATTEMPT_REPEATS);
   });
 
   it("cycles the pose on an ordinary note and summons nobody", () => {
@@ -288,21 +289,28 @@ describe("PerformMinigame on the timeline", () => {
   });
 
   it("holds a half-note flourish longer than a quarter-note one", () => {
-    const short = harness(1);
-    const long = harness(3);
-    for (const h of [short, long]) {
-      const { flourish } = firstTargets(h.attempt);
-      h.advanceTo(flourish.startBeat);
-      h.playAt(flourish.midi, flourish.startBeat);
-      h.advanceTo(flourish.startBeat + 0.01);
-    }
-    const at = (h: ReturnType<typeof harness>, dt: number) => {
-      const { flourish } = firstTargets(h.attempt);
-      h.advanceTo(flourish.startBeat + dt);
-      return spriteAt(h.attempt, "performer", flourish.startBeat + dt).assetId;
+    // No authored level currently has a non-quarter flourish, so this drives
+    // PerformMinigame directly with a synthetic opportunity of each duration
+    // rather than reading it off scenario content.
+    const view = { beat: 0, notes: [], laneCount: 8, strikeX: 0.5, span: { from: 0, to: 1 }, measure: { width: 0.4, beatWidth: 0.1 } };
+    const at = (duration: "quarter" | "half", beat: number) => {
+      const data = PERFORM_MINIGAME.parseLevel(
+        { visual: { visualSpanMeasures: 4, resetBetweenMeasures: false, flourishBeats: [0], goatsPerFlourish: 1 } },
+        { noteOpportunityCount: 1, measures: 4 }
+      );
+      const minigame = PERFORM_MINIGAME.create({
+        config: FRONTMAN,
+        data,
+        assets: [],
+        plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
+        opportunities: [{ index: 0, startBeat: 0, durationBeats: duration === "half" ? 2 : 1, duration, lane: 0, midi: 60 }],
+      }) as PerformMinigame;
+      minigame.onJudged({ id: 0, outcome: "perfect", opportunityIndex: 0, playedMidi: 60, lane: 0, beat: 0 }, 0);
+      minigame.update(beat);
+      return minigame.render({ ...view, beat }).sprites?.find((s) => s.key === "performer")?.assetId;
     };
-    expect(FRONTMAN.bindings.flourishPoses).toContain(at(long, 1.5));
-    expect(FRONTMAN.bindings.performerPoses).toContain(at(short, 1.5));
+    expect(FRONTMAN.bindings.flourishPoses).toContain(at("half", 1.5));
+    expect(FRONTMAN.bindings.performerPoses).toContain(at("quarter", 1.5));
   });
 
   it("brings a goat in from the wing for a flourish, walking rather than appearing", () => {
@@ -325,7 +333,7 @@ describe("PerformMinigame on the timeline", () => {
 
   it("summons more goats per flourish at a higher level, and never fewer overall", () => {
     const crowds = LEVELS.map((d) => performIn(playFlawlessly(d).attempt).progress.crowd);
-    expect(crowds[0]).toBe(4 * ATTEMPT_REPEATS); // one per L1 flourish, on both passes
+    expect(crowds[0]).toBe(2 * ATTEMPT_REPEATS); // one per L1 flourish, on both passes
     for (let i = 1; i < crowds.length; i += 1) expect(crowds[i]!).toBeGreaterThanOrEqual(crowds[i - 1]!);
     expect(crowds[3]!).toBeGreaterThan(crowds[0]!);
   });
@@ -349,8 +357,8 @@ describe("PerformMinigame on the timeline", () => {
   it("draws half the crowd for a Good flourish", () => {
     const perfect = harness(4);
     const good = harness(4);
-    // L4's first flourish is an eighth, whose Good window is a quarter beat.
-    for (const [h, late] of [[perfect, 0], [good, 0.18]] as const) {
+    // L4's first flourish is a quarter note: Perfect is within 0.18 beats, Good within 0.5.
+    for (const [h, late] of [[perfect, 0], [good, 0.3]] as const) {
       const { flourish } = firstTargets(h.attempt);
       h.advanceTo(flourish.startBeat);
       h.playAt(flourish.midi, flourish.startBeat, late);
@@ -397,14 +405,26 @@ describe("PerformMinigame on the timeline", () => {
   });
 
   it("impresses the crowd at two stars and pays off at three", () => {
-    const { attempt, result } = playFlawlessly(1);
-    expect(result.stars).toBe(3);
+    // Not playFlawlessly: its final advanceTo(ATTEMPT_BEATS) outlives the
+    // payoff effect's short life (PAYOFF_BEATS), so it must be sampled right
+    // after ★★★ locks — on the attempt's last note — not at the very end.
+    const h = harness(1);
+    for (const target of h.attempt.targets) {
+      h.advanceTo(target.startBeat);
+      h.playAt(target.midi, target.startBeat);
+      h.advanceTo(target.startBeat + 0.001);
+    }
+    const { attempt } = h;
+    const lastNoteBeat = attempt.targets[attempt.targets.length - 1]!.startBeat;
     expect(performIn(attempt).progress.impressed).toBe(true);
-    const crowd = crowdAt(attempt, 16.01);
+    const crowd = crowdAt(attempt, lastNoteBeat + 0.01);
     expect(crowd.length).toBeGreaterThan(0);
     for (const goat of crowd) expect(goat.assetId).toBe(FRONTMAN.bindings.audienceStates[1]);
-    const stage = stageOf(attempt, 16.01);
+    const stage = stageOf(attempt, lastNoteBeat + 0.01);
     expect((stage.sprites ?? []).some((s) => s.assetId === FRONTMAN.bindings.payoffEffects[0])).toBe(true);
+
+    h.advanceTo(ATTEMPT_BEATS);
+    expect(attempt.result?.stars).toBe(3);
   });
 
   it("takes the finish pose when the attempt passes, in front of the crowd it earned", () => {
@@ -465,7 +485,8 @@ describe("PerformMinigame content rules", () => {
         midi: t.midi,
       })),
     }) as PerformMinigame;
-    for (const index of [3, 7, 11, 15]) {
+    // L1's two flourish opportunities (index 5, 11 per authored pass), across both attempt repeats.
+    for (const index of [5, 11, 17, 23]) {
       minigame.onJudged({ id: index, outcome: "perfect", opportunityIndex: index, playedMidi: 60, lane: 0, beat: index }, index);
     }
     expect(minigame.progress.crowd).toBe(2);
