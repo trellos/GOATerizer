@@ -62,15 +62,43 @@ type Stage = {
 All three are optional. A minigame returning `{}` is invisible and the timeline
 renders exactly as the host draws it alone.
 
-> **What is wired today.** `notes` is drawn (DECISION-044). `background` and
-> `sprites` are not yet: the scenario backdrop is still its own canvas behind
-> the timeline, so a background clipped to your `span` would be a second,
-> disagreeing answer about where the art goes, and the two actors are still
-> drawn by `ui/timeline/actor-layer.ts` and `repeat-layer.ts` through a
-> transitional `prototypeLayer()` hook. Return them anyway — the contract is
-> what a new family should be written against, and both are read once the
-> backdrop folds onto the timeline canvas and the crusher's solved arm is baked
-> to a pose ladder.
+> **What is wired today.** `notes` is drawn (DECISION-044) and so is `sprites`
+> (DECISION-050, `ui/timeline/stage-layer.ts`) — a family with no prototype
+> layer of its own, which is every family from here on, is its sprites and
+> nothing else. `background` is not read yet: the scenario backdrop is still its
+> own canvas behind the timeline, fed by `backgroundId()`, so a background
+> clipped to your `span` would be a second, disagreeing answer about where the
+> art goes. Return it anyway — the contract is what a new family should be
+> written against, and it is read once the backdrop folds onto the timeline
+> canvas. The two prototype actors are still drawn by
+> `ui/timeline/actor-layer.ts` and `repeat-layer.ts` through the transitional
+> `prototypeLayer()` hook, until the crusher's solved arm is baked to a pose
+> ladder.
+
+### How big a sprite is
+
+`scale` multiplies the sprite's **natural size**, and natural size is the size
+the art was drawn at. Scenario art is small pixel art the runtime scales up, so
+one art pixel needs a fixed exchange rate: the **nominal scene**, 384x216 — the
+size each generator under `scripts/` composes into — whose *height* is mapped
+onto the play area's. So `scale: 1` draws a sprite at the size it would be in a
+scene that tall: a 47px ram stands about a fifth of it, and a 15x60 accent flash
+stays tall and thin next to a 37x37 burst.
+
+The frame is a host convention rather than a measurement of any file. Every
+shipped scenario composes into it today, but a backdrop is not a statement about
+the art in front of it — an art pass that briefly shipped Rocky's backdrops at
+768x288 with its sprites unchanged, since reverted, would have halved every
+actor in the game had the unit been read from that file. So art drawn against a
+different scene wants a family-level `scale`, not a new frame. Butt-Butt-BONK
+has one: its pack is drawn nearly three times larger than the generated art, and
+one constant brings the ram, the wolf and their impact effects down together,
+keeping the proportion they were drawn in.
+
+Sizing is from the frame's height alone, never its width, so it does not move
+with the window's aspect ratio. That is what lets a family place an actor by
+arithmetic — hooves at `y = 1.27`, horns reaching `0.994` — and have it hold at
+every viewport.
 
 ---
 

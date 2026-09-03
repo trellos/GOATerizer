@@ -29,12 +29,13 @@ import type { Fingering } from "../../music/fingering.js";
 import { formatFretPosition } from "../../music/fingering.js";
 import { laneLabel, laneMidiNotes, type RunKey } from "../../music/keys.js";
 import { LANE_COUNT } from "../../music/degrees.js";
-import type { NoteArt, PlacedNote, Stage, StageView } from "../../minigame/api.js";
+import type { Layer, NoteArt, PlacedNote, Stage, StageView } from "../../minigame/api.js";
 import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
 import type { AssetStore } from "../assets.js";
 import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
 import { drawRepeatPerformer, NO_REPEAT_SPRITES, type RepeatSprites } from "./repeat-layer.js";
+import { drawStageSprites, type StageGeometry } from "./stage-layer.js";
 import type {
   PlayedNote,
   TargetNote,
@@ -384,10 +385,16 @@ export class TimelineView {
 
     this.#drawBeatGrid(nowBeat);
     this.#drawRows();
+    // Scenery, behind the bars and behind the harmonic context both — an
+    // "under" sprite is the ground a family stands its actors on.
+    this.#drawStage(stages, "under");
     for (const note of snapshot.bass) this.#drawBass(note, nowBeat);
     for (const note of snapshot.targets) {
       this.#drawTarget(note, nowBeat, stages.get(note.attemptKey)?.notes?.get(note.id));
     }
+    // Actors and effects, in front of the bars — but still under the played
+    // row and the strike line, which stay above everything a minigame draws.
+    this.#drawStage(stages, "over");
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawActor(snapshot, nowBeat);
     this.#drawStrikeLine();
@@ -489,6 +496,43 @@ export class TimelineView {
     ctx.save();
     ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1));
     ctx.drawImage(image, x + width / 2 - w / 2, y - h / 2, w, h);
+    ctx.restore();
+  }
+
+  /** The space a minigame's sprites are placed in. See `stage-layer.ts`. */
+  get #stageGeometry(): StageGeometry {
+    return {
+      playLeft: this.#playLeft,
+      playWidth: this.#playWidth,
+      bandTop: this.#bandTop,
+      bandHeight: this.#bandHeight,
+      paneHeight: this.#height,
+    };
+  }
+
+  /**
+   * One layer of every on-screen minigame's own art.
+   *
+   * Attempts are drawn in the order the model holds them, so around a handover
+   * the outgoing scenario's actors sit behind the incoming one's rather than
+   * fighting for the same z. Within an attempt the family's own `z` decides,
+   * which is the only ordering it gets to ask for.
+   */
+  #drawStage(stages: ReadonlyMap<string, Stage>, layer: Layer): void {
+    const images = this.#assets;
+    if (!images || stages.size === 0) return;
+
+    const ctx = this.#ctx;
+    ctx.save();
+    // The same clip the bars and the note art get: a sprite may bleed as far
+    // above or below the lanes as it likes and still never reach the gutter.
+    this.#clipPlayfield();
+    const geometry = this.#stageGeometry;
+    for (const stage of stages.values()) {
+      if (stage.sprites && stage.sprites.length > 0) {
+        drawStageSprites(ctx, stage.sprites, layer, geometry, images);
+      }
+    }
     ctx.restore();
   }
 

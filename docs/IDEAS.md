@@ -231,6 +231,44 @@ Both sit behind `docs/game-design/PROPOSED_Next_Families.md` (DECISION-047),
 which is where the re-verification was done and where the full provenance table
 lives.
 
+### The browser suite still asks L4 for eighth notes
+
+DECISION-049 re-pinned the unit tests to the Scale content redo, which moved
+Rocky Ascent's eighth-note material from L3/L4 up to L5/L6. `npm run
+validate:browser` was not re-pinned with them, so two of its checks — "L4's
+eight eighth notes take about four beats" and "L4 is denser than L1" — now fail
+on `main` describing content that no longer exists there. Same staleness, same
+fix: read the assertion's intent and point it at L5/L6.
+
+(The third failure in the same run, "the frame loop is not capped at 60fps", is
+the headless container rendering on the CPU with vsync disabled, not the game.)
+
+### The frontman is the least visible thing on his own stage
+
+Noticed the first time Goat Frontman actually drew its sprites (DECISION-050).
+The crowd is white goats on a dark stage floor and reads instantly; the
+performer is a dark goat on the same floor, lit from behind by the backdrop's
+own spotlights, and at a glance the eye finds the crowd and the mic stand before
+it finds him. He is the subject of the scenario and currently its faintest
+object.
+
+Nothing is wrong with the placement — he stands where the class puts him and the
+crowd grows around him correctly. It is a value problem in the art:
+`goat_goat_frontman_perform_*` want a rim light or a lighter body, or
+`bg_goat_frontman` wants to be darker where he stands. Both are one pass in
+`scripts/lib/frontman-art.mjs`.
+
+### The ram snaps back after every headbutt
+
+Butt-Butt-BONK's leap is an `arc()` toward the wolf that holds for a third of a
+beat and then stops being drawn, so the ram is back at its resting spot on the
+next frame — it lunges in and teleports out. It was invisible until the sprites
+drew (DECISION-050) and it is a real gap in the gesture: the family owns its own
+motion (`minigame/api.ts`, **Motion**), so the fix is a return arc, or holding
+the landed position until the next note rather than for a fixed span. Worth
+doing next to whatever pass gives the wolf a reaction bigger than swapping to
+its bonked frame.
+
 ## Closed
 
 ### The gate sets itself, as early as there is signal — built, 2026-08-31 (DECISION-035)

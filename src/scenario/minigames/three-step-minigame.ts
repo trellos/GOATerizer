@@ -66,6 +66,29 @@ const LEAP_BEATS = 1 / 3;
 /** How high the leap arcs, in lane-band units. Negative y is up. */
 const LEAP_HEIGHT = 0.55;
 
+/*
+ * How big the two animals are, and how far apart they stand.
+ *
+ * A sprite at `scale: 1` is the size it was drawn at, against the nominal scene
+ * in `ui/timeline/stage-layer.ts`. This family's art came out of a third-party
+ * pack drawn much larger than the generated art the other families use — the ram
+ * is 47 art pixels tall where a Rocky goat is 18 — so at 1 it stands three and a
+ * half lanes tall and swallows the wolf it is supposed to be butting. Both are
+ * scaled together, keeping the proportion they were drawn in, into the roughly
+ * two-lane range every other actor in the game occupies.
+ *
+ * The distance between them is spent to the **left**, where the notes have
+ * already been played: a sprite this wide sitting ahead of the strike line
+ * would cover the bars the player is still reading.
+ */
+const ACTOR_SCALE = 0.62;
+/** Where the ram waits, in beats left of the strike line. */
+const RAM_REST_BEATS = 1.2;
+/** Where the leap puts it: close enough that the headbutt lands on the wolf. */
+const RAM_LEAP_BEATS = 0.7;
+/** Where the wolf stands, in beats right of the strike line. */
+const TARGET_AHEAD_BEATS = 0.35;
+
 export type ThreeStepConfig = {
   background: string;
   stepA: string;
@@ -240,8 +263,9 @@ class ThreeStepMinigame implements Minigame {
       sprites.push({
         key: "target",
         assetId: targetArt,
-        x: view.strikeX + view.measure.beatWidth * 0.35,
+        x: view.strikeX + view.measure.beatWidth * TARGET_AHEAD_BEATS,
         y: laneY(this.#aim ?? 0) + 0.12,
+        scale: ACTOR_SCALE,
         anchor: "bottom",
         layer: "over",
       });
@@ -252,21 +276,26 @@ class ThreeStepMinigame implements Minigame {
       // Mid-leap the ram flies an arc between the two lanes; otherwise it
       // stands on the one its pose was set on, leaning at what is coming.
       const restY = laneY(pose.lane);
+      const restX = view.strikeX - view.measure.beatWidth * RAM_REST_BEATS;
       const position = this.#leap
         ? arc(
-            { x: view.strikeX - view.measure.beatWidth * 0.55, y: laneY(this.#leap.from) },
-            { x: view.strikeX - view.measure.beatWidth * 0.1, y: laneY(this.#leap.to) },
+            { x: restX, y: laneY(this.#leap.from) },
+            {
+              x: view.strikeX - view.measure.beatWidth * RAM_LEAP_BEATS,
+              y: laneY(this.#leap.to),
+            },
             LEAP_HEIGHT,
             this.#leap.startBeat,
             LEAP_BEATS,
             view.beat
           )
-        : { x: view.strikeX - view.measure.beatWidth * 0.55, y: restY };
+        : { x: restX, y: restY };
       sprites.push({
         key: "ram",
         assetId: pose.assetId,
         x: position.x,
         y: position.y,
+        scale: ACTOR_SCALE,
         anchor: "bottom",
         layer: "over",
       });
@@ -278,6 +307,10 @@ class ThreeStepMinigame implements Minigame {
         assetId: flash.assetId,
         x: view.strikeX,
         y: laneY(flash.lane),
+        // The same scale as the animals: the effects were drawn in the same
+        // frame, and a flash that keeps its full size next to a scaled-down ram
+        // reads as a different scene happening on top of this one.
+        scale: ACTOR_SCALE,
         layer: "over",
         opacity: decay(flash.startBeat, EFFECT_BEATS, view.beat),
       });
