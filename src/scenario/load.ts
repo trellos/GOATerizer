@@ -256,9 +256,18 @@ function parseLevel(
   };
 }
 
+/**
+ * Validates one authored scenario.
+ *
+ * `assetUrl` answers where one asset id lives rather than being a map of every
+ * id the caller believes the scenario needs. The minigame is the authority on
+ * *which* ids exist (`assetIds`), and it is asked here — so the caller supplies
+ * a naming rule and cannot get the list wrong, which is what a per-scenario
+ * hand-written list of ids could always do.
+ */
 export function loadScenario(
   raw: unknown,
-  assetUrls: Readonly<Record<string, string>>
+  assetUrl: (assetId: string) => string
 ): ScenarioDefinition {
   const root = obj(raw, "scenario");
   const id = str(root["id"], "scenario.id");
@@ -270,10 +279,26 @@ export function loadScenario(
 
   // The minigame validates its own half. A scenario is free to carry whatever
   // shape its family asks for; this loader never looks inside either blob.
+  /*
+   * Which scenario this one's ART is named after.
+   *
+   * Normally itself. A family may derive asset ids from the scenario id by
+   * convention rather than making every scenario bind them by hand — CLIMB does
+   * exactly that for its two note-bar pieces — and that convention is what makes
+   * a *copy* of a scenario point at art that does not exist. So a scenario may
+   * say whose art it uses, exactly as `assetDirectory` says where that art
+   * lives, and the two together are what let the editor create a scenario that
+   * is playable before anybody has drawn anything for it.
+   */
+  const artId =
+    typeof root["assetScenarioId"] === "string" && root["assetScenarioId"] !== ""
+      ? root["assetScenarioId"]
+      : id;
+
   const config = minigame.parseConfig({
     classParameters: root["classParameters"],
     assetBindings: root["assetBindings"],
-    scenarioId: id,
+    scenarioId: artId,
   });
 
   const supportedLevels = arr(root["supportedLevels"], "scenario.supportedLevels").map((entry, i) =>
@@ -303,11 +328,8 @@ export function loadScenario(
 
   // Which ids exist is the minigame's answer, not a naming convention guessed
   // at here.
-  for (const assetId of minigame.assetIds(config, [...levels.values()].map((l) => l.data))) {
-    if (assetUrls[assetId] === undefined) {
-      throw new ScenarioDataError("scenario.assetBindings", `no URL supplied for ${assetId}`);
-    }
-  }
+  const assetIds = minigame.assetIds(config, [...levels.values()].map((level) => level.data));
+  const assetUrls = Object.fromEntries(assetIds.map((assetId) => [assetId, assetUrl(assetId)]));
 
   return {
     id,

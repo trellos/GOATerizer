@@ -29,6 +29,13 @@
           <p class="tagline">You really suck and this is your best shot.</p>
           <button class="primary" id="start-play" type="button">Play</button>
           <button class="secondary" id="start-calibrate" type="button">Timing check</button>
+          <!--
+            Dev only (?dev=1). The editor writes to docs/scenarios/ through the
+            dev server, so it is useless in a deployed build and hidden there.
+          -->
+          <button class="secondary" id="start-editor" type="button" hidden>
+            Minigame editor
+          </button>
           <p class="hint">
             Plug in or mic a guitar. The browser will ask for the microphone.
           </p>
@@ -199,6 +206,14 @@
 
         <canvas id="energy-canvas" class="energy-overlay"></canvas>
         <div class="input-warning" id="game-input-warning" hidden></div>
+        <!--
+          Only while the editor is previewing. A preview is a real attempt and
+          runs its full length, which is a long time to watch something you have
+          already seen the problem with.
+        -->
+        <button class="secondary preview-exit" id="preview-exit" type="button" hidden>
+          Exit preview
+        </button>
       </section>
 
       <!-- ---------------------------------------------------------------- -->
@@ -222,6 +237,97 @@
             </button>
             <button class="secondary" id="results-new" type="button">New game</button>
           </div>
+        </div>
+      </section>
+      <!-- ---------------------------------------------------------------- -->
+      <!--
+        The minigame editor. Dev only, and deliberately laid out like the
+        mockup in the design brief: a four-bar timeline with the note palette
+        to its left, the loop handle above it, and the scenario's own data
+        underneath. Nothing here is generated at runtime except the palette,
+        the difficulty buttons and the two dropdowns, which are lists whose
+        length is data.
+      -->
+      <section class="screen" id="screen-editor">
+        <header class="topbar editor-topbar">
+          <div class="bar-left">
+            <span class="bar-title">Minigame editor</span>
+            <span class="readout" id="editor-class">—</span>
+          </div>
+          <p class="bar-hint" id="editor-status"></p>
+          <div class="bar-right">
+            <button class="secondary" id="editor-exit" type="button">Back</button>
+          </div>
+        </header>
+
+        <div class="editor-stage">
+          <div class="palette" id="editor-palette"></div>
+          <canvas id="editor-canvas"></canvas>
+        </div>
+
+        <div class="editor-controls">
+          <div class="editor-row">
+            <label class="editor-field">
+              <span>Family</span>
+              <select id="editor-family"></select>
+            </label>
+
+            <label class="editor-field editor-field-wide">
+              <span>Scenario</span>
+              <span class="editor-scenario-row">
+                <select id="editor-scenario"></select>
+                <button class="chip" id="editor-scenario-rename" type="button" title="Rename">
+                  ✎
+                </button>
+                <button class="chip" id="editor-scenario-delete" type="button" title="Delete">
+                  🗑
+                </button>
+                <button class="chip" id="editor-scenario-new" type="button" title="New scenario">
+                  New…
+                </button>
+              </span>
+            </label>
+
+            <div class="editor-field">
+              <span>Tempo</span>
+              <span class="editor-tempo">
+                <button class="chip" id="editor-bpm-down" type="button">&lt;</button>
+                <b id="editor-bpm">90</b>
+                <button class="chip" id="editor-bpm-up" type="button">&gt;</button>
+                <em id="editor-tempo-name">Billy Goat</em>
+              </span>
+            </div>
+
+            <div class="editor-field">
+              <span>Transport</span>
+              <span class="button-row">
+                <button class="primary" id="editor-play" type="button">Play</button>
+                <button class="secondary" id="editor-save" type="button">Save</button>
+              </span>
+            </div>
+          </div>
+
+          <div class="editor-row">
+            <div class="editor-field editor-field-wide">
+              <span>Difficulty level</span>
+              <div class="button-row" id="editor-levels"></div>
+            </div>
+
+            <div class="editor-field">
+              <span>Preview</span>
+              <span class="button-row">
+                <select id="editor-accuracy"></select>
+                <button class="secondary" id="editor-preview" type="button">Preview</button>
+              </span>
+            </div>
+          </div>
+
+          <label class="editor-field editor-premise">
+            <span>Premise</span>
+            <textarea id="editor-premise" rows="3" spellcheck="true"></textarea>
+          </label>
+
+          <ul class="editor-problems" id="editor-problems" hidden></ul>
         </div>
       </section>
     </main>

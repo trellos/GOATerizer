@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Designer tool: writes `docs/scenarios/goat-frontman/goat_frontman.scenario.json`.
+ * Designer tool: writes `docs/scenarios/goat_frontman.scenario.json`.
  *
  * Emits the whole file, like `author-can-crushing.mjs`: Goat Frontman is new
  * and the committed JSON has no hand edits to preserve yet. The committed JSON
@@ -56,7 +56,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.resolve(here, "..", "docs", "scenarios", "goat-frontman");
+const OUT_DIR = path.resolve(here, "..", "docs", "scenarios");
 const OUT_FILE = path.join(OUT_DIR, "goat_frontman.scenario.json");
 const TUNING_FILE = path.resolve(here, "..", "src", "config", "tuning.ts");
 

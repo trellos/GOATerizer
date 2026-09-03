@@ -9,7 +9,7 @@
  * the vertical slice playable, not a design decision.
  *
  * Star thresholds are NOT here: they are per-level authored scenario data and
- * live in `docs/scenarios/rocky-ascent/rocky_ascent.scenario.json`. What lives
+ * live in `docs/scenarios/rocky_ascent.scenario.json`. What lives
  * here is the *metric* those thresholds are denominated in.
  *
  * A few values here are not free choices at all: they MIRROR an internal
@@ -351,7 +351,7 @@ export const AUTOPLAY_DEFAULT_SEED = 1;
  * recognizer drops the occasional onset, so the achieved rate runs a little
  * under. The deterministic test provider hits them exactly.
  */
-export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25 } as const;
+export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25, "0": 0 } as const;
 
 /**
  * Of the opportunities a tier does *not* hit, the share played as an audible
@@ -362,6 +362,16 @@ export const AUTOPLAY_HIT_RATE = { perfect: 1, "75": 0.75, "50": 0.5, "25": 0.25
  * mode is to make failure legible.
  */
 export const AUTOPLAY_WRONG_SHARE = 0.7;
+
+/**
+ * The share at the 0% tier, which is all of them.
+ *
+ * At every other tier a fumble is sometimes just silence, because that is what
+ * a real player's bad run sounds like. The 0% tier exists to make a minigame
+ * fail audibly — it is what the editor's Preview offers as its worst case — and
+ * a bar of silence shows nothing.
+ */
+export const AUTOPLAY_WRONG_SHARE_AT_ZERO = 1;
 
 /**
  * Timing jitter on a hit, as a fraction of that target's *clamped Good* window.
@@ -458,10 +468,14 @@ export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;
  * Loudness of the autoplay monitor (`src/dev/autoplay-monitor.ts`) — the
  * audible pluck that lets a developer hear what autoplay played, independent
  * of whichever sink (`synth` or `test`) is actually driving judgment. Mixed
- * onto the same master bus as the bass and drums, so this is well under
- * `AUTOPLAY_PLUCK_PEAK_GAIN`: loud enough to follow the performance, not loud
- * enough to bury the backing track it exists to be checked against.
+ * onto the same master bus as the bass and drums.
+ *
+ * Raised from 0.35, where the guitar could not be picked out of the backing at
+ * all: it is the thing the whole screen is about, and it was mixed like a
+ * click track. The other half of that fix is the timbre — the monitor plucks a
+ * harmonic voice rather than the recognizer's bare sine
+ * (`src/dev/pluck-voices.ts`) — so this buys presence rather than just volume.
  * Provisional per `AGENTS.md` §17 — nobody has designed a "how loud is a demo
- * click track" answer.
+ * guitar" answer.
  */
-export const AUTOPLAY_MONITOR_GAIN = 0.35;
+export const AUTOPLAY_MONITOR_GAIN = 0.6;

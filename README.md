@@ -185,7 +185,8 @@ Dev tooling is gated behind `?dev=1` and never reachable from normal play.
 | `?dev=1` | Show the developer panel (transport, detection, judgment, latency, scenario progress) |
 | `?dev=1&input=test` | Drive the game from the **deterministic test provider** instead of a guitar. Bypasses Tuninator entirely — injects already-judged note events. The UI says so, loudly, the whole time |
 | `?dev=1&input=synth` | Drive the game from a **synthetic sine-wave microphone**, through the real Tuninator recognizer. For environments that cannot grant microphone access (this repo was built and calibrated partly in one) but still need the actual detection/latency pipeline exercised, not bypassed. Autoplay schedules real sine plucks instead of injected events. The UI says so, loudly, the whole time |
-| `?dev=1&autoplay=perfect\|75\|50\|25` | **Play the game for you**, so you can watch what playing looks like without a guitar. `perfect` takes every note dead on. `75`, `50` and `25` take that share of the note opportunities and fumble the rest: most fumbles are played as an audible wrong pitch — which never consumes the target, so it costs you a red bar *and* a miss — some are simply not played, and the occasional extra wrong note gets noodled into a gap. Picking a tier switches the input source to `synth` if a live microphone is selected, since a microphone cannot play anything; `input=test` is left alone, because it can. With no `input=` at all, the link implies `input=synth` |
+| `?dev=1&editor=1` | Open the **minigame editor** straight away. Also reachable from the button `?dev=1` adds to the start screen. It writes to `docs/scenarios/` through the dev server, so it only does anything under `npm run dev` — see below |
+| `?dev=1&autoplay=perfect\|75\|50\|25\|0` | **Play the game for you**, so you can watch what playing looks like without a guitar. `perfect` takes every note dead on. `75`, `50` and `25` take that share of the note opportunities and fumble the rest, and `0` takes none of them — every opportunity attacked, every one of them wrong, which is a scenario failing out loud rather than a bar of silence: most fumbles are played as an audible wrong pitch — which never consumes the target, so it costs you a red bar *and* a miss — some are simply not played, and the occasional extra wrong note gets noodled into a gap. Picking a tier switches the input source to `synth` if a live microphone is selected, since a microphone cannot play anything; `input=test` is left alone, because it can. With no `input=` at all, the link implies `input=synth` |
 | `?dev=1&seed=N` | Picks a different seeded autoplay performance. The same `N` fumbles the same notes in the same places every time, so a screenshot or a bug report reproduces |
 | `?dev=1&level=N` | Force every slot to difficulty *N*, for tuning one level without grinding up to it. Which scenario fills it is still whatever the registry's difficulty pool picks — no longer always Rocky Ascent now that companion scenarios share levels with it |
 | `?dev=1&scenario=<id>` | Pin every slot that scenario authors to it, so one scenario can be looked at without rerolling the run. Slots it does not author fall back to normal random selection. Unknown ids are refused with a console warning rather than silently ignored |
@@ -232,7 +233,8 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 | `src/scenario/` | Scenario schema and loader, the registry, the minigame classes (`ClimbMinigame`, `RepeatMinigame`, `PerformMinigame`, `ThreeStepMinigame`) and the shared `TimelineActor` |
 | `src/ui/` | Timeline model and views, the actor and performer layers, the scenario backdrop, trophies, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
-| `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
+| `docs/scenarios/` | Authored scenario data, one flat file per scenario — the runtime discovers the whole directory |
+| `src/editor/` | The minigame note editor: a dev-only timeline for authoring that data by hand |
 
 ### The boundaries that matter
 
@@ -275,7 +277,7 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 
 ### Adding a scenario
 
-1. Author `docs/scenarios/<id>/<id>.scenario.json` — supported levels, prompts
+1. Author `docs/scenarios/<id>.scenario.json` — supported levels, prompts
    in scale-degree tokens, star thresholds, asset bindings, and whatever else
    the minigame named in `minigameClass` requires. The loader does not know what
    that is: it resolves the id through the minigame registry and hands the raw
@@ -283,12 +285,51 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
    anything they cannot map (`DECISION_LOG.md`, DECISION-043). The authored key
    is still `minigameClass`; it reaches the model as `ScenarioDefinition.minigameId`,
    which is an open string rather than the closed union the old name implies.
-2. Drop art in `public/assets/scenarios/<id>/`, and record its provenance in
-   `docs/assets/ASSET_SOURCES.md`.
-3. Add one entry to `src/scenario/registry.ts`.
+2. Drop art in `public/assets/scenarios/<id>/` (the id with dashes for
+   underscores, or whatever the file's optional `assetDirectory` names), and
+   record its provenance in `docs/assets/ASSET_SOURCES.md`.
 
-No gameplay code changes. `src/scenario/load.ts` validates the file and throws
+That is the whole procedure: the registry globs the directory, and which asset
+ids the scenario needs is the minigame's own answer (`assetIds`) rather than a
+list anybody maintains. No code changes and no gameplay changes. `src/scenario/load.ts` validates the file and throws
 loudly rather than repairing it.
+
+---
+
+## The minigame editor
+
+`npm run dev`, then `?dev=1` and **Minigame editor** on the start screen (or go
+straight there with `?dev=1&editor=1`).
+
+It edits the note content of `docs/scenarios/*.scenario.json` on a four-bar
+timeline — the phrase a scenario authors — and saves through a dev-server route
+that writes the file. **It only works locally**, and that is the point: what it
+produces is a diff you commit.
+
+| | |
+|---|---|
+| **Place** | Click empty space for a note of the armed length, or drag one off the palette. Notes snap to sixteenths; triplets snap to thirds of a beat |
+| **Resize** | Drag a note's right edge. `<>` appears on the note under the pointer. Only lengths the note's own start allows are offered — a note on an odd sixteenth cannot become a triplet without being moved, and that would not be a resize |
+| **Move** | Drag from anywhere else. A ghost shows where it will land; drag off the timeline and nothing moves. Ctrl-drag duplicates instead |
+| **Select** | Click, ctrl-click to add, or drag a marquee from empty space. Dragging one selected note drags them all. Ctrl-C/V, Delete, Ctrl-Z |
+| **Loop** | Drag the ▼ handle. One bar, two bars or the whole phrase; the rest is shaded and shows the repetition it will be saved as. Notes outside the loop are remembered, not deleted — widen it and they come back |
+| **Play** | Loops the timeline with the game's own kit and a synth for the notes. The beat is the one this level would get in a run, and both follow the edit: moving a note or switching difficulty changes what is playing without stopping the loop |
+| **Preview** | Hands the scenario — saved or not — to the real game for one attempt, autoplayed at 0/25/50/75/100%. Nothing is scored, and **Exit preview** comes straight back. It runs on injected input rather than the microphone, so it works with no mic, no permission and no recognizer — a preview asks whether the phrase plays, and that should not depend on the machine's audio stack |
+| **Levels** | 1–7. A difficulty the scenario has not authored is dimmed; selecting it starts one, with the scenario data of the nearest level it does author |
+| **Scenarios** | New… copies the open scenario (same class, same art, same notes) under a new name; ✎ renames; 🗑 deletes the file |
+
+Two things it will refuse, and both are the schema being honest rather than the
+tool being fussy. A prompt is a **sequence**, so two notes cannot sound at once;
+and every silence is spelled as rests, which a two-tick hole between a sixteenth
+and a triplet cannot be. It says which, in beats, and will not save until it is
+fixed. Save is gated on `loadScenario` accepting the whole file, so the editor
+can only write scenarios the game can load — including the rules a family owns,
+like CLIMB's one waypoint per note and THREE-STEP's whole groups of three.
+
+Everything derived from the notes is derived: positions, rest spelling,
+`noteOpportunityCount`, the star ladder, and a family's own level data
+(`MinigameAuthoring.reconcileLevel` — a CLIMB route is *resampled* to the new
+note count, so a hand-tuned near-vertical summit stays hand-tuned).
 
 ---
 

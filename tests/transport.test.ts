@@ -158,9 +158,12 @@ describe("bass line", () => {
       for (const roll of [0, 0.25, 0.5, 0.75, 0.99]) {
         for (const note of generateBassLine(key, () => roll).notes) {
           expect(note.midi).toBeLessThan(lowestLane);
-          // A playable bass register: G1 up to F3, across all 24 keys.
-          expect(note.midi).toBeGreaterThanOrEqual(31);
-          expect(note.midi).toBeLessThanOrEqual(53);
+          // A playable bass register: A#1 up to G#3, across all 24 keys. It
+          // moved up with the guitar's own register (`LOWEST_TONIC_MIDI`),
+          // which is derived rather than stated twice — the invariant above,
+          // strictly below the lowest lane, is the one that matters.
+          expect(note.midi).toBeGreaterThanOrEqual(34);
+          expect(note.midi).toBeLessThanOrEqual(56);
         }
       }
     }

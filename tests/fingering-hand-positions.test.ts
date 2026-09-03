@@ -56,10 +56,10 @@ describe("which strings the picker reaches", () => {
 
   it("offers a D-rooted shape in every key whose octave reaches the D string", () => {
     const reachable = keysThatReach(D_STRING);
-    // Seven of the twelve tonics sit at or above open D in the run register, so
-    // fourteen of the 24 keys. The other ten are out of reach by construction,
-    // not by omission.
-    expect(reachable).toHaveLength(14);
+    // Ten of the twelve tonics sit at or above open D3 in the run register — C3
+    // and C#3 are the only two below it — so twenty of the 24 keys. The other
+    // four are out of reach by construction, not by omission.
+    expect(reachable).toHaveLength(20);
     for (const key of reachable) {
       expect(rootedOn(key, D_STRING).length, keyDisplayName(key)).toBeGreaterThanOrEqual(1);
     }
@@ -67,10 +67,11 @@ describe("which strings the picker reaches", () => {
 
   it("offers a G-rooted shape in every key whose octave reaches the G string", () => {
     const reachable = keysThatReach(G_STRING);
-    // Only two tonics — G and G#/Ab — put the run's root at or above the open G
-    // string, so four keys. That ceiling is the register, not the shape table:
-    // widening it means moving the octave the whole game is written in.
-    expect(reachable).toHaveLength(4);
+    // Five tonics — G, G#/Ab, A, A#/Bb and B — put the run's root at or above
+    // the open G string, so ten keys. That ceiling is the register, not the
+    // shape table: it doubled when the register moved up to C3, which is what
+    // "the octave the whole game is written in" decides.
+    expect(reachable).toHaveLength(10);
     for (const key of reachable) {
       expect(rootedOn(key, G_STRING).length, keyDisplayName(key)).toBeGreaterThanOrEqual(1);
     }
@@ -81,7 +82,7 @@ describe("which strings the picker reaches", () => {
     }
   });
 
-  it("puts the low root at the one fret it can sit at, which on G is 0 or 1", () => {
+  it("puts the low root at the one fret it can sit at, and on G within the box", () => {
     // The lane pitches are fixed, so a root string does not offer a *choice* of
     // fret for the low root — there is exactly one, and it is decided by the
     // register. This is why no distribution can invent a higher G position: the
@@ -92,19 +93,19 @@ describe("which strings the picker reaches", () => {
         const open = OPEN_STRING_MIDI[fingering.rootString] as number;
         expect(fingering.positions[0]?.fret, keyDisplayName(key)).toBe(tonicMidi(key) - open);
       }
-      // On the G string that determined fret is never above the first.
+      // On the G string that determined fret stays inside the first position:
+      // the register tops out at B3, four frets above the open G.
       const onG = tonicMidi(key) - (OPEN_STRING_MIDI[G_STRING] as number);
-      expect(onG, keyDisplayName(key)).toBeLessThanOrEqual(1);
+      expect(onG, keyDisplayName(key)).toBeLessThanOrEqual(4);
     }
   });
 
   it("gives most D-reachable keys two D-string hand positions, not one", () => {
-    // The improvement this shape table exists for. With only the two
-    // three-string boxes, six keys offered a second D-rooted position; the
-    // three-string `3-2-3` deal and the four-string spreads take that to twelve
-    // of the fourteen keys that can reach the string at all.
+    // The improvement this shape table exists for: the three-string `3-2-3`
+    // deal and the four-string spreads give a second D-rooted position in
+    // eighteen of the twenty keys that can reach the string at all.
     const withTwo = keysThatReach(D_STRING).filter((key) => rootedOn(key, D_STRING).length >= 2);
-    expect(withTwo.length).toBeGreaterThanOrEqual(12);
+    expect(withTwo.length).toBeGreaterThanOrEqual(18);
   });
 
   it("keeps the low strings offered too — this is a spread, not a swap", () => {
@@ -178,13 +179,13 @@ function reachablePositions(key: RunKey, rootString: number): number[] {
 
 describe("the picker leaves no reachable place unoffered", () => {
   it("offers every hand position the G string can actually take", () => {
-    // The headline fact, and the reason more distributions did not move the G
-    // count. Across all 24 keys, eight G-rooted shapes fit the window — but they
-    // stand in only five places, because on the G string the low root can only
-    // sit at fret 0 or 1 (see the test above) and the neck offers nothing higher
-    // that is still this key's tonic. The picker offers all five. The three it
-    // drops are second fingerings of a place already on the row, not a place
-    // the player is being denied.
+    // The headline fact, and the reason more distributions do not move the G
+    // count much. On the G string the low root sits at one fret decided by the
+    // key (see the test above) and the neck offers nothing higher that is still
+    // this key's tonic, so across all 24 keys the G-rooted shapes stand in only
+    // fourteen distinct places. The picker offers every one of them; anything it
+    // drops is a second fingering of a place already on the row, not a place the
+    // player is being denied.
     let reachable = 0;
     let offered = 0;
     for (const key of ALL_KEYS) {
@@ -194,7 +195,7 @@ describe("the picker leaves no reachable place unoffered", () => {
       reachable += places.length;
       offered += shown.length;
     }
-    expect(reachable).toBe(5);
+    expect(reachable).toBe(14);
     expect(offered).toBe(reachable);
   });
 

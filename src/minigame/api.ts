@@ -438,11 +438,63 @@ export interface Minigame {
  * unmappable, matching the loud-failure contract scenario loading already has —
  * a bad edit should fail a test, not transpose a note mid-run.
  */
+/**
+ * One authored level, as JSON. What the editor holds and what the parsers read.
+ *
+ * Deliberately the raw object rather than the parsed `data`: authoring has to
+ * round-trip every key in the file, including the prose ones no parser looks at,
+ * and a family's own block is the only part of it a family may touch.
+ */
+export type AuthoredLevel = Readonly<Record<string, unknown>>;
+
+/** The host-owned facts a family reconciles its own level data against. */
+export type AuthoringShape = {
+  readonly difficulty: number;
+  readonly noteOpportunityCount: number;
+  /** Measures in the authored phrase. */
+  readonly measures: number;
+  /** How many times an attempt plays that phrase. */
+  readonly attemptRepeats: number;
+  /** Phrase-relative start beats of the note opportunities, in order. */
+  readonly noteStartBeats: readonly number[];
+};
+
+/**
+ * Authoring-time support. Used by the minigame editor (`src/editor/`) and by
+ * nothing at run time.
+ *
+ * A family's level data is coupled to the *prompt* in ways only that family
+ * knows: a CLIMB level authors one waypoint per note opportunity, a PERFORM
+ * level's flourishes sit on particular beats, a REPEAT level counts its own
+ * targets. Change the notes and those become wrong — `parseLevel` will refuse
+ * the file, which is correct and unhelpful to somebody moving a note in a GUI.
+ *
+ * So the family, which is the only thing that can, fixes its own half.
+ */
+export interface MinigameAuthoring {
+  /**
+   * Returns `level` with this family's own data made consistent with `shape`.
+   *
+   * Must be pure, must not touch keys that are not this family's, and must
+   * produce something its own `parseLevel` accepts — including from a level that
+   * has none of its blocks yet, which is what a newly authored difficulty looks
+   * like. It may not change the prompt: the notes are the author's.
+   */
+  reconcileLevel(level: AuthoredLevel, shape: AuthoringShape): AuthoredLevel;
+}
+
 export interface MinigameModule {
   readonly id: MinigameId;
   readonly displayName: string;
   /** Must equal {@link MINIGAME_API_VERSION} for the host to load it. */
   readonly apiVersion: number;
+
+  /**
+   * Optional. How this family keeps its level data in step with an edited
+   * prompt, for the note editor. A family without it can still be edited — its
+   * level data simply has nothing that depends on the notes.
+   */
+  readonly authoring?: MinigameAuthoring;
 
   /** Scenario-level configuration. Throws on invalid input. */
   parseConfig(raw: unknown): unknown;

@@ -7,7 +7,7 @@
  * supported difficulty. Nothing here is inferred from a difficulty number.
  *
  * These types describe the *runtime* shape. The authored shape lives in
- * `docs/scenarios/<id>/<id>.scenario.json` and is validated into these by
+ * `docs/scenarios/<id>.scenario.json` and is validated into these by
  * `load.ts`.
  */
 

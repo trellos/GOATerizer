@@ -67,11 +67,13 @@ describe("authored octave-band tokens", () => {
 });
 
 describe("transposition", () => {
-  it("places the tonic in the octave starting at A2", () => {
+  it("places every key's root between the two Cs of the A string", () => {
+    // C3 at the third fret and C4 at the fifteenth. The register is stated in
+    // those terms because that is the stretch of neck the game is played in.
     for (let tonic = 0; tonic < 12; tonic += 1) {
       const midi = tonicMidi({ tonic: tonic as PitchClassIndex, mode: "major" });
-      expect(midi).toBeGreaterThanOrEqual(45);
-      expect(midi).toBeLessThan(57);
+      expect(midi).toBeGreaterThanOrEqual(48);
+      expect(midi).toBeLessThan(60);
     }
   });
 
@@ -79,8 +81,8 @@ describe("transposition", () => {
     for (const { key } of KEY_WEIGHTS) {
       const notes = laneMidiNotes(key);
       expect(notes).toHaveLength(8);
-      expect(notes[0]).toBeGreaterThanOrEqual(45); // A2, fifth fret of the low E
-      expect(notes[7]).toBeLessThanOrEqual(68); // G#4, well inside the neck
+      expect(notes[0]).toBeGreaterThanOrEqual(48); // C3, third fret of the A
+      expect(notes[7]).toBeLessThanOrEqual(71); // B4, well inside the neck
     }
   });
 

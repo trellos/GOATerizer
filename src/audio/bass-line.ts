@@ -67,8 +67,9 @@ function stepDegree(degree: Degree, steps: number): Degree {
  * Degrees more than a sixth above the tonic are voiced *below* it instead — the
  * fifth becomes a fifth down, the leading tone a semitone under the root. That
  * is ordinary bass voice-leading, and it keeps the line inside a compact range
- * (G1..F3 across all 24 keys) instead of leaping a seventh every time the
- * progression touches a high degree.
+ * (A#1..G#3 across all 24 keys) instead of leaping a seventh every time the
+ * progression touches a high degree. The range is derived from the guitar's own
+ * register rather than stated: move `LOWEST_TONIC_MIDI` and this moves with it.
  *
  * Every note lands strictly below the lowest of the eight pitch lanes in every
  * key — the highest a voiced degree can reach is `tonic - 3` — so the bass
