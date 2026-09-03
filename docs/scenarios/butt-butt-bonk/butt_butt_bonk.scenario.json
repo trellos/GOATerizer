@@ -43,7 +43,7 @@
     ],
     "badNoteBehavior": [
       "a miss or a wrong note breaks the group; the count resets and no group is credited",
-      "the ram never moves to the played pitch \u2014 this family's actor is terrain-bound, not a projectile"
+      "the ram never moves to the played pitch — this family's actor is terrain-bound, not a projectile"
     ],
     "minigameCompleteBehavior": [
       "if passed, hold goat_butt_butt_bonk_finish",
@@ -121,13 +121,15 @@
     "The FIRST scenario in this repository built from third-party art rather than generated placeholders. Sources are vendored under art-sources/ and derived by scripts/import-scenario-art.mjs; nothing is fetched at build time or hotlinked at runtime.",
     "The first authored triplet content in the game, so it is also the first thing to select the drum kit's triplet rhythm variant, which was built and tested but had never been heard.",
     "No level contains a sixteenth. A level must test triplets OR sixteenths, never both (src/audio/drum-pattern.ts, asserted by tests/drum-intensity.test.ts).",
-    "L1-6 per the catalogue. L7 is deliberately absent, matching the catalogue's supported range; the run's L7 content gap stays open."
+    "L1-6 per the catalogue. L7 is deliberately absent, matching the catalogue's supported range; the run's L7 content gap stays open.",
+    "Authored from the designer's triplet-group notation (`a-b-c` for a group, `rq` for a one-beat rest); see scripts/author-butt-butt-bonk.mjs. L1/L2 write two groups separated by rests and repeat that twice; L3/L4/L6 write four groups back to back with no rest and repeat that four times; L5 does the same but breaks the pattern in its last group.",
+    "The phrase tables and star thresholds are regenerable via scripts/author-butt-butt-bonk.mjs."
   ],
   "designerReview": {
     "blockingIssues": [],
     "nonBlockingTBD": [
       "Star thresholds are PROVISIONAL, following Rocky Ascent's shape rather than a played measurement.",
-      "alternateAfterGroups is a reversible default per level; nothing has playtested where the alternate ending should start.",
+      "alternateAfterGroups is set to half of each level's authored group count and has not been playtested; nothing has confirmed where the alternate ending should start.",
       "The wolf stands at one lane offset from the strike line for the whole attempt. Letting it close in between measures is the obvious next iteration and is BattleMinigame's mechanic, not this family's."
     ]
   },
@@ -147,9 +149,9 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
+          "beatWithinMeasure": 1,
           "scaleDegree": "1"
         },
         {
@@ -160,7 +162,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         },
         {
           "index": 2,
@@ -175,33 +177,63 @@
         {
           "index": 3,
           "type": "rest",
-          "duration": "half",
-          "durationBeats": 2,
-          "startBeat": 1.0,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0
+          "beatWithinMeasure": 2
         },
         {
           "index": 4,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 3.0,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 5,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "2"
+          "startBeat": 2.333,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "3"
         },
         {
           "index": 6,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 2.667,
+          "startMeasure": 1,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 7,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 8,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 9,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
@@ -211,99 +243,71 @@
           "scaleDegree": "2"
         },
         {
-          "index": 7,
+          "index": 10,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 8,
-          "type": "rest",
-          "duration": "half",
-          "durationBeats": 2,
-          "startBeat": 5.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2.0
-        },
-        {
-          "index": 9,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 7.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4.0
-        },
-        {
-          "index": 10,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
           "scaleDegree": "3"
         },
         {
           "index": 11,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 8.333,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.333,
-          "scaleDegree": "3"
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.667,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
         },
         {
           "index": 13,
-          "type": "rest",
-          "duration": "half",
-          "durationBeats": 2,
-          "startBeat": 9.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 2.0
-        },
-        {
-          "index": 14,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 11.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4.0
-        },
-        {
-          "index": 15,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "startBeat": 6.333,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 14,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 6.667,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 15,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4
         },
         {
           "index": 16,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.333,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.333,
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
           "scaleDegree": "1"
         },
         {
@@ -311,45 +315,163 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.667,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "startBeat": 8.333,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.333,
+          "scaleDegree": "2"
         },
         {
           "index": 18,
-          "type": "rest",
-          "duration": "half",
-          "durationBeats": 2,
-          "startBeat": 13.0,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.0
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 8.667,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.667,
+          "scaleDegree": "3"
         },
         {
           "index": 19,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 15.0,
+          "startBeat": 9,
+          "startMeasure": 3,
+          "beatWithinMeasure": 2
+        },
+        {
+          "index": 20,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 21,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 10.333,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 22,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 10.667,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 23,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4
+        },
+        {
+          "index": 24,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 25,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 12.333,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.333,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 26,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 12.667,
+          "startMeasure": 4,
+          "beatWithinMeasure": 1.667,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 27,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 13,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2
+        },
+        {
+          "index": 28,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 29,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14.333,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 30,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14.667,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 31,
+          "type": "rest",
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4
         }
       ],
-      "noteOpportunityCount": 12,
+      "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
-        "alternateAfterGroups": 2,
+        "groupCharacter": "a rising triplet group answered by a falling one, each followed by a full beat's rest",
+        "alternateAfterGroups": 4,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds lock once earned.",
-        "passThreshold": 54,
-        "star2Threshold": 192,
-        "star3Threshold": 240,
+        "passThreshold": 108,
+        "star2Threshold": 384,
+        "star3Threshold": 480,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 240 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 480 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
@@ -371,10 +493,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "3"
         },
         {
           "index": 1,
@@ -384,7 +506,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "4"
         },
         {
           "index": 2,
@@ -401,18 +523,18 @@
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0
+          "beatWithinMeasure": 2
         },
         {
           "index": 4,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
+          "beatWithinMeasure": 3,
           "scaleDegree": "2"
         },
         {
@@ -423,7 +545,7 @@
           "startBeat": 2.333,
           "startMeasure": 1,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "2"
+          "scaleDegree": "1"
         },
         {
           "index": 6,
@@ -433,25 +555,25 @@
           "startBeat": 2.667,
           "startMeasure": 1,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 7,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 3.0,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 4
         },
         {
           "index": 8,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
+          "beatWithinMeasure": 1,
           "scaleDegree": "3"
         },
         {
@@ -462,7 +584,7 @@
           "startBeat": 4.333,
           "startMeasure": 2,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 10,
@@ -472,25 +594,25 @@
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 11,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0
+          "beatWithinMeasure": 2
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
+          "beatWithinMeasure": 3,
           "scaleDegree": "2"
         },
         {
@@ -501,7 +623,7 @@
           "startBeat": 6.333,
           "startMeasure": 2,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "2"
+          "scaleDegree": "1"
         },
         {
           "index": 14,
@@ -511,26 +633,26 @@
           "startBeat": 6.667,
           "startMeasure": 2,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 15,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 4
         },
         {
           "index": 16,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
+          "scaleDegree": "3"
         },
         {
           "index": 17,
@@ -540,7 +662,7 @@
           "startBeat": 8.333,
           "startMeasure": 3,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "4"
         },
         {
           "index": 18,
@@ -550,26 +672,26 @@
           "startBeat": 8.667,
           "startMeasure": 3,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "4"
+          "scaleDegree": "3"
         },
         {
           "index": 19,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0
+          "beatWithinMeasure": 2
         },
         {
           "index": 20,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 21,
@@ -579,7 +701,7 @@
           "startBeat": 10.333,
           "startMeasure": 3,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "3"
+          "scaleDegree": "1"
         },
         {
           "index": 22,
@@ -589,26 +711,26 @@
           "startBeat": 10.667,
           "startMeasure": 3,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "2"
         },
         {
           "index": 23,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 4
         },
         {
           "index": 24,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "3"
         },
         {
           "index": 25,
@@ -618,7 +740,7 @@
           "startBeat": 12.333,
           "startMeasure": 4,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 26,
@@ -635,19 +757,19 @@
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0
+          "beatWithinMeasure": 2
         },
         {
           "index": 28,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 29,
@@ -667,23 +789,23 @@
           "startBeat": 14.667,
           "startMeasure": 4,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "2"
         },
         {
           "index": 31,
           "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 4
         }
       ],
       "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
-        "alternateAfterGroups": 3,
+        "groupCharacter": "a triplet group that turns back on itself (up then down) answered by one that steps up and back, each followed by a rest",
+        "alternateAfterGroups": 4,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
       "stars": {
@@ -693,7 +815,7 @@
         "star2Threshold": 384,
         "star3Threshold": 480,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 480 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 480 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
@@ -715,9 +837,9 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
+          "beatWithinMeasure": 1,
           "scaleDegree": "1"
         },
         {
@@ -728,7 +850,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         },
         {
           "index": 2,
@@ -745,10 +867,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
         },
         {
           "index": 4,
@@ -758,7 +880,7 @@
           "startBeat": 1.333,
           "startMeasure": 1,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 5,
@@ -768,17 +890,17 @@
           "startBeat": 1.667,
           "startMeasure": 1,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 7,
@@ -788,7 +910,7 @@
           "startBeat": 2.333,
           "startMeasure": 1,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "3"
+          "scaleDegree": "2"
         },
         {
           "index": 8,
@@ -798,29 +920,50 @@
           "startBeat": 2.667,
           "startMeasure": 1,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 9,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 3.0,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
         },
         {
           "index": 10,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "2"
+          "startBeat": 3.333,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4.333,
+          "scaleDegree": "3"
         },
         {
           "index": 11,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 3.667,
+          "startMeasure": 1,
+          "beatWithinMeasure": 4.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 12,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 13,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
@@ -830,27 +973,27 @@
           "scaleDegree": "2"
         },
         {
-          "index": 12,
+          "index": 14,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 13,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 5.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
           "scaleDegree": "3"
         },
         {
-          "index": 14,
+          "index": 15,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 16,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
@@ -860,76 +1003,97 @@
           "scaleDegree": "3"
         },
         {
-          "index": 15,
+          "index": 17,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
           "startBeat": 5.667,
           "startMeasure": 2,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 16,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 6.0,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "4"
-        },
-        {
-          "index": 17,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 6.333,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.333,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 6.667,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.667,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 19,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 7.0,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 6.333,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "2"
         },
         {
           "index": 20,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "startBeat": 6.667,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "3"
         },
         {
           "index": 21,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.333,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
         },
         {
           "index": 22,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 7.333,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 23,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 7.667,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 24,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 25,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 8.333,
+          "startMeasure": 3,
+          "beatWithinMeasure": 1.333,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 26,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
@@ -939,27 +1103,27 @@
           "scaleDegree": "3"
         },
         {
-          "index": 23,
+          "index": 27,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
+          "beatWithinMeasure": 2,
           "scaleDegree": "4"
         },
         {
-          "index": 24,
+          "index": 28,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
           "startBeat": 9.333,
           "startMeasure": 3,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "4"
+          "scaleDegree": "3"
         },
         {
-          "index": 25,
+          "index": 29,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
@@ -969,52 +1133,13 @@
           "scaleDegree": "2"
         },
         {
-          "index": 26,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 10.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 27,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 10.333,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3.333,
-          "scaleDegree": "3"
-        },
-        {
-          "index": 28,
-          "type": "note",
-          "duration": "eighthTriplet",
-          "durationBeats": 0.333,
-          "startBeat": 10.667,
-          "startMeasure": 3,
-          "beatWithinMeasure": 3.667,
-          "scaleDegree": "1"
-        },
-        {
-          "index": 29,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 11.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 4.0
-        },
-        {
           "index": 30,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
+          "startBeat": 10,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3,
           "scaleDegree": "1"
         },
         {
@@ -1022,59 +1147,59 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.333,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "startBeat": 10.333,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "2"
         },
         {
           "index": 32,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.667,
-          "startMeasure": 4,
-          "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "startBeat": 10.667,
+          "startMeasure": 3,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "3"
         },
         {
           "index": 33,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.0,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "startBeat": 11,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
         },
         {
           "index": 34,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.333,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.333,
-          "scaleDegree": "2"
+          "startBeat": 11.333,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.333,
+          "scaleDegree": "3"
         },
         {
           "index": 35,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.667,
-          "startMeasure": 4,
-          "beatWithinMeasure": 2.667,
-          "scaleDegree": "6"
+          "startBeat": 11.667,
+          "startMeasure": 3,
+          "beatWithinMeasure": 4.667,
+          "scaleDegree": "2"
         },
         {
           "index": 36,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
+          "beatWithinMeasure": 1,
           "scaleDegree": "1"
         },
         {
@@ -1082,46 +1207,127 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.333,
+          "startBeat": 12.333,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.333,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 1.333,
+          "scaleDegree": "2"
         },
         {
           "index": 38,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.667,
+          "startBeat": 12.667,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1.667,
+          "scaleDegree": "3"
         },
         {
           "index": 39,
-          "type": "rest",
-          "duration": "quarter",
-          "durationBeats": 1,
-          "startBeat": 15.0,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 40,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 13.333,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 41,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 13.667,
+          "startMeasure": 4,
+          "beatWithinMeasure": 2.667,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 42,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
+        },
+        {
+          "index": 43,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14.333,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.333,
+          "scaleDegree": "2"
+        },
+        {
+          "index": 44,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 14.667,
+          "startMeasure": 4,
+          "beatWithinMeasure": 3.667,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 45,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 15,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
+        },
+        {
+          "index": 46,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 15.333,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.333,
+          "scaleDegree": "3"
+        },
+        {
+          "index": 47,
+          "type": "note",
+          "duration": "eighthTriplet",
+          "durationBeats": 0.333,
+          "startBeat": 15.667,
+          "startMeasure": 4,
+          "beatWithinMeasure": 4.667,
+          "scaleDegree": "2"
         }
       ],
-      "noteOpportunityCount": 36,
+      "noteOpportunityCount": 48,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
-        "alternateAfterGroups": 4,
+        "groupCharacter": "the same rising/falling pair as L1, back to back with no rest between groups",
+        "alternateAfterGroups": 8,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0. Thresholds lock once earned.",
-        "passThreshold": 162,
-        "star2Threshold": 576,
-        "star3Threshold": 720,
+        "passThreshold": 216,
+        "star2Threshold": 768,
+        "star3Threshold": 960,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 720 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
@@ -1143,10 +1349,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 1,
@@ -1156,7 +1362,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "3"
         },
         {
           "index": 2,
@@ -1166,17 +1372,17 @@
           "startBeat": 0.667,
           "startMeasure": 1,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 4,
@@ -1196,17 +1402,17 @@
           "startBeat": 1.667,
           "startMeasure": 1,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "4"
+          "scaleDegree": "1"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 7,
@@ -1226,17 +1432,17 @@
           "startBeat": 2.667,
           "startMeasure": 1,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 9,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 3.0,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 10,
@@ -1246,7 +1452,7 @@
           "startBeat": 3.333,
           "startMeasure": 1,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 11,
@@ -1256,17 +1462,17 @@
           "startBeat": 3.667,
           "startMeasure": 1,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "6"
+          "scaleDegree": "1"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 13,
@@ -1276,7 +1482,7 @@
           "startBeat": 4.333,
           "startMeasure": 2,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 14,
@@ -1286,17 +1492,17 @@
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "7"
+          "scaleDegree": "4"
         },
         {
           "index": 15,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 16,
@@ -1306,7 +1512,7 @@
           "startBeat": 5.333,
           "startMeasure": 2,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 17,
@@ -1316,17 +1522,17 @@
           "startBeat": 5.667,
           "startMeasure": 2,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "6"
+          "scaleDegree": "1"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 19,
@@ -1346,17 +1552,17 @@
           "startBeat": 6.667,
           "startMeasure": 2,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 21,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 22,
@@ -1376,17 +1582,17 @@
           "startBeat": 7.667,
           "startMeasure": 2,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "4"
+          "scaleDegree": "1"
         },
         {
           "index": 24,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
+          "scaleDegree": "2"
         },
         {
           "index": 25,
@@ -1396,7 +1602,7 @@
           "startBeat": 8.333,
           "startMeasure": 3,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "3"
         },
         {
           "index": 26,
@@ -1413,10 +1619,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 28,
@@ -1436,17 +1642,17 @@
           "startBeat": 9.667,
           "startMeasure": 3,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "5"
+          "scaleDegree": "1"
         },
         {
           "index": 30,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 31,
@@ -1466,17 +1672,17 @@
           "startBeat": 10.667,
           "startMeasure": 3,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "6"
+          "scaleDegree": "4"
         },
         {
           "index": 33,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 34,
@@ -1486,7 +1692,7 @@
           "startBeat": 11.333,
           "startMeasure": 3,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 35,
@@ -1496,17 +1702,17 @@
           "startBeat": 11.667,
           "startMeasure": 3,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "7"
+          "scaleDegree": "1"
         },
         {
           "index": 36,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 37,
@@ -1516,7 +1722,7 @@
           "startBeat": 12.333,
           "startMeasure": 4,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 38,
@@ -1526,16 +1732,16 @@
           "startBeat": 12.667,
           "startMeasure": 4,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "1"
+          "scaleDegree": "4"
         },
         {
           "index": 39,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
+          "beatWithinMeasure": 2,
           "scaleDegree": "3"
         },
         {
@@ -1546,7 +1752,7 @@
           "startBeat": 13.333,
           "startMeasure": 4,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "3"
+          "scaleDegree": "2"
         },
         {
           "index": 41,
@@ -1563,9 +1769,9 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
+          "beatWithinMeasure": 3,
           "scaleDegree": "2"
         },
         {
@@ -1576,7 +1782,7 @@
           "startBeat": 14.333,
           "startMeasure": 4,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 44,
@@ -1586,17 +1792,17 @@
           "startBeat": 14.667,
           "startMeasure": 4,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 45,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "3"
         },
         {
           "index": 46,
@@ -1606,7 +1812,7 @@
           "startBeat": 15.333,
           "startMeasure": 4,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         },
         {
           "index": 47,
@@ -1616,14 +1822,14 @@
           "startBeat": 15.667,
           "startMeasure": 4,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "3"
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 48,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
-        "alternateAfterGroups": 6,
+        "groupCharacter": "the same shape as L3, one step higher in the run",
+        "alternateAfterGroups": 8,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
       "stars": {
@@ -1633,7 +1839,7 @@
         "star2Threshold": 768,
         "star3Threshold": 960,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
@@ -1655,9 +1861,9 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
+          "beatWithinMeasure": 1,
           "scaleDegree": "1"
         },
         {
@@ -1668,7 +1874,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         },
         {
           "index": 2,
@@ -1678,17 +1884,17 @@
           "startBeat": 0.667,
           "startMeasure": 1,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
         },
         {
           "index": 4,
@@ -1698,7 +1904,7 @@
           "startBeat": 1.333,
           "startMeasure": 1,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 5,
@@ -1708,17 +1914,17 @@
           "startBeat": 1.667,
           "startMeasure": 1,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "6"
+          "scaleDegree": "2"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 7,
@@ -1728,7 +1934,7 @@
           "startBeat": 2.333,
           "startMeasure": 1,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "3"
+          "scaleDegree": "2"
         },
         {
           "index": 8,
@@ -1738,16 +1944,16 @@
           "startBeat": 2.667,
           "startMeasure": 1,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "7"
+          "scaleDegree": "3"
         },
         {
           "index": 9,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 3.0,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
+          "beatWithinMeasure": 4,
           "scaleDegree": "4"
         },
         {
@@ -1758,7 +1964,7 @@
           "startBeat": 3.333,
           "startMeasure": 1,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "4"
+          "scaleDegree": "5"
         },
         {
           "index": 11,
@@ -1768,17 +1974,17 @@
           "startBeat": 3.667,
           "startMeasure": 1,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "1"
         },
         {
           "index": 12,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
         },
         {
           "index": 13,
@@ -1788,7 +1994,7 @@
           "startBeat": 4.333,
           "startMeasure": 2,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "b1"
+          "scaleDegree": "2"
         },
         {
           "index": 14,
@@ -1798,17 +2004,17 @@
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 15,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
         },
         {
           "index": 16,
@@ -1818,7 +2024,7 @@
           "startBeat": 5.333,
           "startMeasure": 2,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "7"
+          "scaleDegree": "3"
         },
         {
           "index": 17,
@@ -1828,17 +2034,17 @@
           "startBeat": 5.667,
           "startMeasure": 2,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 19,
@@ -1848,7 +2054,7 @@
           "startBeat": 6.333,
           "startMeasure": 2,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "6"
+          "scaleDegree": "2"
         },
         {
           "index": 20,
@@ -1865,10 +2071,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
         },
         {
           "index": 22,
@@ -1888,16 +2094,16 @@
           "startBeat": 7.667,
           "startMeasure": 2,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "2"
+          "scaleDegree": "1"
         },
         {
           "index": 24,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
           "scaleDegree": "1"
         },
         {
@@ -1908,7 +2114,7 @@
           "startBeat": 8.333,
           "startMeasure": 3,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         },
         {
           "index": 26,
@@ -1918,17 +2124,17 @@
           "startBeat": 8.667,
           "startMeasure": 3,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "6"
+          "scaleDegree": "3"
         },
         {
           "index": 27,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "4"
         },
         {
           "index": 28,
@@ -1938,7 +2144,7 @@
           "startBeat": 9.333,
           "startMeasure": 3,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 29,
@@ -1948,17 +2154,17 @@
           "startBeat": 9.667,
           "startMeasure": 3,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "7"
+          "scaleDegree": "2"
         },
         {
           "index": 30,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 31,
@@ -1968,7 +2174,7 @@
           "startBeat": 10.333,
           "startMeasure": 3,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "3"
+          "scaleDegree": "2"
         },
         {
           "index": 32,
@@ -1978,16 +2184,16 @@
           "startBeat": 10.667,
           "startMeasure": 3,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "3"
         },
         {
           "index": 33,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
+          "beatWithinMeasure": 4,
           "scaleDegree": "4"
         },
         {
@@ -1998,7 +2204,7 @@
           "startBeat": 11.333,
           "startMeasure": 3,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "4"
+          "scaleDegree": "5"
         },
         {
           "index": 35,
@@ -2008,17 +2214,17 @@
           "startBeat": 11.667,
           "startMeasure": 3,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "7"
+          "scaleDegree": "1"
         },
         {
           "index": 36,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "1"
         },
         {
           "index": 37,
@@ -2028,7 +2234,7 @@
           "startBeat": 12.333,
           "startMeasure": 4,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "scaleDegree": "2"
         },
         {
           "index": 38,
@@ -2038,16 +2244,16 @@
           "startBeat": 12.667,
           "startMeasure": 4,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "3"
         },
         {
           "index": 39,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
+          "beatWithinMeasure": 2,
           "scaleDegree": "4"
         },
         {
@@ -2058,7 +2264,7 @@
           "startBeat": 13.333,
           "startMeasure": 4,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "4"
+          "scaleDegree": "3"
         },
         {
           "index": 41,
@@ -2068,17 +2274,17 @@
           "startBeat": 13.667,
           "startMeasure": 4,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "7"
+          "scaleDegree": "2"
         },
         {
           "index": 42,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "1"
         },
         {
           "index": 43,
@@ -2098,17 +2304,17 @@
           "startBeat": 14.667,
           "startMeasure": 4,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "6"
+          "scaleDegree": "3"
         },
         {
           "index": 45,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "4"
         },
         {
           "index": 46,
@@ -2118,7 +2324,7 @@
           "startBeat": 15.333,
           "startMeasure": 4,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "1"
+          "scaleDegree": "5"
         },
         {
           "index": 47,
@@ -2128,13 +2334,13 @@
           "startBeat": 15.667,
           "startMeasure": 4,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "5"
+          "scaleDegree": "1"
         }
       ],
       "noteOpportunityCount": 48,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
+        "groupCharacter": "L3's rising/falling pair, with the last group breaking the pattern to leap up to the octave",
         "alternateAfterGroups": 8,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
@@ -2145,7 +2351,7 @@
         "star2Threshold": 768,
         "star3Threshold": 960,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
@@ -2167,10 +2373,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 0.0,
+          "startBeat": 0,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 1,
@@ -2180,7 +2386,7 @@
           "startBeat": 0.333,
           "startMeasure": 1,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "b1"
+          "scaleDegree": "3"
         },
         {
           "index": 2,
@@ -2190,17 +2396,17 @@
           "startBeat": 0.667,
           "startMeasure": 1,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 3,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 1.0,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 4,
@@ -2210,7 +2416,7 @@
           "startBeat": 1.333,
           "startMeasure": 1,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "7"
+          "scaleDegree": "2"
         },
         {
           "index": 5,
@@ -2220,17 +2426,17 @@
           "startBeat": 1.667,
           "startMeasure": 1,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "4"
+          "scaleDegree": "1"
         },
         {
           "index": 6,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 2.0,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 7,
@@ -2240,7 +2446,7 @@
           "startBeat": 2.333,
           "startMeasure": 1,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "6"
+          "scaleDegree": "3"
         },
         {
           "index": 8,
@@ -2250,17 +2456,17 @@
           "startBeat": 2.667,
           "startMeasure": 1,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 9,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 3.0,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 10,
@@ -2270,7 +2476,7 @@
           "startBeat": 3.333,
           "startMeasure": 1,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "5"
+          "scaleDegree": "1"
         },
         {
           "index": 11,
@@ -2287,10 +2493,10 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 4.0,
+          "startBeat": 4,
           "startMeasure": 2,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "b1"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 13,
@@ -2300,7 +2506,7 @@
           "startBeat": 4.333,
           "startMeasure": 2,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "3"
         },
         {
           "index": 14,
@@ -2310,17 +2516,17 @@
           "startBeat": 4.667,
           "startMeasure": 2,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "6"
+          "scaleDegree": "4"
         },
         {
           "index": 15,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 5.0,
+          "startBeat": 5,
           "startMeasure": 2,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 16,
@@ -2340,17 +2546,17 @@
           "startBeat": 5.667,
           "startMeasure": 2,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "5"
+          "scaleDegree": "1"
         },
         {
           "index": 18,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 6.0,
+          "startBeat": 6,
           "startMeasure": 2,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "6"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 19,
@@ -2377,9 +2583,9 @@
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 7.0,
+          "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4.0,
+          "beatWithinMeasure": 4,
           "scaleDegree": "5"
         },
         {
@@ -2390,7 +2596,7 @@
           "startBeat": 7.333,
           "startMeasure": 2,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "4"
+          "scaleDegree": "1"
         },
         {
           "index": 23,
@@ -2400,17 +2606,17 @@
           "startBeat": 7.667,
           "startMeasure": 2,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "3"
+          "scaleDegree": "2"
         },
         {
           "index": 24,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 8.0,
-          "startMeasure": 3,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "1"
+          "startBeat": 8,
+          "startMeasure": 2,
+          "beatWithinMeasure": 5,
+          "scaleDegree": "2"
         },
         {
           "index": 25,
@@ -2420,7 +2626,7 @@
           "startBeat": 8.333,
           "startMeasure": 3,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "5"
+          "scaleDegree": "3"
         },
         {
           "index": 26,
@@ -2430,17 +2636,17 @@
           "startBeat": 8.667,
           "startMeasure": 3,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "4"
         },
         {
           "index": 27,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 9.0,
+          "startBeat": 9,
           "startMeasure": 3,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "2"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 28,
@@ -2450,7 +2656,7 @@
           "startBeat": 9.333,
           "startMeasure": 3,
           "beatWithinMeasure": 2.333,
-          "scaleDegree": "6"
+          "scaleDegree": "2"
         },
         {
           "index": 29,
@@ -2460,17 +2666,17 @@
           "startBeat": 9.667,
           "startMeasure": 3,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "7"
+          "scaleDegree": "1"
         },
         {
           "index": 30,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 10.0,
+          "startBeat": 10,
           "startMeasure": 3,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 31,
@@ -2480,7 +2686,7 @@
           "startBeat": 10.333,
           "startMeasure": 3,
           "beatWithinMeasure": 3.333,
-          "scaleDegree": "7"
+          "scaleDegree": "3"
         },
         {
           "index": 32,
@@ -2490,17 +2696,17 @@
           "startBeat": 10.667,
           "startMeasure": 3,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "6"
+          "scaleDegree": "4"
         },
         {
           "index": 33,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 11.0,
+          "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 34,
@@ -2510,7 +2716,7 @@
           "startBeat": 11.333,
           "startMeasure": 3,
           "beatWithinMeasure": 4.333,
-          "scaleDegree": "b1"
+          "scaleDegree": "1"
         },
         {
           "index": 35,
@@ -2520,17 +2726,17 @@
           "startBeat": 11.667,
           "startMeasure": 3,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "5"
+          "scaleDegree": "2"
         },
         {
           "index": 36,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 12.0,
+          "startBeat": 12,
           "startMeasure": 4,
-          "beatWithinMeasure": 1.0,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 1,
+          "scaleDegree": "2"
         },
         {
           "index": 37,
@@ -2540,7 +2746,7 @@
           "startBeat": 12.333,
           "startMeasure": 4,
           "beatWithinMeasure": 1.333,
-          "scaleDegree": "1"
+          "scaleDegree": "3"
         },
         {
           "index": 38,
@@ -2550,17 +2756,17 @@
           "startBeat": 12.667,
           "startMeasure": 4,
           "beatWithinMeasure": 1.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "4"
         },
         {
           "index": 39,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 13.0,
+          "startBeat": 13,
           "startMeasure": 4,
-          "beatWithinMeasure": 2.0,
-          "scaleDegree": "4"
+          "beatWithinMeasure": 2,
+          "scaleDegree": "3"
         },
         {
           "index": 40,
@@ -2580,17 +2786,17 @@
           "startBeat": 13.667,
           "startMeasure": 4,
           "beatWithinMeasure": 2.667,
-          "scaleDegree": "7"
+          "scaleDegree": "1"
         },
         {
           "index": 42,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 14.0,
+          "startBeat": 14,
           "startMeasure": 4,
-          "beatWithinMeasure": 3.0,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 3,
+          "scaleDegree": "2"
         },
         {
           "index": 43,
@@ -2610,17 +2816,17 @@
           "startBeat": 14.667,
           "startMeasure": 4,
           "beatWithinMeasure": 3.667,
-          "scaleDegree": "6"
+          "scaleDegree": "4"
         },
         {
           "index": 45,
           "type": "note",
           "duration": "eighthTriplet",
           "durationBeats": 0.333,
-          "startBeat": 15.0,
+          "startBeat": 15,
           "startMeasure": 4,
-          "beatWithinMeasure": 4.0,
-          "scaleDegree": "1"
+          "beatWithinMeasure": 4,
+          "scaleDegree": "5"
         },
         {
           "index": 46,
@@ -2640,13 +2846,13 @@
           "startBeat": 15.667,
           "startMeasure": 4,
           "beatWithinMeasure": 4.667,
-          "scaleDegree": "b1"
+          "scaleDegree": "2"
         }
       ],
       "noteOpportunityCount": 48,
       "authoredBeatCount": 16,
       "visual": {
-        "groupCharacter": "two preparatory horn taps and a third-partial headbutt",
+        "groupCharacter": "L4's shape, with the last group breaking the pattern to leap down and back up through the root",
         "alternateAfterGroups": 8,
         "targetTreatment": "one wolf at the strike line; it sits down once bonked and stands back up on the measure line"
       },
@@ -2657,7 +2863,7 @@
         "star2Threshold": 768,
         "star3Threshold": 960,
         "provisional": true,
-        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one \u2014 the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
+        "note": "PROVISIONAL. An attempt plays this four-measure phrase 2 times, so 960 judgment points are available (Perfect 10 per opportunity, src/config/tuning.ts JUDGMENT_POINTS). Pass is 45% of a single pass, deliberately NOT scaled, so a good second read redeems a bad first one — the same shape Rocky Ascent uses. Two stars is 80% of the full attempt and three stars is 100%, so a triplet exercise still has to be played clean all the way through."
       },
       "scoring": {
         "streakBonusEligible": true,
