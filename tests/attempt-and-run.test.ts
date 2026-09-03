@@ -249,6 +249,44 @@ describe("run shell", () => {
     );
   });
 
+  it("ends at the first slot nothing authors, as a content limit", () => {
+    // The shipped ladder tops out at L7 and Rocky Ascent High authors it, so a
+    // normal run no longer reaches this ending — but the rule is still the rule,
+    // and it is what stands between an unauthored slot and a crash mid-run. The
+    // dev-only difficultySequence override is how the case is reached now: L8 is
+    // past the top of the ladder, so nothing in the library fills it.
+    const run = new RunState({
+      key: KEY,
+      bpm: BPM,
+      random: () => 0,
+      difficultySequence: [1, 8],
+    });
+    expect(run.slots[0]?.scenario).not.toBeNull();
+    expect(run.slots[1]?.scenario).toBeNull();
+
+    const pass: AttemptResult = {
+      scenarioId: run.currentSlot!.scenario!.id,
+      difficulty: run.currentSlot!.difficulty,
+      stars: 2,
+      passed: true,
+      score: 100,
+      judgmentPoints: 100,
+      perfect: 1,
+      good: 0,
+      missed: 0,
+      wrongNotes: 0,
+      streak: 1,
+      bestStreak: 1,
+    };
+
+    // Passing slot 0 lands on slot 1, which nothing authors: a content limit,
+    // not a game-over — the player did not fail anything.
+    expect(run.recordResult(pass)).toBe("content-limit");
+    expect(run.over).toBe(true);
+    expect(run.slotsPlayed).toBe(1);
+    expect(run.summary.ending).toBe("content-limit");
+  });
+
   it("plays every slot out now that the library authors the whole ladder", () => {
     const run = new RunState({ key: KEY, bpm: BPM, random: () => 0 });
     const pass = (stars: number): AttemptResult => ({
