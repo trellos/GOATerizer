@@ -6,10 +6,11 @@ A browser guitar game where the guitar is the controller. Real notes, played on 
 real instrument, detected by [Tuninator](https://github.com/trellos/Tuninator),
 make a stupid pixel goat climb a mountain.
 
-This repository currently contains a **vertical slice**: a full run shell, five
-scenarios across two minigame classes covering difficulties 1–6, live guitar
-input, a continuous musical clock, pregame, a timing check, timeline, judgment,
-scoring, stars and results. `docs/game-design/` is the design authority;
+This repository currently contains a **vertical slice**: a full run shell, seven
+scenarios across four minigame classes (Climb, Repeat, Perform, Three-Step)
+covering difficulties 1–7, live guitar input, a continuous musical clock,
+pregame, a timing check, timeline, judgment, scoring, stars and results.
+`docs/game-design/` is the design authority;
 `AGENTS.md` is the repository's working agreement; `docs/IDEAS.md` is the
 running backlog of things noticed while playing, and of the content gaps sitting
 behind finished systems.
@@ -93,6 +94,7 @@ npm run typecheck         # tsc --noEmit
 npm run build             # typecheck + production build
 npm run validate:browser  # build, serve, drive real Chromium through a whole run
 npm run art               # regenerate the placeholder pixel art
+npm run art:import        # cut vendored third-party art (art-sources/) into scenario assets
 npm run shoot:actors      # close-ups and animation strips of the timeline actors
 ```
 
@@ -227,7 +229,7 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 | `src/music/` | Degrees, keys, transposition, guitar fingerings, pitch maths |
 | `src/input/` | The `GuitarInputProvider` boundary, the Tuninator adapter, the deterministic test provider |
 | `src/game/` | Target resolution, judgment, score, stars, the attempt, the 16-slot run, ranks |
-| `src/scenario/` | Scenario schema and loader, the registry, the minigame classes (`RepeatMinigame`, `TimelineActor`) |
+| `src/scenario/` | Scenario schema and loader, the registry, the minigame classes (`ClimbMinigame`, `RepeatMinigame`, `PerformMinigame`, `ThreeStepMinigame`) and the shared `TimelineActor` |
 | `src/ui/` | Timeline model and views, the actor and performer layers, the scenario backdrop, trophies, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
 | `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
@@ -313,29 +315,30 @@ presented as design.
 
 ## Known limits of this slice
 
-- **Nothing authors L7.** The run's difficulty sequence ends on it, so a run
-  that gets that far ends as a *content limit* rather than fabricating exercise
-  data the designer has not written. The ladder is also not monotonic in note
-  count: the `_high` scenarios sit two levels above the normal ones and reuse
-  their phrase tables, so the densest material in the game is an L4.
-- **Two minigame classes.** `RepeatMinigame` and the shared `TimelineActor` are
-  built; TRAVERSE, THREE-STEP, PERFORM and BATTLE are named in the model and not
-  implemented. `ClimbMinigame`'s runtime was deleted when the actors moved onto
-  the timeline — its scenarios still declare the class, and their route data is
-  still authored and validated, but nothing reads it (DECISION-023).
+- **Rocky Ascent High is the only scenario that reaches L7.** The run's
+  difficulty sequence ends on L7; every other shipped scenario tops out lower,
+  so nothing in the shipped library is a content limit any more
+  (DECISION-049). The ladder is also not monotonic in note count: the `_high`
+  scenarios sit two levels above the normal ones and reuse their phrase
+  tables, so the densest material in the game is an L4.
+- **Four of six minigame classes.** `ClimbMinigame`, `RepeatMinigame`,
+  `PerformMinigame` and `ThreeStepMinigame` are built and registered
+  (DECISION-043, DECISION-046, DECISION-048); `TraverseMinigame` and
+  `BattleMinigame` are named in the model and not implemented.
 - **The actors are a draft.** The goat and both cans are the scenarios' own
   placeholder sprites; the can crusher is still canvas primitives, because his
   swing is a two-bone solve rather than a pose cycle and no fixed sprite holds
   it. That gap is now the most obvious rough edge in the frame — see
   `docs/IDEAS.md`.
-- **Placeholder art is original CC0 work**, not the third-party packs the
-  scenario file names — see `docs/assets/ASSET_SOURCES.md` for why and for how
-  to swap them in.
-- **Nothing selects a drum rhythm variant.** Every intensity rung has straight,
-  sixteenth and triplet versions, chosen from the authored notes — but all 20
-  authored levels resolve to `straight`, because the material tops out at
-  eighths. Two thirds of the drum work is unheard in play until a scenario is
-  authored in sixteenths or triplets.
+- **Placeholder art is original CC0 work** for the four scenarios that predate
+  DECISION-047; Goat Frontman and Butt-Butt-BONK use real third-party art
+  instead — see `docs/assets/ASSET_SOURCES.md` for provenance and licensing.
+- **The sixteenth drum rhythm variant is still unheard.** Every intensity rung
+  has straight, eighth, sixteenth and triplet versions, chosen from the
+  authored notes. Butt-Butt-BONK authors triplets, so that variant is now
+  selected by real content (DECISION-048); nothing yet authors a sixteenth —
+  the obvious candidate is a future `BattleMinigame` scenario, whose musical
+  family is sixteenth phrases.
 - **The G string offers one hand position, and cannot offer more.** The low root
   has exactly one possible fret per string, and the register the game is written
   in puts that below the nut on the G string in 20 of 24 keys — see
