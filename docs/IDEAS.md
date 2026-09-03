@@ -55,12 +55,19 @@ monotonic in note count — the `_high` scenarios sit two levels above the norma
 ones and reuse their phrase tables, so the densest material in the game is an
 L4.
 
+**Closed, 2026-09-02 (DECISION-049).** Rocky Ascent High now authors L7 (the
+Scale content redo added L5–L7 across the ladder), so nothing in the shipped
+library is a content limit any more, and the drum ladder's top rung ("rage")
+is heard in play. Every other shipped scenario still tops out lower, and the
+ladder remains non-monotonic in note count as described above.
+
 ### Drum rungs 6–7 are still unmeasured, though no longer unprotected
 
 There is now a soft clipper on the master (DECISION-033), so a loud rung cannot
-square off the output the way it could. But rungs 6–7 have still never been
-*heard*, because nothing authors those difficulties — worth measuring against
-pinned L6/L7 content once it exists, to check they read as an escalation rather
+square off the output the way it could. Rung 6 has still never been *heard* in
+play, because nothing authors that difficulty; rung 7 is now reachable via
+Rocky Ascent High's L7 (DECISION-049) — worth measuring against pinned L6/L7
+content once rung 6 also has content, to check they read as an escalation rather
 than as the clipper working harder.
 
 ---

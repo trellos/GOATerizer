@@ -5,13 +5,19 @@
 
 **Date:** 2026-09-02
 
-> **Update, same day: one of the five is built.** `ThreeStepMinigame` ships, and
-> the triplet slot was filled by **Butt-Butt-BONK** — triplets against a wolf, by
-> moonlight — rather than Hop-Hop-LEAP, on the designer's instruction. It uses
-> the same two asset packs entry 2 names below, plus the backdrop from entry 3
-> recoloured to night. See `DECISION-048` and
-> `docs/scenarios/butt-butt-bonk/`. The four entries below that are not built
-> stand as written.
+> **Update, same day: two of the five are now built.** `ThreeStepMinigame`
+> ships, and the triplet slot was filled by **Butt-Butt-BONK** — triplets
+> against a wolf, by moonlight — rather than Hop-Hop-LEAP, on the designer's
+> instruction. It uses the same two asset packs entry 2 names below, plus the
+> backdrop from entry 3 recoloured to night. See `DECISION-048` and
+> `docs/scenarios/butt-butt-bonk/`.
+>
+> **Later update: `PerformMinigame` also ships**, as entry 5's own **Goat
+> Frontman**, despite this document ranking it last on the grounds that no
+> pack served its expressive-pose needs — see `DECISION-046` and
+> `docs/scenarios/goat-frontman/`. §5 below stands as originally written and
+> is superseded by that decision. The two entries still not built (entries 3
+> and 4, plus the second `BattleMinigame` in entry 1) stand as written.
 >
 > Worth recording, because it changes entry 1's cost: **alizard's wolf sheet has
 > an opaque teal background, not alpha.** It needs the same keying step the birds
@@ -23,15 +29,18 @@ Four of the six permanent minigame families have no scenario and no code:
 |---|---|---|---|
 | `ClimbMinigame` | Scale | yes | `src/scenario/minigames/climb-minigame.ts` |
 | `RepeatMinigame` | Straight Sixteenths | yes | `src/scenario/minigames/repeat-module.ts` |
-| `PerformMinigame` | Blues Lick | **no** | — |
+| `PerformMinigame` | Blues Lick | **yes** | `src/scenario/minigames/perform-minigame.ts` (Goat Frontman, DECISION-046) |
 | `TraverseMinigame` | Scale Run | **no** | — |
-| `ThreeStepMinigame` | Triplets | **no** | — |
+| `ThreeStepMinigame` | Triplets | **yes** | `src/scenario/minigames/three-step-minigame.ts` (Butt-Butt-BONK, DECISION-048) |
 | `BattleMinigame` | Sixteenth Phrases | **no** | — |
 
-Five scenarios are proposed below: one per unbuilt family, plus a second
-`BattleMinigame` that costs almost no new art. They are ranked by the only
-criterion that separates them — **whether usable pixel art actually exists
-online under a licence this repository can accept.**
+Five scenarios were proposed below when this document was written: one per
+unbuilt family, plus a second `BattleMinigame` that costs almost no new art.
+Two of the five families (`ThreeStepMinigame`, `PerformMinigame`) are now
+built, though not always with the exact scenario proposed here — see the
+update note above. They were ranked by the only criterion that separates
+them — **whether usable pixel art actually exists online under a licence
+this repository can accept.**
 
 Every asset named here was fetched and inspected from this environment on
 2026-09-02: licence page read, file downloaded, dimensions and frame layout
@@ -179,6 +188,11 @@ steps.
 ---
 
 ## 5. Goat Frontman — `PerformMinigame` (Blues Lick), GOATS
+
+> **Built, DECISION-046.** Goat Frontman shipped — see
+> `docs/scenarios/goat-frontman/` and `docs/assets/ASSET_SOURCES.md`. The
+> analysis below is kept as the record of why it was ranked last, not as a
+> live proposal.
 
 Catalogue entry: GOATS → Blues Lick. Supported L2–6.
 

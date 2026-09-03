@@ -11,6 +11,17 @@ It answers, for every scenario:
 
 The asset IDs below preserve the existing catalog. This document does **not** create new artwork. It only makes the runtime binding explicit.
 
+**This is a catalogue of scenario concepts, not an implementation-status
+list.** Of the ~190 entries below, only five are built and registered in
+`src/scenario/registry.ts`: **Rocky Ascent** and **Rocky Descent**
+(`ClimbMinigame`, each with an `_high` companion scenario, for seven
+scenarios total), **Can Crushing** (`RepeatMinigame`), **Goat Frontman**
+(`PerformMinigame`), and **Butt-Butt-BONK** (`ThreeStepMinigame`). Everything
+else here is a named, slot-bound proposal waiting on a scenario JSON, art,
+and a registry entry (README.md "Adding a scenario"); check
+`src/scenario/registry.ts` for the current authoritative list of what
+actually ships.
+
 ---
 
 ## 1. Runtime Classes
@@ -92,9 +103,9 @@ Attempt-global score, thresholds, star tier, and explicitly persistent spectacle
 ### Rocky Ascent
 
 - **Minigame class:** `ClimbMinigame`
-- **Supported levels:** L1–4
+- **Supported levels:** L1–6 (shipped as authored; the catalogue entry below predates the Scale content redo, DECISION-049). The companion `Rocky Ascent High` scenario reuses this slot binding at L3–7, the only scenario in the shipped library that reaches L7.
 - **Visual span:** 4m continuous (default)
-- **Scenario role:** L1 is a pleasant series of boulders; each level gets steeper and more precarious until L4 is an absurd near-vertical summit climb.
+- **Scenario role:** L1 is a pleasant series of boulders; each level gets steeper and more precarious until the top of the ladder is an absurd near-vertical summit climb.
 
 | Class slot | Existing asset ID(s) | How the asset fits |
 |---|---|---|

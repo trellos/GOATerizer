@@ -55,8 +55,12 @@ generation.
 
 ## What I want from you
 
-Propose new scenarios for the five families other than `ClimbMinigame` — that
-one is built and does not need more. For each proposal give me:
+Propose new scenarios for `TraverseMinigame` and `BattleMinigame`, which have
+no built scenario yet, or a second scenario for a family that already has
+one (`ClimbMinigame`, `RepeatMinigame`, `PerformMinigame`, `ThreeStepMinigame`
+all have exactly one built scenario each and could take another). Check
+`src/scenario/registry.ts` for the current list before proposing — this list
+goes stale as families ship. For each proposal give me:
 
 1. **Name** and one-line premise.
 2. **Family** and why the musical material suits it.

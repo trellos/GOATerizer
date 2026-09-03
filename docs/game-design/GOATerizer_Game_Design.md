@@ -449,9 +449,8 @@ Examples:
 
 The game-level system generates the performance event and energy. The class decides the scenario consequence.
 
-Detailed class behavior is defined in:
+Detailed class behavior is defined in this document (§8) and in:
 
-- `GOATerizer_Parameterized_Minigame_Behavior_and_Scenario_Bindings.md`
 - `GOATerizer_Scenario_Asset_Slot_Bindings.md`
 
 ---
@@ -1101,17 +1100,24 @@ The overall game does not attempt to infer those things from the numeric difficu
 
 ## Companion Documents
 
+**Two canonical design documents exist: this one and the one below.** Earlier
+revisions of this section named six companion files —
+`GOATerizer_MinGame_Structure(1).md`, `GOATerizer_Visual_Asset_System(1).md`,
+`GOATerizer_Theme_Applications.md` and
+`GOATerizer_Parameterized_Minigame_Behavior_and_Scenario_Bindings.md` among
+them. None of those paths exist; their content was folded into this document
+(§8, class behavior) and the one below before this repository was created
+(see `AGENTS.md` §1, which corrects the same stale list).
+
 The detailed content/runtime architecture is defined by:
 
-- `GOATerizer_MinGame_Structure(1).md`
-- `GOATerizer_Visual_Asset_System(1).md`
-- `GOATerizer_Theme_Applications.md`
-- `GOATerizer_Parameterized_Minigame_Behavior_and_Scenario_Bindings.md`
 - `GOATerizer_Scenario_Asset_Slot_Bindings.md`
 
-If this GDD conflicts with those documents on **game-level flow**, this GDD should be treated as the newer authority.
+If this GDD conflicts with that document on **game-level flow**, this GDD
+should be treated as the newer authority.
 
-For minigame-class visual behavior and scenario asset bindings, the companion specifications remain authoritative.
+For minigame-class visual behavior and scenario asset bindings, the companion
+specification remains authoritative.
 
 ---
 

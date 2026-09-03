@@ -250,11 +250,11 @@ type IntensitySpec = {
  *                  cymbal, a kick on every beat and on every pickup slot the
  *                  fill leaves free, and a descending tom fill across beat 4.
  *
- * Nothing authors difficulty 7 today (the run's `DIFFICULTY_SEQUENCE` ends
- * there, but no scenario has L7 level data). All seven are defined anyway: the
- * ladder is a property of the difficulty scale, not of the current content, and
- * a content gap is not a reason for the top rung to be missing when it is
- * filled.
+ * Rocky Ascent High authors L7 (DECISION-049), so rung 7 is heard in play;
+ * every other shipped scenario tops out lower. All seven rungs are defined
+ * regardless: the ladder is a property of the difficulty scale, not of the
+ * current content, and a content gap is not a reason for the top rung to be
+ * missing when it is filled.
  */
 const INTENSITY_LADDER: readonly IntensitySpec[] = [
   {
