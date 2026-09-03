@@ -364,6 +364,8 @@ export class GameApp {
    * rather than on the results screen.
    */
   #previewing = false;
+  /** The input source to put back when a preview ends. See `#previewScenario`. */
+  #inputBeforePreview: "tuninator" | "test" | "synth" = "tuninator";
   /** `?dev=1&seed=N`. Fixed by default, so a demo link replays. */
   #autoplaySeed: number = AUTOPLAY_DEFAULT_SEED;
   /**
@@ -564,6 +566,30 @@ export class GameApp {
     this.#devScenarioId = options.scenario.id;
     this.#devLevel = options.difficulty;
     this.#showPreviewExit(true);
+    // The dev panel is hidden while the editor is up; a preview is the game, and
+    // its readouts are how you find out why a preview did not do what you meant.
+    this.#debug?.setEnabled(this.#devMode);
+
+    /*
+     * A preview runs on INJECTED input, never on a microphone.
+     *
+     * The autoplay tiers normally drive the synthetic mic, so that a demo
+     * exercises the real recognizer — which is the right default for a demo and
+     * the wrong one here. A preview answers "does the phrase I just authored
+     * play", and routing that answer through `getUserMedia`, a worklet, an
+     * amplitude gate and pitch detection means it can come back "no" for a
+     * dozen reasons that have nothing to do with the notes: no permission, a
+     * live mic picking up a silent room, a gate set for a loud pickup. Then
+     * every target simply expires to a miss and nothing says why.
+     *
+     * `TestGuitarInputProvider` puts the planned gestures straight into the
+     * judge. Everything downstream is still the real game — the same targets,
+     * the same judgment, the same score — and the notes are still audible,
+     * because the monitor plays them whichever sink is driving.
+     */
+    this.#inputBeforePreview = this.#initialInputKind;
+    this.#initialInputKind = "test";
+
     // A scenario created in this session has art nothing has loaded yet.
     await this.#assets.load(options.scenario.assetUrls);
     await this.#enterPregame();
@@ -585,6 +611,8 @@ export class GameApp {
     if (!this.#previewing) return;
     this.#previewing = false;
     this.#showPreviewExit(false);
+    this.#initialInputKind = this.#inputBeforePreview;
+    this.#debug?.setEnabled(false);
 
     this.#run = null;
     this.#current = null;

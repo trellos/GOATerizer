@@ -138,7 +138,7 @@ export class EditorPlayback {
     else this.#transport.setBpm(program.bpm);
 
     this.#drums ??= new DrumPlayer(context, this.#transport, master);
-    this.#plucks ??= new PluckVoicePool(context, master);
+    this.#plucks ??= this.#buildPlucks(context, master);
     this.#drums.start();
 
     // Start on the next bar line, so the loop and the kit agree about beat 1.
@@ -246,12 +246,22 @@ export class EditorPlayback {
     const context = this.#audio.context;
     const master = this.#audio.master;
     if (!context || !master) return;
-    this.#plucks ??= new PluckVoicePool(context, master);
+    this.#plucks ??= this.#buildPlucks(context, master);
     const ref = resolveDegree(
       parseDegreeToken(tokenForLane(vocabulary, note.lane)),
       EDITOR_KEY.mode
     );
     this.#plucks.pluck(degreeToMidi(ref, EDITOR_KEY), context.currentTime + 0.01, 0.25);
+  }
+
+  /**
+   * The editor's guitar: the harmonic pluck, not the recognizer's sine.
+   *
+   * Nothing here is ever detected — the editor has no judge — so the only
+   * listener is a person, competing with a drum kit. See `dev/pluck-voices.ts`.
+   */
+  #buildPlucks(context: AudioContext, master: AudioNode): PluckVoicePool {
+    return new PluckVoicePool(context, master, "pluck");
   }
 
   #tick(): void {

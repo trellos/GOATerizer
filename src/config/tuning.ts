@@ -468,10 +468,14 @@ export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;
  * Loudness of the autoplay monitor (`src/dev/autoplay-monitor.ts`) — the
  * audible pluck that lets a developer hear what autoplay played, independent
  * of whichever sink (`synth` or `test`) is actually driving judgment. Mixed
- * onto the same master bus as the bass and drums, so this is well under
- * `AUTOPLAY_PLUCK_PEAK_GAIN`: loud enough to follow the performance, not loud
- * enough to bury the backing track it exists to be checked against.
+ * onto the same master bus as the bass and drums.
+ *
+ * Raised from 0.35, where the guitar could not be picked out of the backing at
+ * all: it is the thing the whole screen is about, and it was mixed like a
+ * click track. The other half of that fix is the timbre — the monitor plucks a
+ * harmonic voice rather than the recognizer's bare sine
+ * (`src/dev/pluck-voices.ts`) — so this buys presence rather than just volume.
  * Provisional per `AGENTS.md` §17 — nobody has designed a "how loud is a demo
- * click track" answer.
+ * guitar" answer.
  */
-export const AUTOPLAY_MONITOR_GAIN = 0.35;
+export const AUTOPLAY_MONITOR_GAIN = 0.6;
