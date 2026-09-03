@@ -4,6 +4,17 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
+#### DECISION-049: A minigame is told the phrase length, and the shipped tests are re-pinned to the authored content
+* **Date:** 2026-09-02
+* **Status:** Accepted
+* **Owner:** Trevor (agent-assisted)
+* **Context:** `npm run build` and `npm test` were both red on `main`. Three separate causes had piled up: `PERFORM_MINIGAME` never implemented the `backgroundId` member the module contract added, and three test files had drifted from the API (`AttemptRuntime` no longer emits an `energy` event, `parseLevel` is handed the whole level object); the Scale content redo (e1c9e35) moved Rocky Ascent's eighth-note material from L3/L4 up to L5/L6 and added L5-L7 across the ladder without re-pinning the tests that named those levels; and Goat Frontman's authored star ceilings were still the one-pass numbers from the branch where an attempt played its phrase once. Underneath the last of these, `flourishOpportunities` took its modulo from `plan.totalBeats` — the whole attempt — so a flourish authored at beat 3 was marked on the first pass and silently dropped on the second, which is the opposite of what its own doc comment promises.
+* **Decision:** Add `phraseBeats` to the host-owned `AttemptContext.plan` — the length of the *authored phrase*, which an attempt plays `ATTEMPT_REPEATS` times — and take the flourish modulo from it. Regenerate `goat_frontman.scenario.json` with `scripts/author-goat-frontman.mjs`, which already reads `ATTEMPT_REPEATS` from `src/config/tuning.ts`. Update the drifted tests to assert the content that is actually authored, keeping each test's original intent (the eighth-note density cases move to L5/L6; the run-shell case now states that nothing in the shipped library is a content limit any more, since Rocky Ascent High authors L7).
+* **Alternatives Considered:** (a) Deriving the phrase length inside `PerformMinigame` by importing `ATTEMPT_REPEATS` and dividing `totalBeats`. Rejected: how many times the host repeats a phrase is host business, and a family reaching into `src/config/tuning.ts` is exactly the ownership inversion AGENTS.md §"Scenarios Own" forbids. (b) Reverting the Scale content redo so the old tests passed again. Rejected: the redo is a deliberate design change with authored data behind it — the tests were the stale half.
+* **Consequences:** Positive — `npm test` (583) and `npm run build` are green, so the Pages deploy can run; flourish notes now fire on both passes of an attempt, which is what the design and the docstring already said; Goat Frontman's ★★★ once again means every opportunity in the *attempt* taken at Perfect. Negative — `plan` grows a fourth field every future family has to understand, and no *normal* run can reach the "content-limit" ending any more, so the test that covers it now reaches an unauthored slot through the dev-only `difficultySequence` override rather than by playing the shipped ladder out. The rule stays covered; what is no longer covered is the shipped library happening to have a hole in it.
+
+---
+
 > **Renumbered on merge.** These two entries were written as DECISION-045
 > and -046 on a branch that was cut before the Goat Frontman work took those
 > ids on `main`. The content is unchanged; only the numbers and the

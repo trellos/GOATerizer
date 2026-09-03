@@ -51,7 +51,7 @@ describe("timing windows", () => {
     // The floor, and why it exists. Eighth material used to be clamped to a
     // quarter of a beat either side, and at 90bpm that is 167ms — inside the
     // uncompensated latency of an ordinary rig. See `GOOD_WINDOW_FLOOR_BEATS`.
-    const windows = computeWindows(levelTargets(4));
+    const windows = computeWindows(levelTargets(6));
     for (const window of windows) {
       expect(window.good).toBeGreaterThanOrEqual(GOOD_WINDOW_FLOOR_BEATS);
     }
@@ -61,7 +61,7 @@ describe("timing windows", () => {
     // Forgiveness is about what counts as a hit. Widening what counts as
     // *flawless* would make three stars mean less, so the floor deliberately
     // does not reach Perfect.
-    const windows = computeWindows(levelTargets(4));
+    const windows = computeWindows(levelTargets(6));
     expect(windows[3]?.perfect).toBe(TIMING_WINDOWS_BEATS.eighth.perfect);
     expect(windows[3]?.perfect).toBeLessThan(windows[3]!.good);
   });
@@ -385,8 +385,8 @@ describe("releases", () => {
 });
 
 describe("dense subdivisions stay unambiguous", () => {
-  it("assigns each eighth-note attack to its own target at L4", () => {
-    const targets = levelTargets(4);
+  it("assigns each eighth-note attack to its own target at L6", () => {
+    const targets = levelTargets(6);
     const harness = makeJudge(targets);
     for (const target of targets) harness.play(target.midi, target.startBeat);
 
@@ -396,7 +396,7 @@ describe("dense subdivisions stay unambiguous", () => {
   });
 
   it("assigns a slightly-late eighth to the target it was aimed at, not the next", () => {
-    const targets = levelTargets(4);
+    const targets = levelTargets(6);
     const harness = makeJudge(targets);
     const target = targets[6]!;
     harness.play(target.midi, target.startBeat + 0.12);
@@ -415,7 +415,7 @@ describe("dense subdivisions stay unambiguous", () => {
     // for whom *every* note landed on the neighbouring target's time and was
     // called a wrong note. Target 6 is still there to be hit, so this is
     // forgiveness rather than a free pass.
-    const targets = levelTargets(4);
+    const targets = levelTargets(6);
     const harness = makeJudge(targets);
     harness.play(targets[7]!.midi, targets[6]!.startBeat);
 

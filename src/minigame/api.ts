@@ -103,6 +103,14 @@ export type AttemptContext = {
     readonly measures: number;
     readonly beatsPerMeasure: number;
     readonly totalBeats: number;
+    /**
+     * Beats in the *authored phrase*, which an attempt plays more than once —
+     * so `totalBeats` is a whole multiple of this. A family that has to line an
+     * authored beat up with the pass it is being played on needs the phrase
+     * length, not the attempt length: taking an opportunity's start beat modulo
+     * this is what lets a phrase authored once say the same thing on every pass.
+     */
+    readonly phraseBeats: number;
   };
   /** The prompt, in order. Readable; never changeable. */
   readonly opportunities: readonly Opportunity[];

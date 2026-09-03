@@ -11,6 +11,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
+
 import goatFrontmanJson from "../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
 import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/game/attempt.js";
 import { RunState } from "../src/game/run.js";
@@ -51,9 +53,6 @@ function harness(difficulty: number, key: RunKey = G_MINOR, startBeat = 20) {
   const clock = { time: startBeat * SECONDS_PER_BEAT };
   attempt.onEvent((event) => {
     events.push(event);
-    if (event.type === "energy") {
-      attempt.deliverEnergy(event.energy, attempt.toAttemptBeat(toBeat(clock.time)));
-    }
   });
   provider.onEvent((event) => attempt.handleGuitarEvent(event));
   void provider.start();
@@ -78,7 +77,7 @@ function playFlawlessly(difficulty: number, key: RunKey = G_MINOR): { attempt: A
     h.playAt(target.midi, target.startBeat);
     h.advanceTo(target.startBeat + 0.001);
   }
-  h.advanceTo(16);
+  h.advanceTo(ATTEMPT_BEATS);
   const result = h.attempt.result;
   if (!result) throw new Error("attempt did not complete");
   return { attempt: h.attempt, result };
@@ -128,7 +127,7 @@ function firstTargets(attempt: AttemptRuntime) {
       lane: t.lane,
       midi: t.midi,
     })),
-    plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16 },
+    plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
   });
   const flourish = attempt.targets.find((t) => flourishes.has(t.opportunityIndex));
   const plain = attempt.targets.find((t) => !flourishes.has(t.opportunityIndex));
@@ -210,7 +209,7 @@ describe("Goat Frontman scenario data", () => {
     const { passThreshold, star2Threshold, star3Threshold, provisional } = level(difficulty).stars;
     expect(passThreshold).toBeLessThan(star2Threshold);
     expect(star2Threshold).toBeLessThan(star3Threshold);
-    expect(star3Threshold).toBe(level(difficulty).noteOpportunityCount * 10);
+    expect(star3Threshold).toBe(level(difficulty).noteOpportunityCount * 10 * ATTEMPT_REPEATS);
     expect(provisional).toBe(true);
   });
 
@@ -255,7 +254,7 @@ describe("PerformMinigame on the timeline", () => {
       if (flourishes.has(index)) expect(art.overlay?.assetId).toBe(FRONTMAN.bindings.noteArt.flourish);
       else expect(art.overlay).toBeUndefined();
     }
-    expect(flourishes.size).toBe(4);
+    expect(flourishes.size).toBe(4 * ATTEMPT_REPEATS);
   });
 
   it("cycles the pose on an ordinary note and summons nobody", () => {
@@ -326,18 +325,21 @@ describe("PerformMinigame on the timeline", () => {
 
   it("summons more goats per flourish at a higher level, and never fewer overall", () => {
     const crowds = LEVELS.map((d) => performIn(playFlawlessly(d).attempt).progress.crowd);
-    expect(crowds[0]).toBe(4); // one per L1 flourish
+    expect(crowds[0]).toBe(4 * ATTEMPT_REPEATS); // one per L1 flourish, on both passes
     for (let i = 1; i < crowds.length; i += 1) expect(crowds[i]!).toBeGreaterThanOrEqual(crowds[i - 1]!);
     expect(crowds[3]!).toBeGreaterThan(crowds[0]!);
   });
 
   it("gives every crowd member its own slot, spread to both sides", () => {
     const { attempt } = playFlawlessly(3);
-    const crowd = crowdAt(attempt, 30);
+    // Past the last flourish plus the walk-on, so nobody is still in the wings.
+    const crowd = crowdAt(attempt, ATTEMPT_BEATS + 4);
     expect(crowd.length).toBe(performIn(attempt).progress.crowd);
-    const xs = crowd.map((s) => s.x.toFixed(4));
-    expect(new Set(xs).size).toBe(xs.length);
-    const performerX = spriteAt(attempt, "performer", 30).x;
+    // A slot is a place on the stage, not an x: the rows behind the first
+    // reuse the same offsets set further back, so uniqueness is x AND y.
+    const places = crowd.map((s) => `${s.x.toFixed(4)},${s.y.toFixed(4)}`);
+    expect(new Set(places).size).toBe(places.length);
+    const performerX = spriteAt(attempt, "performer", ATTEMPT_BEATS + 4).x;
     expect(crowd.some((s) => s.x < performerX)).toBe(true);
     expect(crowd.some((s) => s.x > performerX)).toBe(true);
     expect(crowdSlot(0).dx).toBeGreaterThan(0);
@@ -415,7 +417,7 @@ describe("PerformMinigame on the timeline", () => {
 
   it("freezes, still performing, when the attempt fails", () => {
     const h = harness(1);
-    h.advanceTo(16);
+    h.advanceTo(ATTEMPT_BEATS);
     const result = h.attempt.result!;
     expect(result.stars).toBe(0);
     expect(performIn(h.attempt).progress.frozen).toBe(true);
@@ -453,7 +455,7 @@ describe("PerformMinigame content rules", () => {
       config: { ...FRONTMAN, crowdCapacity: 2 },
       data: attempt.level.data,
       assets: [],
-      plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16 },
+      plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
       opportunities: attempt.targets.map((t) => ({
         index: t.opportunityIndex,
         startBeat: t.startBeat,
@@ -474,7 +476,7 @@ describe("PerformMinigame content rules", () => {
     expect(() =>
       flourishOpportunities([2.5], {
         opportunities: [{ index: 0, startBeat: 0, durationBeats: 1, duration: "quarter", lane: 0, midi: 60 }],
-        plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16 },
+        plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
       })
     ).toThrow(/not the start of any note opportunity/);
   });
@@ -487,7 +489,7 @@ describe("PerformMinigame content rules", () => {
         { index: 0, startBeat: 3, durationBeats: 1, duration: "quarter", lane: 0, midi: 60 },
         { index: 1, startBeat: 19, durationBeats: 1, duration: "quarter", lane: 0, midi: 60 },
       ],
-      plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16 },
+      plan: { measures: 4, beatsPerMeasure: 4, totalBeats: 16, phraseBeats: 16 },
     });
     expect([...flourishes]).toEqual([0, 1]);
   });
@@ -495,7 +497,14 @@ describe("PerformMinigame content rules", () => {
   it("refuses a level with more flourishes than notes, and a lone audience state", () => {
     expect(() =>
       PERFORM_MINIGAME.parseLevel(
-        { visualSpanMeasures: 4, resetBetweenMeasures: false, flourishBeats: [0, 1, 2], goatsPerFlourish: 1 },
+        {
+          visual: {
+            visualSpanMeasures: 4,
+            resetBetweenMeasures: false,
+            flourishBeats: [0, 1, 2],
+            goatsPerFlourish: 1,
+          },
+        },
         { noteOpportunityCount: 2, measures: 4 }
       )
     ).toThrow(/3 flourishes for 2/);

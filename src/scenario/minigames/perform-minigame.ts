@@ -693,6 +693,10 @@ export const PERFORM_MINIGAME: MinigameModule = {
     };
   },
 
+  backgroundId(config: unknown): string {
+    return performConfig(config).bindings.background;
+  },
+
   assetIds(config: unknown): readonly string[] {
     const { bindings } = performConfig(config);
     return [
@@ -749,7 +753,7 @@ export function flourishOpportunities(
   flourishBeats: readonly number[],
   context: Pick<AttemptContext, "opportunities" | "plan">
 ): ReadonlySet<number> {
-  const span = context.plan.totalBeats;
+  const span = context.plan.phraseBeats;
   const result = new Set<number>();
   for (const flourishBeat of flourishBeats) {
     let matched = false;

@@ -118,6 +118,7 @@ export class AttemptRuntime {
           measures: level.measurePlan.attemptMeasures * ATTEMPT_REPEATS,
           beatsPerMeasure: level.measurePlan.beatsPerMeasure,
           totalBeats: ATTEMPT_BEATS,
+          phraseBeats: level.measurePlan.attemptMeasures * level.measurePlan.beatsPerMeasure,
         },
         opportunities: this.targets.map((target) => ({
           index: target.opportunityIndex,
