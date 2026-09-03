@@ -173,10 +173,164 @@ function checkRoute(raw: unknown, where: string, opportunities: number): void {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* Authoring                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Where a route starts and ends when a level has never had one. */
+const DEFAULT_START = { x: 0.1, y: 0.88 };
+const DEFAULT_DESTINATION = { x: 0.8, y: 0.3 };
+/** The wobble that keeps a long climb from reading as a ladder. */
+const ZIGZAG = 0.035;
+const ZIGZAG_PERIOD = 3;
+/** The foothold tilt cycle every Rocky route has used since it was authored. */
+const ROTATIONS: readonly number[] = [0, -4, 3, -2, 5];
+
+type Waypoint = { x: number; y: number; scale: number; rotationDeg: number };
+
+const round4 = (value: number): number => Math.round(value * 1e4) / 1e4;
+
+function readWaypoint(raw: unknown, fallback: Waypoint): Waypoint {
+  if (typeof raw !== "object" || raw === null) return fallback;
+  const point = raw as Record<string, unknown>;
+  const pick = (key: string, or: number): number =>
+    typeof point[key] === "number" && Number.isFinite(point[key]) ? (point[key] as number) : or;
+  return {
+    x: pick("x", fallback.x),
+    y: pick("y", fallback.y),
+    scale: pick("scale", fallback.scale),
+    rotationDeg: pick("rotationDeg", fallback.rotationDeg),
+  };
+}
+
+/**
+ * Resamples a route to a new number of waypoints.
+ *
+ * One successful note advances exactly one waypoint, so editing the notes moves
+ * the count and the route has to follow. Resampling the existing polyline rather
+ * than regenerating a line preserves what a designer hand-tuned: L4's absurd
+ * near-vertical summit stays absurd and near-vertical whether it is climbed in
+ * twelve steps or thirty.
+ *
+ * With no route to resample — a difficulty being authored for the first time —
+ * it draws a plain ascent between the level's own start and destination, which
+ * is a placeholder that reads correctly rather than a guess at somebody's taste.
+ */
+function resampleWaypoints(existing: readonly Waypoint[], count: number): Waypoint[] {
+  const out: Waypoint[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const t = count === 1 ? 1 : i / (count - 1);
+    const at = t * (existing.length - 1);
+    const low = existing[Math.floor(at)] as Waypoint;
+    const high = existing[Math.min(existing.length - 1, Math.ceil(at))] as Waypoint;
+    const blend = at - Math.floor(at);
+    out.push({
+      x: round4(low.x + (high.x - low.x) * blend),
+      y: round4(low.y + (high.y - low.y) * blend),
+      scale: round4(low.scale + (high.scale - low.scale) * blend),
+      rotationDeg: ROTATIONS[i % ROTATIONS.length] as number,
+    });
+  }
+  return out;
+}
+
+function generateWaypoints(
+  start: { x: number; y: number },
+  destination: { x: number; y: number },
+  count: number
+): Waypoint[] {
+  const out: Waypoint[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const t = (i + 1) / count;
+    const wobble = Math.sin(((i + 1) / ZIGZAG_PERIOD) * Math.PI) * ZIGZAG;
+    out.push({
+      x: round4(start.x + (destination.x - start.x) * t + wobble),
+      y: round4(start.y + (destination.y - start.y) * t),
+      scale: 1,
+      rotationDeg: ROTATIONS[i % ROTATIONS.length] as number,
+    });
+  }
+  return out;
+}
+
 export const CLIMB_MINIGAME: MinigameModule = {
   id: "ClimbMinigame",
   displayName: "Climb",
   apiVersion: MINIGAME_API_VERSION,
+
+  authoring: {
+    /**
+     * Keeps the route one waypoint per note opportunity, and the measure plan's
+     * own two fields present.
+     *
+     * Everything else in `visual` is prose a designer wrote about the level and
+     * is passed through untouched — the count is the only thing the notes decide.
+     */
+    reconcileLevel(level, shape) {
+      const visual = { ...((level["visual"] as Record<string, unknown>) ?? {}) };
+      const route = { ...((visual["route"] as Record<string, unknown>) ?? {}) };
+      const rawWaypoints = Array.isArray(route["waypoints"]) ? route["waypoints"] : [];
+
+      const startPosition = readWaypoint(route["startPosition"], {
+        ...DEFAULT_START,
+        scale: 1,
+        rotationDeg: 0,
+      });
+      const existing = rawWaypoints.map((entry, i) =>
+        readWaypoint(entry, {
+          ...DEFAULT_DESTINATION,
+          scale: 1,
+          rotationDeg: ROTATIONS[i % ROTATIONS.length] as number,
+        })
+      );
+
+      const waypoints =
+        shape.noteOpportunityCount === 0
+          ? []
+          : existing.length > 0
+            ? resampleWaypoints(existing, shape.noteOpportunityCount)
+            : generateWaypoints(
+                startPosition,
+                readWaypoint(route["destination"], {
+                  ...DEFAULT_DESTINATION,
+                  scale: 1,
+                  rotationDeg: 0,
+                }),
+                shape.noteOpportunityCount
+              );
+
+      const last = waypoints[waypoints.length - 1];
+      const measurePlan = { ...((level["measurePlan"] as Record<string, unknown>) ?? {}) };
+
+      return {
+        ...level,
+        measurePlan: {
+          ...measurePlan,
+          visualSpanMeasures:
+            typeof measurePlan["visualSpanMeasures"] === "number"
+              ? measurePlan["visualSpanMeasures"]
+              : shape.measures,
+          resetBetweenMeasures: measurePlan["resetBetweenMeasures"] === true,
+        },
+        visual: {
+          ...visual,
+          waypointCount: waypoints.length,
+          route: {
+            ...route,
+            space:
+              typeof route["space"] === "string"
+                ? route["space"]
+                : "normalised scenario space: x rightwards 0..1, y downwards 0..1 (0 = top of frame)",
+            startPosition: { x: round4(startPosition.x), y: round4(startPosition.y) },
+            destination: last
+              ? { x: round4(last.x), y: round4(Math.max(0.04, last.y - 0.06)) }
+              : { ...DEFAULT_DESTINATION },
+            waypoints,
+          },
+        },
+      };
+    },
+  },
 
   parseConfig(raw: unknown): ClimbConfig {
     const { classParameters, assetBindings, scenarioId } = obj(raw, "scenario") as {

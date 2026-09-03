@@ -67,7 +67,7 @@ and becomes the place the scenario happens.
 | Live last-note ornament | Needs the star rule and trophy tiers settled in play first; it is a polish pass on top of them. |
 | Background parallax run-progress | Pure art, no mechanism, and it is the easiest thing to add later. |
 | Theme-specific ornaments beyond the goat | Only GOATS has art. A crown on a can-crusher is a later art decision. |
-| The other four minigame classes | TRAVERSE/THREE-STEP/PERFORM/BATTLE have no built scenarios at all. |
+| The other four minigame classes | As first written: TRAVERSE/THREE-STEP/PERFORM/BATTLE had no built scenarios at all. THREE-STEP (Butt-Butt-BONK, DECISION-048) and PERFORM (Goat Frontman, DECISION-046) have since shipped; TRAVERSE and BATTLE remain unbuilt. |
 | Deleting the waypoint routes | See §6 — they stay, unused, behind the class switch. |
 | Keeping the scenario as a diorama | The mechanic replaced it; the panel is a backdrop now. See §6. |
 

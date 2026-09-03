@@ -147,13 +147,15 @@ const SHAPES: readonly { id: string; label: string; perString: readonly number[]
  * elsewhere and cannot be argued with here. The low root has to *be* on the
  * root string, so the string's open pitch cannot be above it, and the run's
  * tonic lives in the fixed one-octave register `LOWEST_TONIC_MIDI` opens
- * (`music/keys.ts`) — A2 up to G#3. Counting tonics inside that register:
+ * (`music/keys.ts`) — C3 up to B3. Counting tonics inside that register:
  *
- *   - the low E and A strings can carry every key;
- *   - the D string (open D3) can carry the seven tonics from D up, so 14 of the
+ *   - the low E and A strings can carry every key — though on the low E the
+ *     root runs from fret 8 to fret 19, so the highest keys are past
+ *     {@link MAX_FRET} and are simply not offered there;
+ *   - the D string (open D3) can carry the ten tonics from D up, so 20 of the
  *     24 keys;
- *   - the G string (open G3) can carry two, G and G#/Ab, so 4 keys — and only
- *     with the root at fret 0 or 1, which is why a key never has more than a
+ *   - the G string (open G3) can carry five, G through B, so 10 keys — with the
+ *     root inside the first four frets, which is why a key never has more than a
  *     couple of G-rooted places to stand.
  *
  * No shape table can widen that. Adding deals fills in the keys that *can* take

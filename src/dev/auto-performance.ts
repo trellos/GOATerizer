@@ -28,6 +28,7 @@ import {
   AUTOPLAY_WRONG_NOTE_CANDIDATES,
   AUTOPLAY_WRONG_NOTE_MARGIN_BEATS,
   AUTOPLAY_WRONG_SHARE,
+  AUTOPLAY_WRONG_SHARE_AT_ZERO,
   WRONG_NOTE_DEBOUNCE_BEATS,
 } from "../config/tuning.js";
 import { computeWindows, type TargetWindows } from "../game/judgment.js";
@@ -40,13 +41,21 @@ import { mod } from "../music/pitch.js";
  * The ids are also the `?autoplay=` values and the dev-button id suffixes, so
  * there is one vocabulary rather than three that have to be kept in step.
  */
-export type AutoplayMode = "perfect" | "75" | "50" | "25" | "off";
+export type AutoplayMode = "perfect" | "75" | "50" | "25" | "0" | "off";
 
-export const AUTOPLAY_MODES: readonly AutoplayMode[] = ["perfect", "75", "50", "25", "off"];
+export const AUTOPLAY_MODES: readonly AutoplayMode[] = ["perfect", "75", "50", "25", "0", "off"];
 
 export function parseAutoplayMode(value: string | null): AutoplayMode | null {
   return AUTOPLAY_MODES.find((mode) => mode === value) ?? null;
 }
+
+/*
+ * `"0"` and `"off"` are not the same tier and the difference is the point.
+ * `"off"` plays nothing at all — silence over the minigame. `"0"` is a
+ * performance: every opportunity is attacked, and every one of them is wrong,
+ * which is what the editor's 0% preview wants to show. A run of misses is
+ * nearly invisible; a run of wrong notes is a scenario failing out loud.
+ */
 
 /** One thing the fake guitarist does. Times are attempt-relative beats. */
 export type AutoGesture = {
@@ -291,7 +300,8 @@ export function planAutoPerformance(options: PlanOptions): AutoPerformance {
     // A wrong pitch does not consume its target (`game/judgment.ts`), so the
     // target still expires to a miss. One fumble, two marks: a wrong played
     // bar and a missed target.
-    if (random() < AUTOPLAY_WRONG_SHARE) {
+    const wrongShare = mode === "0" ? AUTOPLAY_WRONG_SHARE_AT_ZERO : AUTOPLAY_WRONG_SHARE;
+    if (random() < wrongShare) {
       const midi = pickWrongMidi({
         beat,
         targets,

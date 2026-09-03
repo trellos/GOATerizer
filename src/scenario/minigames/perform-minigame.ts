@@ -641,6 +641,48 @@ export const PERFORM_MINIGAME: MinigameModule = {
   displayName: "Perform",
   apiVersion: MINIGAME_API_VERSION,
 
+  authoring: {
+    /**
+     * Keeps the flourishes on notes that still exist.
+     *
+     * A flourish is a beat the crowd grows on, so it only means anything sitting
+     * on a note opportunity. Editing the prompt moves those beats around, and a
+     * flourish left behind on a beat that is now a rest is a payoff that can
+     * never be earned — so a flourish whose note has gone is dropped rather than
+     * slid onto its neighbour, which would be inventing choreography.
+     */
+    reconcileLevel(level, shape) {
+      const visual = { ...((level["visual"] as Record<string, unknown>) ?? {}) };
+      const authored = Array.isArray(visual["flourishBeats"]) ? visual["flourishBeats"] : [];
+      const onNotes = new Set(shape.noteStartBeats.map((beat) => beat.toFixed(3)));
+      const kept = authored
+        .filter((beat): beat is number => typeof beat === "number" && Number.isFinite(beat))
+        .filter((beat) => onNotes.has(beat.toFixed(3)))
+        .slice(0, shape.noteOpportunityCount);
+      const perFlourish =
+        typeof visual["goatsPerFlourish"] === "number" && visual["goatsPerFlourish"] >= 0
+          ? Math.round(visual["goatsPerFlourish"])
+          : 1;
+
+      return {
+        ...level,
+        visual: {
+          ...visual,
+          visualSpanMeasures:
+            typeof visual["visualSpanMeasures"] === "number"
+              ? visual["visualSpanMeasures"]
+              : shape.measures,
+          resetBetweenMeasures: visual["resetBetweenMeasures"] === true,
+          flourishBeats: kept,
+          goatsPerFlourish: perFlourish,
+          // What a clean attempt is worth, which is the whole phrase's
+          // flourishes once per pass.
+          expectedCrowd: kept.length * perFlourish * shape.attemptRepeats,
+        },
+      };
+    },
+  },
+
   parseConfig(raw: unknown): PerformConfig {
     const root = obj(raw, "perform config");
     const params = obj(root["classParameters"], "scenario.classParameters");

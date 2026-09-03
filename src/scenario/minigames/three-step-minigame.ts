@@ -409,6 +409,41 @@ export const THREE_STEP_MINIGAME: MinigameModule = {
   displayName: "Three-Step",
   apiVersion: MINIGAME_API_VERSION,
 
+  authoring: {
+    /**
+     * Nothing here counts notes: this family's level data is how it *reads* the
+     * triplet groups, not how many there are. The one rule that does depend on
+     * the prompt — whole groups of three — is a refusal rather than a repair
+     * (`parseLevel`), because two thirds of a headbutt is not something an
+     * editor can quietly finish on the author's behalf.
+     *
+     * So this only fills in the fields a difficulty being authored for the first
+     * time has not got yet.
+     */
+    reconcileLevel(level, shape) {
+      const measurePlan = { ...((level["measurePlan"] as Record<string, unknown>) ?? {}) };
+      const visual = { ...((level["visual"] as Record<string, unknown>) ?? {}) };
+      return {
+        ...level,
+        measurePlan: {
+          ...measurePlan,
+          visualSpanMeasures:
+            typeof measurePlan["visualSpanMeasures"] === "number"
+              ? measurePlan["visualSpanMeasures"]
+              : 1,
+          resetBetweenMeasures: measurePlan["resetBetweenMeasures"] !== false,
+        },
+        visual: {
+          ...visual,
+          alternateAfterGroups:
+            typeof visual["alternateAfterGroups"] === "number"
+              ? visual["alternateAfterGroups"]
+              : shape.measures,
+        },
+      };
+    },
+  },
+
   parseConfig(raw: unknown): ThreeStepConfig {
     const { assetBindings } = obj(raw, "scenario") as { assetBindings: unknown };
     const bindings = obj(assetBindings, "scenario.assetBindings");
@@ -469,13 +504,17 @@ export const THREE_STEP_MINIGAME: MinigameModule = {
     const visual = obj(level["visual"], "level.visual");
 
     const prompt = level["prompt"];
+    // Notes, not events. A triplet *rest* is a written length, not a step —
+    // counting one as a headbutt would let a level whose groups are two thirds
+    // of a phrase pass as whole ones, which is exactly what happens when a note
+    // is deleted in the editor and its silence is spelled back as a rest of the
+    // same length.
     const triplets = Array.isArray(prompt)
-      ? prompt.filter(
-          (event) =>
-            typeof event === "object" &&
-            event !== null &&
-            (event as Record<string, unknown>)["duration"] === "eighthTriplet"
-        ).length
+      ? prompt.filter((event) => {
+          if (typeof event !== "object" || event === null) return false;
+          const authored = event as Record<string, unknown>;
+          return authored["type"] === "note" && authored["duration"] === "eighthTriplet";
+        }).length
       : 0;
     if (triplets === 0) {
       throw new ScenarioDataError(

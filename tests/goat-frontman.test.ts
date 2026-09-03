@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import goatFrontmanJson from "../docs/scenarios/goat-frontman/goat_frontman.scenario.json";
+import goatFrontmanJson from "../docs/scenarios/goat_frontman.scenario.json";
 import { ATTEMPT_BEATS, ATTEMPT_REPEATS } from "../src/config/tuning.js";
 import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/game/attempt.js";
 import { RunState } from "../src/game/run.js";

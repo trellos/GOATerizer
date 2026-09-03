@@ -28,7 +28,9 @@ export class AutoplayMonitor {
     this.#gain = context.createGain();
     this.#gain.gain.value = AUTOPLAY_MONITOR_GAIN;
     this.#gain.connect(destination);
-    this.#voices = new PluckVoicePool(context, this.#gain);
+    // The audible timbre, not the recognizer's sine: nothing here is ever
+    // detected, and a person has to pick this out of a drum kit and a bass.
+    this.#voices = new PluckVoicePool(context, this.#gain, "pluck");
   }
 
   /** Same envelope and note-off behaviour as `SyntheticGuitarSource.pluck`. */

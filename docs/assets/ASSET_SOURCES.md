@@ -40,9 +40,12 @@ Every asset id below follows `<kind>_<scenario id>[_suffix]` — swap
 | `prop_rocky_ascent_goal` | `…/prop_rocky_ascent_goal.png` | `destinationVisual` |
 | `fx_rocky_ascent_dust` | `…/fx_rocky_ascent_dust.png` | `stepEffects[0]` (contact) |
 | `fx_rocky_ascent_tick` | `…/fx_rocky_ascent_tick.png` | `stepEffects[1]` (accent) |
+| `note_rocky_ascent_ledge` | `…/note_rocky_ascent_ledge.png` | `footholdArt.body` (derived from the scenario id, not authored — see `GOATerizer_Minigame_Authoring.md` §5) |
+| `note_rocky_ascent_crag` | `…/note_rocky_ascent_crag.png` | `footholdArt.crag` (derived from the scenario id, not authored) |
 
 Directories: `rocky-ascent/`, `rocky-ascent-high/`, `rocky-descent/`,
-`rocky-descent-high/` — ten files each, same ten slots, forty files total.
+`rocky-descent-high/` — twelve files each, same twelve slots (the ten above
+plus the two derived `footholdArt` files), forty-eight files total.
 
 **The background and the pose cycle are drawn; the rest is not.** The
 timeline-actor work moved the goat onto the note bars and reduced the scenario
@@ -238,7 +241,7 @@ The crowd goat (shipped, above) is one sprite instantiated up to
 swap between its two states; that stayed true when it changed from generated
 to real art.
 
-**Lighting pass, 2026-09-03 (DECISION-051).** The four `performerPoses[]` and
+**Lighting pass, 2026-09-03 (DECISION-055).** The four `performerPoses[]` and
 the `finishPose` gained the rim light the two `flourishPoses[]` were drawn with
 from the start, and `bg_goat_frontman` gained a third beam — a white follow-spot
 aimed where the performer stands, with a pool on the boards at hoof height. The

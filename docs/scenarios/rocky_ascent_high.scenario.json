@@ -208,7 +208,7 @@
   "productionNotes": [
     "This is the hard companion to Rocky Ascent, not a transposition of it.",
     "The pitch content is the same one octave as the normal version; the difficulty comes from sequencing the octave in threes rather than running it straight.",
-    "Supported difficulties are exactly two levels above the normal version: L3–6 instead of L1–4.",
+    "Supported difficulties are two levels above the normal version (L3–6 for L1–4), plus L7, which carries forward original L6 content to close the run's L7 content gap (DECISION-049).",
     "One successful note opportunity advances exactly one waypoint.",
     "Placeholder source families may be reused from the normal version; final art can distinguish this version later."
   ],

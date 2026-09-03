@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Designer tool: writes `docs/scenarios/butt-butt-bonk/butt_butt_bonk.scenario.json`.
+ * Designer tool: writes `docs/scenarios/butt_butt_bonk.scenario.json`.
  *
  * Emits the whole file, like `author-goat-frontman.mjs`: the JSON is the
  * runtime authority and nothing regenerates it at play time; this script
@@ -29,7 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.resolve(here, "..", "docs", "scenarios", "butt-butt-bonk");
+const OUT_DIR = path.resolve(here, "..", "docs", "scenarios");
 const OUT_FILE = path.join(OUT_DIR, "butt_butt_bonk.scenario.json");
 const TUNING_FILE = path.resolve(here, "..", "src", "config", "tuning.ts");
 

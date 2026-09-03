@@ -129,22 +129,29 @@ function parseMode(suffix: string): Mode | null {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The lowest MIDI note the run's tonic may take: A2, the fifth fret of the low
- * E string.
+ * The lowest MIDI note the run's tonic may take: C3, the third fret of the A
+ * string.
  *
- * PROVISIONAL TUNING. The tonic is placed in the octave starting there, so the
- * one-octave span `tonic .. tonic+12` lands between A2 (45) and G#4 (68)
- * whatever the key, and sits inside Tuninator's default 70–1400Hz analysis
- * range with room at both ends.
+ * PROVISIONAL TUNING. The tonic is placed in the octave starting there, so
+ * **every key's root lands between the two Cs of the A string** — C3 at the
+ * third fret and C4 at the fifteenth — and the one-octave span
+ * `tonic .. tonic+12` lands between C3 (48) and B4 (71) whatever the key. That
+ * is the guitar's second octave, and it is where a note is loud enough to be
+ * heard: the register below it bottomed out at A2 (110Hz), which a laptop
+ * speaker barely reproduces and the synthetic guitar could not make audible at
+ * all. It also sits further inside Tuninator's default 70–1400Hz analysis range
+ * than the old one did.
  *
- * Why not E2, where the two-octave timeline started: a one-octave span is half
- * as tall, and anchoring it at the open low E pins every key to first position,
- * where only shapes rooted on the low E string are reachable. Starting at A2
- * puts every key's octave inside the stretch of neck where shapes rooted on
- * three different strings all fit, which is what makes the pregame fingering
- * choice ("where on the neck do I want to practise this") a real choice.
+ * Why not E2 or A2, where this started: a one-octave span is half as tall as the
+ * two-octave timeline it replaced, and anchoring it low pins every key to first
+ * position, where only shapes rooted on the low E string are reachable. Starting
+ * at C3 puts every key's octave in the stretch of neck where shapes rooted on
+ * three different strings all fit — the A string reaches every key from fret 3
+ * to fret 14, and the D and G strings reach far more keys than they did an
+ * octave down — which is what makes the pregame fingering choice ("where on the
+ * neck do I want to practise this") a real choice.
  */
-export const LOWEST_TONIC_MIDI = 45;
+export const LOWEST_TONIC_MIDI = 48;
 
 export function tonicMidi(key: RunKey): number {
   return LOWEST_TONIC_MIDI + mod(key.tonic - (LOWEST_TONIC_MIDI % 12), 12);

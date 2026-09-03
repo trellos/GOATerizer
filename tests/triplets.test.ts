@@ -32,10 +32,8 @@ import type { PromptEvent } from "../src/scenario/types.js";
 
 const KEY: RunKey = { tonic: 7, mode: "minor" };
 
-/** Every id the fixture binds, resolved to something. The loader checks nothing else. */
-const ASSET_URLS: Readonly<Record<string, string>> = Object.fromEntries(
-  ["bg", "ready", "action", "finish", "can", "crushed", "impact"].map((id) => [id, `/${id}.png`])
-);
+/** Where the fixture's asset ids resolve to. The loader checks nothing else. */
+const ASSET_URL = (id: string): string => `/${id}.png`;
 
 const THIRD = 1 / 3;
 
@@ -118,7 +116,7 @@ function scenarioWith(prompt: readonly RawEvent[]): unknown {
 }
 
 function loadPrompt(prompt: readonly RawEvent[]): readonly PromptEvent[] {
-  const scenario = loadScenario(scenarioWith(prompt), ASSET_URLS);
+  const scenario = loadScenario(scenarioWith(prompt), ASSET_URL);
   return scenario.levels.get(1)!.prompt;
 }
 
@@ -157,7 +155,7 @@ describe("authoring a triplet", () => {
     // so the second pass's thirds are the first pass's thirds — but only
     // because the positions were exact to begin with. Float-summed, the drift
     // would be doubled here rather than merely carried.
-    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URLS).levels.get(1)!;
+    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URL).levels.get(1)!;
     const targets = resolveTargets(level, KEY);
     const phrase = level.measurePlan.attemptMeasures * level.measurePlan.beatsPerMeasure;
 
@@ -194,7 +192,7 @@ describe("a triplet on the timeline and under the judge", () => {
   });
 
   it("widens a triplet's window to its neighbour, and not one beat further", () => {
-    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URLS).levels.get(1)!;
+    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URL).levels.get(1)!;
     const targets = resolveTargets(level, KEY);
     const windows = computeWindows(targets);
     const gap = targets[2]!.startBeat - targets[1]!.startBeat;
@@ -231,7 +229,7 @@ describe("a triplet on the timeline and under the judge", () => {
   });
 
   it("scores three notes a third of a beat apart without one stealing another", () => {
-    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URLS).levels.get(1)!;
+    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URL).levels.get(1)!;
     const targets = resolveTargets(level, KEY);
     const events: JudgmentEvent[] = [];
     const judge = new TargetJudge({ targets, key: KEY });
@@ -251,7 +249,7 @@ describe("a triplet on the timeline and under the judge", () => {
   });
 
   it("will not let a triplet attack reach a target past its own neighbour", () => {
-    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URLS).levels.get(1)!;
+    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URL).levels.get(1)!;
     const targets = resolveTargets(level, KEY);
     const judge = new TargetJudge({ targets, key: KEY });
     const gap = targets[1]!.startBeat - targets[0]!.startBeat;
@@ -266,7 +264,7 @@ describe("a triplet on the timeline and under the judge", () => {
     // The windows now overlap -- each triplet's reaches its neighbour's attack
     // -- so the guarantee is structural rather than geometric: `#findMatch`
     // filters by pitch and never re-offers a resolved target.
-    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URLS).levels.get(1)!;
+    const level = loadScenario(scenarioWith(tripletPrompt()), ASSET_URL).levels.get(1)!;
     const targets = resolveTargets(level, KEY);
     const judge = new TargetJudge({ targets, key: KEY });
 
