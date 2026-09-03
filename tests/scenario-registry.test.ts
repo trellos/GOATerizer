@@ -109,20 +109,21 @@ describe("scenario registry", () => {
   });
 
   it("declares the supported levels the scenario files author", () => {
-    expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
+    expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4, 5, 6]);
     expect([...ROCKY_DESCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
-    expect([...ROCKY_ASCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6]);
+    expect([...ROCKY_ASCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6, 7]);
     expect([...ROCKY_DESCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6]);
     expect([...CAN_CRUSHING.supportedLevels]).toEqual([1, 2, 3, 4]);
     expect([...GOAT_FRONTMAN.supportedLevels]).toEqual([1, 2, 3, 4]);
   });
 
   it.each([
-    [1, ["can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
-    [2, ["can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
+    [1, ["butt_butt_bonk", "can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
+    [2, ["butt_butt_bonk", "can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
     [
       3,
       [
+        "butt_butt_bonk",
         "can_crushing",
         "goat_frontman",
         "rocky_ascent",
@@ -134,6 +135,7 @@ describe("scenario registry", () => {
     [
       4,
       [
+        "butt_butt_bonk",
         "can_crushing",
         "goat_frontman",
         "rocky_ascent",
@@ -142,9 +144,9 @@ describe("scenario registry", () => {
         "rocky_descent_high",
       ],
     ],
-    [5, ["rocky_ascent_high", "rocky_descent_high"]],
-    [6, ["rocky_ascent_high", "rocky_descent_high"]],
-    [7, []],
+    [5, ["butt_butt_bonk", "rocky_ascent", "rocky_ascent_high", "rocky_descent_high"]],
+    [6, ["butt_butt_bonk", "rocky_ascent", "rocky_ascent_high", "rocky_descent_high"]],
+    [7, ["rocky_ascent_high"]],
   ])("difficulty %i is covered by exactly %j", (difficulty, expectedIds) => {
     const ids = scenariosForDifficulty(difficulty)
       .map((scenario) => scenario.id)
@@ -152,8 +154,10 @@ describe("scenario registry", () => {
     expect(ids).toEqual([...expectedIds].sort());
   });
 
-  it("L7 is a real content limit, not a bug: nothing authors it", () => {
-    expect(scenariosForDifficulty(7)).toHaveLength(0);
+  it("L7 is authored by exactly one scenario — the high ascent is the ceiling", () => {
+    expect(scenariosForDifficulty(7).map((scenario) => scenario.id)).toEqual([
+      "rocky_ascent_high",
+    ]);
   });
 
   it("authors every target inside the one-octave pitch space, in either mode", () => {
@@ -234,6 +238,7 @@ describe("minigame registry", () => {
         parseConfig: () => ({}),
         parseLevel: () => ({}),
         assetIds: () => [],
+        backgroundId: () => "background",
         create: () => {
           throw new Error("unreachable");
         },

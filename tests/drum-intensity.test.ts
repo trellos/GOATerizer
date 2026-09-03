@@ -149,9 +149,12 @@ describe("selecting a beat for a minigame", () => {
   });
 
   it("takes the rung from the difficulty and the feel from the notes", () => {
-    const level = ROCKY_ASCENT.levels.get(3)!;
-    // Rocky Ascent L3 is eighths, which is the default beat, at rung 3.
-    expect(drumPatternForAttempt(level.difficulty, level.prompt).id).toBe("L3/eighth");
+    const quarters = ROCKY_ASCENT.levels.get(3)!;
+    // Rocky Ascent L3 is a quarter-note ladder, at rung 3; L5 is where the
+    // eighths arrive, and the rung follows the difficulty rather than the feel.
+    expect(drumPatternForAttempt(quarters.difficulty, quarters.prompt).id).toBe("L3/quarters");
+    const eighths = ROCKY_ASCENT.levels.get(5)!;
+    expect(drumPatternForAttempt(eighths.difficulty, eighths.prompt).id).toBe("L5/eighth");
     expect(drumPatternForAttempt(6, prompt([0.25, "sixteenth", 0.25])).id).toBe("L6/sixteenth");
     expect(drumPatternForAttempt(1, prompt([1 / 3, "quarter", 1 / 3])).id).toBe("L1/triplet");
   });
