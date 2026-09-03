@@ -9,7 +9,7 @@
  * the vertical slice playable, not a design decision.
  *
  * Star thresholds are NOT here: they are per-level authored scenario data and
- * live in `docs/scenarios/rocky-ascent/rocky_ascent.scenario.json`. What lives
+ * live in `docs/scenarios/rocky_ascent.scenario.json`. What lives
  * here is the *metric* those thresholds are denominated in.
  *
  * A few values here are not free choices at all: they MIRROR an internal

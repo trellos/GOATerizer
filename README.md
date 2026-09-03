@@ -232,7 +232,8 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 | `src/scenario/` | Scenario schema and loader, the registry, the minigame classes (`ClimbMinigame`, `RepeatMinigame`, `PerformMinigame`, `ThreeStepMinigame`) and the shared `TimelineActor` |
 | `src/ui/` | Timeline model and views, the actor and performer layers, the scenario backdrop, trophies, dev panel |
 | `src/config/` | **Every provisional tuning number**, in one place |
-| `docs/scenarios/` | Authored scenario data — the runtime imports it directly |
+| `docs/scenarios/` | Authored scenario data, one flat file per scenario — the runtime discovers the whole directory |
+| `src/editor/` | The minigame note editor: a dev-only timeline for authoring that data by hand |
 
 ### The boundaries that matter
 
@@ -275,7 +276,7 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
 
 ### Adding a scenario
 
-1. Author `docs/scenarios/<id>/<id>.scenario.json` — supported levels, prompts
+1. Author `docs/scenarios/<id>.scenario.json` — supported levels, prompts
    in scale-degree tokens, star thresholds, asset bindings, and whatever else
    the minigame named in `minigameClass` requires. The loader does not know what
    that is: it resolves the id through the minigame registry and hands the raw
@@ -283,11 +284,13 @@ the drums and the judge expire targets early: `DECISION_LOG.md` (DECISION-025).
    anything they cannot map (`DECISION_LOG.md`, DECISION-043). The authored key
    is still `minigameClass`; it reaches the model as `ScenarioDefinition.minigameId`,
    which is an open string rather than the closed union the old name implies.
-2. Drop art in `public/assets/scenarios/<id>/`, and record its provenance in
-   `docs/assets/ASSET_SOURCES.md`.
-3. Add one entry to `src/scenario/registry.ts`.
+2. Drop art in `public/assets/scenarios/<id>/` (the id with dashes for
+   underscores, or whatever the file's optional `assetDirectory` names), and
+   record its provenance in `docs/assets/ASSET_SOURCES.md`.
 
-No gameplay code changes. `src/scenario/load.ts` validates the file and throws
+That is the whole procedure: the registry globs the directory, and which asset
+ids the scenario needs is the minigame's own answer (`assetIds`) rather than a
+list anybody maintains. No code changes and no gameplay changes. `src/scenario/load.ts` validates the file and throws
 loudly rather than repairing it.
 
 ---

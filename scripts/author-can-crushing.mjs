@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Designer tool: writes `docs/scenarios/can-crushing/can_crushing.scenario.json`.
+ * Designer tool: writes `docs/scenarios/can_crushing.scenario.json`.
  *
  * Unlike `author-rocky-scenarios.mjs`, which rewrites the musical content of
  * four existing files and preserves everything else, this one emits the whole
@@ -40,7 +40,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.resolve(here, "..", "docs", "scenarios", "can-crushing");
+const OUT_DIR = path.resolve(here, "..", "docs", "scenarios");
 const OUT_FILE = path.join(OUT_DIR, "can_crushing.scenario.json");
 
 const BEATS_PER_MEASURE = 4;

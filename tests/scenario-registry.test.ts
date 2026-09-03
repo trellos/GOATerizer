@@ -224,7 +224,7 @@ describe("minigame registry", () => {
 
   it("refuses a scenario whose minigame nobody registered, and says which exist", () => {
     const orphan = { ...structuredClone(RAW_SCENARIO_SHAPE), minigameClass: "BattleMinigame" };
-    expect(() => loadScenario(orphan, {})).toThrow(
+    expect(() => loadScenario(orphan, (id) => `/${id}.png`)).toThrow(
       /no minigame registered for "BattleMinigame".*ClimbMinigame/s
     );
   });

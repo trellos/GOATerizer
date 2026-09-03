@@ -23,7 +23,7 @@ import {
   repeatState,
   type RepeatConfig,
 } from "../src/scenario/minigames/repeat-module.js";
-import canCrushingJson from "../docs/scenarios/can-crushing/can_crushing.scenario.json";
+import canCrushingJson from "../docs/scenarios/can_crushing.scenario.json";
 
 const LEVELS = [1, 2, 3, 4] as const;
 
@@ -335,7 +335,7 @@ describe("the loader holds two classes without mixing them", () => {
   it("refuses a repeat scenario that binds climb slots", () => {
     const raw = structuredClone(canCrushingJson) as Record<string, unknown>;
     raw["assetBindings"] = { background: ["bg_can_crushing"] };
-    expect(() => loadScenario(raw, CAN_CRUSHING.assetUrls)).toThrow(/performerNeutral/);
+    expect(() => loadScenario(raw, (id) => `/assets/scenarios/can-crushing/${id}.png`)).toThrow(/performerNeutral/);
   });
 
   it("refuses a repeat scenario whose repeat mode is not one of the two", () => {
@@ -344,7 +344,7 @@ describe("the loader holds two classes without mixing them", () => {
       ...(raw["classParameters"] as Record<string, unknown>),
       repeatMode: "whenever",
     };
-    expect(() => loadScenario(raw, CAN_CRUSHING.assetUrls)).toThrow(/repeatMode/);
+    expect(() => loadScenario(raw, (id) => `/assets/scenarios/can-crushing/${id}.png`)).toThrow(/repeatMode/);
   });
 
   it("still requires a climb scenario to author one waypoint per note", () => {
@@ -352,6 +352,6 @@ describe("the loader holds two classes without mixing them", () => {
     raw["minigameClass"] = "ClimbMinigame";
     // Now it needs a route it does not have, and climb bindings it does not
     // have — either failure is the loader refusing to invent the missing half.
-    expect(() => loadScenario(raw, CAN_CRUSHING.assetUrls)).toThrow(/Invalid scenario data/);
+    expect(() => loadScenario(raw, (id) => `/assets/scenarios/can-crushing/${id}.png`)).toThrow(/Invalid scenario data/);
   });
 });

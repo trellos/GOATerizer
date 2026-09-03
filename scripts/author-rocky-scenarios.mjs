@@ -35,8 +35,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const scenarioPath = (dir, file) =>
-  path.resolve(here, "..", "docs", "scenarios", dir, `${file}.scenario.json`);
+const scenarioPath = (file) =>
+  path.resolve(here, "..", "docs", "scenarios", `${file}.scenario.json`);
 
 const BEATS_PER_MEASURE = 4;
 const ATTEMPT_BEATS = 16;
@@ -385,7 +385,7 @@ function buildRoute(spec, waypointCount) {
 /* -------------------------------------------------------------------------- */
 
 for (const definition of SCENARIOS) {
-  const filePath = scenarioPath(definition.dir, definition.file);
+  const filePath = scenarioPath(definition.file);
   const scenario = JSON.parse(readFileSync(filePath, "utf8"));
   const routes = ROUTES[definition.file];
 

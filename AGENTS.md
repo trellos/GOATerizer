@@ -83,9 +83,13 @@ Scenario-specific authored content lives under:
 
 `docs/scenarios/`
 
-For example:
+One flat directory, one file per scenario:
 
-`docs/scenarios/rocky-ascent/rocky_ascent.scenario.json`
+`docs/scenarios/rocky_ascent.scenario.json`
+
+The directory **is** the scenario library. `src/scenario/registry.ts` discovers
+every `*.scenario.json` in it at build time, so adding a scenario is authoring a
+file — there is no registration step to forget (`DECISION_LOG.md` DECISION-045).
 
 Scenario data is authoritative for:
 
@@ -673,8 +677,12 @@ docs/game-design/
 Scenario-specific content belongs under:
 
 ```text
-docs/scenarios/<scenario-id>/
+docs/scenarios/<scenario_id>.scenario.json
 ```
+
+One file per scenario, in that one directory — the whole directory is the
+library the runtime discovers. Its art belongs under
+`public/assets/scenarios/<scenario-id>/`.
 
 Implementation prompts, if retained, belong under:
 
