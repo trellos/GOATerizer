@@ -405,7 +405,7 @@ describe("editing a timeline", () => {
     const last = document.notes[document.notes.length - 1]!;
     const count = document.notes.length;
     document.select([last.id]);
-    expect(document.moveSelection(PHRASE_TICKS, 0, false)).toBe(true);
+    expect(document.moveSelection(PHRASE_TICKS, 0, false)).toBe("ok");
     expect(document.notes).toHaveLength(count - 1);
   });
 
@@ -417,9 +417,23 @@ describe("editing a timeline", () => {
     // One measure later, onto a beat nothing else occupies is not available in
     // a full phrase — so this lands on top of another note and the longer of
     // the two survives. Either way the source note is still there.
-    expect(document.moveSelection(TICKS_PER_MEASURE, 0, true)).toBe(true);
+    expect(document.moveSelection(TICKS_PER_MEASURE, 0, true)).toBe("ok");
     expect(document.notes.some((entry) => entry.id === first.id)).toBe(true);
     expect(document.notes.length).toBeGreaterThanOrEqual(count);
+  });
+
+  it("refuses a group shift that would take a note off its own grid", () => {
+    const bonk = SCENARIO_SOURCES.find((source) => source.id === "butt_butt_bonk")!.raw as Json;
+    const document = new EditorDocument(bonk, 1);
+    document.setLoopMeasures(4);
+    // Its notes are triplets, on the 4-tick grid; a sixteenth is on the 3-tick
+    // one. Move them together by a third of a beat and one of them has nowhere
+    // legal to land.
+    const sixteenth = document.addNote(45, 0, "sixteenth")!;
+    document.select([sixteenth.id, document.notes[0]!.id]);
+    expect(document.moveSelection(4, 0, false)).toBe("off-grid");
+    // And the timeline is untouched — a refused move is not a half-move.
+    expect(document.notes.some((entry) => entry.id === sixteenth.id)).toBe(true);
   });
 
   it("undoes the last edit, and only the last one", () => {

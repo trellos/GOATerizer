@@ -130,6 +130,8 @@ export class TimelineEditorView {
   #playheadTick: number | null = null;
   /** What a click on empty space places. Set by the palette. */
   #activeDuration: NoteDuration = "quarter";
+  /** Where the pointer last was on the timeline, so a paste lands under it. */
+  #pointerTick = 0;
   #clipboard: readonly Omit<EditorNote, "id">[] = [];
 
   constructor(canvas: HTMLCanvasElement, callbacks: EditorViewCallbacks) {
@@ -201,8 +203,9 @@ export class TimelineEditorView {
       return true;
     }
     if (control && event.key.toLowerCase() === "v") {
-      // Onto the playhead if one is running, else onto the start of the loop.
-      const at = this.#playheadTick ?? 0;
+      // Under the pointer, which is where the author is looking. A paste that
+      // always landed at beat 1 would have to be dragged every time.
+      const at = Math.max(0, Math.round(this.#pointerTick));
       if (!document.paste(this.#clipboard, at)) this.#callbacks.onStatus("nothing to paste");
       this.#callbacks.onEdit();
       return true;
@@ -339,6 +342,7 @@ export class TimelineEditorView {
 
     switch (this.#gesture.kind) {
       case "none": {
+        if (inside) this.#pointerTick = tick;
         const note = inside ? this.#noteUnder(tick, lane) : null;
         this.#hoverNoteId = note?.id ?? null;
         this.#hoverResize =
@@ -431,10 +435,14 @@ export class TimelineEditorView {
           target.lane - note.lane,
           gesture.duplicate
         );
-        if (!moved) {
+        if (moved === "ok") this.#callbacks.onAudition(target);
+        else if (moved === "locked-lane") {
           this.#callbacks.onStatus("that would put a note on a lane this scenario cannot play");
-        } else {
-          this.#callbacks.onAudition(target);
+        } else if (moved === "off-grid") {
+          this.#callbacks.onStatus(
+            "that shift does not fit every selected note's own grid — a triplet and a " +
+              "sixteenth cannot be moved together by a third of a beat"
+          );
         }
         break;
       }

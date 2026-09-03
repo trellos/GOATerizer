@@ -295,21 +295,30 @@ export class EditorDocument {
    * Moves the selection by a whole number of ticks and lanes.
    *
    * Notes pushed off the end of the phrase are deleted — "if a group of notes is
-   * released with some past the end of the timeline, those notes are deleted" —
-   * and a note landing on a lane the scenario cannot play is refused, which
-   * cancels the whole move rather than silently dropping half of it.
+   * released with some past the end of the timeline, those notes are deleted".
+   * Everything else that would go wrong cancels the *whole* move rather than
+   * dropping half of it, and says which: a lane the scenario cannot play, or a
+   * shift that would take one member of a mixed selection off its own grid —
+   * dragging a triplet by a third of a beat cannot move a sixteenth with it, and
+   * quietly re-rhythming the selection to make it fit is worse than refusing.
    */
-  moveSelection(deltaTicks: number, deltaLanes: number, duplicate: boolean): boolean {
+  moveSelection(
+    deltaTicks: number,
+    deltaLanes: number,
+    duplicate: boolean
+  ): "ok" | "nothing-selected" | "locked-lane" | "off-grid" {
     const moving = this.#notes.filter((note) => this.#selection.has(note.id));
-    if (moving.length === 0) return false;
+    if (moving.length === 0) return "nothing-selected";
 
     const moved: EditorNote[] = [];
     for (const note of moving) {
       const lane = note.lane + deltaLanes;
-      if (lane < 0 || lane >= this.#vocabulary.tokens.length || !this.laneAllowed(lane)) return false;
+      if (lane < 0 || lane >= this.#vocabulary.tokens.length || !this.laneAllowed(lane)) {
+        return "locked-lane";
+      }
       const startTick = note.startTick + deltaTicks;
-      if (startTick < 0) return false;
-      if (startTick % startGridOf(note.duration) !== 0) return false;
+      if (startTick < 0) return "off-grid";
+      if (startTick % startGridOf(note.duration) !== 0) return "off-grid";
       // Past the end of the timeline: dropped, not clamped.
       if (startTick + DURATION_TICKS[note.duration] > PHRASE_TICKS) continue;
       moved.push({
@@ -326,7 +335,7 @@ export class EditorDocument {
       : this.#notes.filter((note) => !this.#selection.has(note.id));
     this.#notes = mergeNotes(survivors, moved);
     this.#selection = new Set(moved.map((note) => note.id));
-    return true;
+    return "ok";
   }
 
   /** Changes one note's written length, keeping where it starts. */
