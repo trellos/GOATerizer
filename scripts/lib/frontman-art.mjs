@@ -70,14 +70,50 @@ function frontmanGoatPalette(C) {
   return { fur: C.fur, furShade: C.furShade, furDark: C.furDark, horn: C.horn, eye: C.eye };
 }
 
-/** The four normal-note poses: the Rocky pose cycle, recoloured. */
+/**
+ * Lights the top edge of a goat drawn in the frontman's coat.
+ *
+ * The two flourish poses have carried a hand-drawn rim since they were written,
+ * for the reason `furRim` documents — a nearly black coat on a dark stage is an
+ * outline, and an outline in `furDark` is barely that. The four *normal* poses
+ * did not, because they are the Rocky body recoloured and the recolour has no
+ * rim to give. That was invisible for as long as nothing drew them; the first
+ * time the stage layer did (DECISION-050), the frontman turned out to be the
+ * faintest object in his own scenario — a dark goat on a dark floor between
+ * white crowd goats, found by the eye after the crowd and after the mic stand.
+ *
+ * So the rim is applied to the cycle too, as a lighting pass rather than a
+ * redrawing: the topmost painted pixel of each column, where it is coat rather
+ * than horn, becomes `furRim`. That is what a spotlit figure has, it costs one
+ * pass over the image, and it leaves the silhouette — the thing the poses are
+ * drawn around — exactly as it was.
+ */
+function rimLight(image, C) {
+  const coat = [C.fur, C.furShade, C.furDark];
+  for (let x = 0; x < image.width; x += 1) {
+    for (let y = 0; y < image.height; y += 1) {
+      const i = (y * image.width + x) * 4;
+      if (image.data[i + 3] === 0) continue;
+      const isCoat = coat.some(
+        ([r, g, b]) => image.data[i] === r && image.data[i + 1] === g && image.data[i + 2] === b
+      );
+      // The topmost pixel either takes the light or is a horn, which already
+      // has its own; either way this column is done.
+      if (isCoat) image.set(x, y, C.furRim);
+      break;
+    }
+  }
+  return image;
+}
+
+/** The four normal-note poses: the Rocky pose cycle, recoloured and lit. */
 export function frontmanPose(index, C = FRONTMAN_PALETTE) {
-  return goatPose(GOAT_LEGS[index % GOAT_LEGS.length], frontmanGoatPalette(C));
+  return rimLight(goatPose(GOAT_LEGS[index % GOAT_LEGS.length], frontmanGoatPalette(C)), C);
 }
 
 /** Completion pose: reared up, chin insufferably high. Same as the summit. */
 export function frontmanFinish(C = FRONTMAN_PALETTE) {
-  return goatFinish(frontmanGoatPalette(C));
+  return rimLight(goatFinish(frontmanGoatPalette(C)), C);
 }
 
 /**
@@ -310,6 +346,14 @@ export function background(C = FRONTMAN_PALETTE, seed = 0x5a7e) {
   };
   beam(96, 250, 70, C.beamPink);
   beam(290, 130, 70, C.beamCyan);
+  // And one white follow-spot, tighter than the coloured pair and aimed where
+  // the performer actually stands rather than across the note band. The two
+  // coloured beams cross the lanes and light nothing the player is looking at;
+  // this one is the reason his rim light exists, and it puts a lit floor behind
+  // a dark goat. Wide and soft on purpose: which art pixel the strike line
+  // lands on depends on the gutter's width, so the pool has to be a place, not
+  // a mark.
+  beam(198, 196, 30, C.bulb);
 
   // Truss and bulbs.
   image.fillRect(0, 8, W, 3, C.truss);
@@ -340,6 +384,16 @@ export function background(C = FRONTMAN_PALETTE, seed = 0x5a7e) {
   image.fillRect(0, H - 30, W, 30, C.floor);
   image.fillRect(0, H - 30, W, 2, C.floorEdge);
   for (let x = 0; x < W; x += 16) image.fillRect(x, H - 28, 1, 28, [...C.floorEdge, 60]);
+
+  // Where the follow-spot lands: a pool on the boards, and a hotter core in it.
+  //
+  // Sat high on the floor strip, at the front edge rather than the middle of
+  // it. The performer's hooves are at `y = 1.27` in lane-band units, which is
+  // the top of these boards and not the bottom — a pool centred on the strip
+  // came out below him and lit nobody. Up here it is behind his legs and the
+  // near crowd's, which is the whole job: a light floor for a black goat.
+  image.fillEllipse(196, H - 27, 62, 11, [...C.bulb, 34]);
+  image.fillEllipse(196, H - 26, 36, 7, [...C.bulb, 30]);
 
   return image;
 }

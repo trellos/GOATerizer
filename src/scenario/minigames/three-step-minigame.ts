@@ -65,6 +65,16 @@ const EFFECT_BEATS = 0.5;
 const LEAP_BEATS = 1 / 3;
 /** How high the leap arcs, in lane-band units. Negative y is up. */
 const LEAP_HEIGHT = 0.55;
+/**
+ * The trot back, once the headbutt has landed.
+ *
+ * A third of a beat out and a third back puts the ram home on the beat after
+ * the one it leapt on — the next group's first tap — so the round trip is the
+ * length of the gesture that caused it. The return arcs lower than the leap
+ * because it is not the gesture: the ram is walking off a hit, not landing one.
+ */
+const RECOVER_BEATS = 1 / 3;
+const RECOVER_HEIGHT = 0.18;
 
 /*
  * How big the two animals are, and how far apart they stand.
@@ -126,6 +136,14 @@ export function stepOf(opportunity: Opportunity): Step | null {
   if (withinBeat === TRIPLET_TICKS) return "b";
   if (withinBeat === TRIPLET_TICKS * 2) return "c";
   return null;
+}
+
+/**
+ * The vertical centre of a lane, in the normalised lane-band space sprites are
+ * placed in: lane 0 at the bottom, `laneCount - 1` at the top.
+ */
+function laneY(view: StageView, lane: number): number {
+  return view.laneCount <= 1 ? 0.5 : 1 - (lane + 0.5) / view.laneCount;
 }
 
 /** A pose or effect showing right now, with the beat it started on. */
@@ -224,7 +242,11 @@ class ThreeStepMinigame implements Minigame {
 
   update(beat: number): void {
     this.#effects = this.#effects.filter((flash) => decay(flash.startBeat, EFFECT_BEATS, beat) > 0);
-    if (this.#leap && beat >= this.#leap.startBeat + LEAP_BEATS) this.#leap = null;
+    // Held through the return as well as the leap: dropping it at the top of
+    // the arc is what used to teleport the ram home. See `#ramPosition`.
+    if (this.#leap && beat >= this.#leap.startBeat + LEAP_BEATS + RECOVER_BEATS) {
+      this.#leap = null;
+    }
   }
 
   /**
@@ -251,8 +273,6 @@ class ThreeStepMinigame implements Minigame {
 
   render(view: StageView): Stage {
     const sprites: Sprite[] = [];
-    const laneY = (lane: number): number =>
-      view.laneCount <= 1 ? 0.5 : 1 - (lane + 0.5) / view.laneCount;
 
     // The target waits at the strike line for the whole attempt: this family's
     // notes come to the actor rather than the actor chasing them.
@@ -264,7 +284,7 @@ class ThreeStepMinigame implements Minigame {
         key: "target",
         assetId: targetArt,
         x: view.strikeX + view.measure.beatWidth * TARGET_AHEAD_BEATS,
-        y: laneY(this.#aim ?? 0) + 0.12,
+        y: laneY(view, this.#aim ?? 0) + 0.12,
         scale: ACTOR_SCALE,
         anchor: "bottom",
         layer: "over",
@@ -275,21 +295,9 @@ class ThreeStepMinigame implements Minigame {
     if (pose) {
       // Mid-leap the ram flies an arc between the two lanes; otherwise it
       // stands on the one its pose was set on, leaning at what is coming.
-      const restY = laneY(pose.lane);
+      const restY = laneY(view, pose.lane);
       const restX = view.strikeX - view.measure.beatWidth * RAM_REST_BEATS;
-      const position = this.#leap
-        ? arc(
-            { x: restX, y: laneY(this.#leap.from) },
-            {
-              x: view.strikeX - view.measure.beatWidth * RAM_LEAP_BEATS,
-              y: laneY(this.#leap.to),
-            },
-            LEAP_HEIGHT,
-            this.#leap.startBeat,
-            LEAP_BEATS,
-            view.beat
-          )
-        : { x: restX, y: restY };
+      const position = this.#ramPosition(view, { x: restX, y: restY });
       sprites.push({
         key: "ram",
         assetId: pose.assetId,
@@ -306,7 +314,7 @@ class ThreeStepMinigame implements Minigame {
         key: `fx-${i}-${flash.startBeat}`,
         assetId: flash.assetId,
         x: view.strikeX,
-        y: laneY(flash.lane),
+        y: laneY(view, flash.lane),
         // The same scale as the animals: the effects were drawn in the same
         // frame, and a flash that keeps its full size next to a scaled-down ram
         // reads as a different scene happening on top of this one.
@@ -317,6 +325,43 @@ class ThreeStepMinigame implements Minigame {
     }
 
     return { background: this.#config.background, sprites };
+  }
+
+  /**
+   * Where the ram is: at rest, going out, or coming back.
+   *
+   * The headbutt is a round trip. An earlier pass drew only the outbound arc and
+   * dropped the leap the moment it finished, so the ram lunged at the wolf and
+   * was home again on the very next frame — a teleport, and the one gesture this
+   * whole family is named for. The return is the second half of it: a lower,
+   * flatter arc back to whichever lane the ram is standing on *now*, so a leap
+   * that landed on the last note of a group walks back to where the next group
+   * starts rather than to where the last one did.
+   *
+   * Both halves are `arc()` against `view.beat`, like everything else here —
+   * nothing accumulates, so a dropped frame loses no ground and the position at
+   * any beat is the same on every machine.
+   */
+  #ramPosition(view: StageView, rest: { x: number; y: number }): { x: number; y: number } {
+    const leap = this.#leap;
+    if (!leap) return rest;
+
+    const landing = {
+      x: view.strikeX - view.measure.beatWidth * RAM_LEAP_BEATS,
+      y: laneY(view, leap.to),
+    };
+
+    if (view.beat < leap.startBeat + LEAP_BEATS) {
+      return arc(
+        { x: rest.x, y: laneY(view, leap.from) },
+        landing,
+        LEAP_HEIGHT,
+        leap.startBeat,
+        LEAP_BEATS,
+        view.beat
+      );
+    }
+    return arc(landing, rest, RECOVER_HEIGHT, leap.startBeat + LEAP_BEATS, RECOVER_BEATS, view.beat);
   }
 
   /**

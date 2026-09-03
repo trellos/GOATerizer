@@ -1005,10 +1005,18 @@ try {
   //
   // Both runs are pinned to the same scenario at two difficulties, so the only
   // difference between the two screenshots is the authored rhythm.
+  //
+  // The dense end is **L6**, not L4. The Scale content redo moved Rocky
+  // Ascent's eighth-note material up the ladder and added L5-L7 (DECISION-049
+  // re-pinned the unit tests to it and missed this suite): L4 is sixteen beats
+  // of quarters like L1, so the comparison was measuring one rhythm against
+  // itself and failing on both of its own assertions. L6 is the level that is
+  // now thirty-two eighths.
+  const DENSE_LEVEL = 6;
   const beatsToEightNotes = {};
   for (const [level, file] of [
     [1, "10-timeline-l1.png"],
-    [4, "11-timeline-l4.png"],
+    [DENSE_LEVEL, "11-timeline-l6.png"],
   ]) {
     const shot = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     await shot.goto(`${BASE}/?dev=1&input=test&scenario=rocky_ascent&level=${level}`, {
@@ -1028,23 +1036,26 @@ try {
     await shot.close();
   }
 
-  note(`eight notes took ${beatsToEightNotes[1]} beats at L1, ${beatsToEightNotes[4]} at L4`);
+  note(
+    `eight notes took ${beatsToEightNotes[1]} beats at L1, ` +
+      `${beatsToEightNotes[DENSE_LEVEL]} at L${DENSE_LEVEL}`
+  );
   check(
     "L1's eight quarter notes take about eight beats",
     beatsToEightNotes[1] >= 6.5 && beatsToEightNotes[1] <= 9,
     String(beatsToEightNotes[1])
   );
   check(
-    "L4's eight eighth notes take about four",
-    beatsToEightNotes[4] >= 3 && beatsToEightNotes[4] <= 5.5,
-    String(beatsToEightNotes[4])
+    `L${DENSE_LEVEL}'s eight eighth notes take about four`,
+    beatsToEightNotes[DENSE_LEVEL] >= 3 && beatsToEightNotes[DENSE_LEVEL] <= 5.5,
+    String(beatsToEightNotes[DENSE_LEVEL])
   );
   check(
-    "L4 is denser than L1",
-    beatsToEightNotes[4] < beatsToEightNotes[1],
-    `${beatsToEightNotes[1]} → ${beatsToEightNotes[4]} beats`
+    `L${DENSE_LEVEL} is denser than L1`,
+    beatsToEightNotes[DENSE_LEVEL] < beatsToEightNotes[1],
+    `${beatsToEightNotes[1]} → ${beatsToEightNotes[DENSE_LEVEL]} beats`
   );
-  note("compare 10-timeline-l1.png and 11-timeline-l4.png for the visual escalation");
+  note(`compare 10-timeline-l1.png and 11-timeline-l6.png for the visual escalation`);
 
   /* ==================================================================== */
   /* Part 2b — the frame loop is uncapped and cheap                       */
