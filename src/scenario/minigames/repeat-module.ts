@@ -178,6 +178,32 @@ export const REPEAT_MINIGAME: MinigameModule = {
   displayName: "Repeat",
   apiVersion: MINIGAME_API_VERSION,
 
+  authoring: {
+    /**
+     * One target per note opportunity, and the measure plan's own two fields.
+     *
+     * `expectedCans` is what the level says it is asking for; nothing parses it,
+     * but a level claiming twelve cans while its prompt authors twenty-eight is
+     * a level whose two halves were edited apart.
+     */
+    reconcileLevel(level, shape) {
+      const measurePlan = { ...((level["measurePlan"] as Record<string, unknown>) ?? {}) };
+      const visual = { ...((level["visual"] as Record<string, unknown>) ?? {}) };
+      return {
+        ...level,
+        measurePlan: {
+          ...measurePlan,
+          visualSpanMeasures:
+            typeof measurePlan["visualSpanMeasures"] === "number"
+              ? measurePlan["visualSpanMeasures"]
+              : 1,
+          resetBetweenMeasures: measurePlan["resetBetweenMeasures"] !== false,
+        },
+        visual: { ...visual, expectedCans: shape.noteOpportunityCount },
+      };
+    },
+  },
+
   parseConfig(raw: unknown): RepeatConfig {
     const { classParameters, assetBindings } = obj(raw, "scenario") as {
       classParameters: unknown;
