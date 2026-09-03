@@ -44,9 +44,9 @@ function judged(index: number, outcome: Judged["outcome"], beat: number): Judged
 }
 
 /** A minimal stage view: the host owns all of this, so a test may state it flatly. */
-function view(): StageView {
+function view(beat = 0.7): StageView {
   return {
-    beat: 0.7,
+    beat,
     notes: [],
     laneCount: 8,
     strikeX: 0.3,
@@ -197,6 +197,56 @@ describe("the authored escalation", () => {
     for (let i = 0; i < 40; i += 1) minigame.onJudged(judged(i, "perfect", 0), 0);
     const effects = (minigame.render(view()).sprites ?? []).filter((s) => s.key.startsWith("fx-"));
     expect(effects.length).toBeLessThanOrEqual(6);
+  });
+});
+
+describe("the headbutt is a round trip", () => {
+  /** The x the ram is drawn at on this frame, after letting it decay to it. */
+  function ramX(minigame: ReturnType<typeof instance>, beat: number): number {
+    minigame.update(beat);
+    const ram = minigame.render(view(beat)).sprites?.find((sprite) => sprite.key === "ram");
+    if (!ram) throw new Error("no ram on stage");
+    return ram.x;
+  }
+
+  /** A group whose headbutt lands on a different lane from its taps. */
+  function afterAHeadbutt() {
+    const group = [opportunity(0, 0, 0), opportunity(1, 1 / 3, 0), opportunity(2, 2 / 3, 5)];
+    const minigame = instance(group);
+    minigame.onJudged(judged(0, "perfect", 0), 0);
+    minigame.onJudged(judged(1, "perfect", 1 / 3), 1 / 3);
+    minigame.onJudged(judged(2, "perfect", 2 / 3), 2 / 3);
+    return minigame;
+  }
+
+  // `view()` puts the strike line at 0.3 with a beat 0.1 wide, so the ram rests
+  // at 0.18 and the headbutt lands it at 0.23.
+  const REST_X = 0.18;
+  const LANDING_X = 0.23;
+
+  it("arrives at the wolf, and is home again a third of a beat later", () => {
+    const minigame = afterAHeadbutt();
+    expect(ramX(minigame, 2 / 3)).toBeCloseTo(REST_X, 6);
+    expect(ramX(minigame, 1)).toBeCloseTo(LANDING_X, 6);
+    expect(ramX(minigame, 1 + 1 / 3)).toBeCloseTo(REST_X, 6);
+    // And stays there rather than drifting once the leap state is dropped.
+    expect(ramX(minigame, 2)).toBeCloseTo(REST_X, 6);
+  });
+
+  it("never crosses the gap in one frame", () => {
+    // The bug this pins: the leap used to be dropped the moment it finished, so
+    // the ram lunged at the wolf and was home on the very next frame. The whole
+    // trip is 0.05 wide; a teleport puts all of it into one frame, and an arc
+    // spends it over twenty.
+    const minigame = afterAHeadbutt();
+    let previous = ramX(minigame, 2 / 3);
+    let biggestStep = 0;
+    for (let beat = 2 / 3; beat <= 2.5; beat += 1 / 60) {
+      const x = ramX(minigame, beat);
+      biggestStep = Math.max(biggestStep, Math.abs(x - previous));
+      previous = x;
+    }
+    expect(biggestStep).toBeLessThan((LANDING_X - REST_X) / 4);
   });
 });
 
