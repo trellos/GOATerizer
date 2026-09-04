@@ -765,6 +765,10 @@ export class EditorScreen {
     const warnings = [
       ...document_.readProblems,
       ...this.#problems,
+      // The family's own reading of the open level. Non-blocking by design —
+      // see `EditorDocument.notices` — and prefixed so it is legible as coming
+      // from the minigame rather than from the editor's own spelling rules.
+      ...document_.notices.map((notice) => `L${document_.difficulty}: ${notice}`),
       ...(offTheLadder
         ? [
             `L${document_.difficulty} has no notes${document_.notes.length > 0 ? " inside the loop" : ""}` +

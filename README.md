@@ -305,6 +305,15 @@ ids the scenario needs is the minigame's own answer (`assetIds`) rather than a
 list anybody maintains. No code changes and no gameplay changes. `src/scenario/load.ts` validates the file and throws
 loudly rather than repairing it.
 
+**Three rungs of validation, and they mean different things.** `load.ts` throws
+on a file it cannot map — a phrase that does not total its measures, a degree
+token with no lane. A family's own `parseLevel` throws on its own block. And
+`MinigameAuthoring.reviewLevel` reports a level that is perfectly loadable and
+that the family says should not ship — a PERFORM level with no flourish plays
+fine and never grows a crowd. The editor shows those without blocking a save;
+`tests/scenario-content.test.ts` fails on them. Everything the new scenario has
+to satisfy is checked there automatically, with nothing to add per scenario.
+
 ---
 
 ## The minigame editor

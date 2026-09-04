@@ -549,6 +549,13 @@ changes to it:
   a prompt is reported in the author's terms and not saved. Save is gated on
   `loadScenario`, so the editor cannot write a file the game would reject, and
   it restates none of the loader's or a family's rules.
+- **It reports what a family disapproves of, and saves anyway.** A level can be
+  perfectly loadable and still be one nobody meant to author — a PERFORM level
+  whose flourishes were left behind by moving the notes plays fine and never
+  grows a crowd. `MinigameAuthoring.reviewLevel` is where a family says so, in
+  the author's terms; the editor shows it without blocking, because an author
+  mid-edit is entitled to be half-finished, and `tests/scenario-content.test.ts`
+  fails on it, because a repository is not (`DECISION_LOG.md` DECISION-060).
 
 It writes files only through the Vite dev server (`vite.config.ts`,
 `configureServer`). Do not add a path that writes scenario content from a built
@@ -589,6 +596,15 @@ Before considering a gameplay task complete, run the repository's relevant:
 Add tests for new deterministic gameplay behavior.
 
 For timing / guitar systems, favor tests around domain inputs and outputs rather than fragile visual timing.
+
+Scenario content is tested as **invariants over whatever is authored**, never as
+a transcript of it. `tests/scenario-content.test.ts` is the home for that, and
+the rule is simple: if a test would go red because a designer authored a level
+in the minigame editor, it is testing the wrong thing. Do not assert a
+scenario's supported levels as a literal list, which scenarios cover a
+difficulty, or a level's notes verbatim — assert that a scenario declares
+exactly what it authors, that every difficulty the run can ask for is covered,
+and that each family is satisfied by its own `reviewLevel`.
 
 Important categories include:
 

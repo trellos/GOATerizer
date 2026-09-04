@@ -481,6 +481,42 @@ export interface MinigameAuthoring {
    * like. It may not change the prompt: the notes are the author's.
    */
   reconcileLevel(level: AuthoredLevel, shape: AuthoringShape): AuthoredLevel;
+
+  /**
+   * What this family thinks is *wrong* with a level it has already reconciled.
+   *
+   * Optional, and the answer to a gap the other two rungs leave open. Loading
+   * has exactly two outcomes today and both are absolute: `load.ts` throws when
+   * a file is structurally unusable — the phrase does not total its measures,
+   * a degree token is unreadable — and `parseLevel` throws when this family
+   * cannot map its own block. Everything a family merely *disapproves* of has
+   * nowhere to go, so it goes nowhere.
+   *
+   * That is not a hypothetical. `reconcileLevel` drops a PERFORM flourish whose
+   * note has moved, on purpose, because sliding it onto a neighbour would be
+   * inventing choreography. Doing that to every flourish in a level leaves a
+   * file that loads, parses, plays, and never grows a crowd — the family's
+   * entire payoff, silently gone, with nothing raised anywhere. Three of Goat
+   * Frontman's six levels reached the repository in exactly that state.
+   *
+   * So this is the middle rung: **the level is playable and this family says it
+   * should not ship.** Each string is one finding, addressed to the person who
+   * authored the notes and phrased in their vocabulary — "L3 has no flourish, so
+   * the crowd never grows", not "flourishBeats is empty". An empty array means
+   * the family is satisfied.
+   *
+   * The rule of thumb for what belongs here: report when *this family's own
+   * mechanic cannot happen* in the level as authored. Not taste, not difficulty
+   * balance, and never anything `reconcileLevel` could have fixed — a finding
+   * the author cannot act on is noise, and one the code could have repaired is
+   * a bug in the repair.
+   *
+   * Callers: the editor shows these without blocking a save, because an author
+   * mid-edit is allowed to be half-finished; `tests/scenario-content.test.ts`
+   * runs them over every shipped scenario and fails, because a repository is
+   * not half-finished.
+   */
+  reviewLevel?(level: AuthoredLevel, shape: AuthoringShape): readonly string[];
 }
 
 export interface MinigameModule {
