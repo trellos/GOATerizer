@@ -28,7 +28,7 @@ import {
   startGridOf,
   type EditorNote,
 } from "./grid.js";
-import { buildLevel, withLevel } from "./level.js";
+import { buildLevel, difficultyAfterReorder, withLevel, withLevelsReordered } from "./level.js";
 import { notesFromPrompt } from "./prompt.js";
 import { laneVocabularyOf, type LaneVocabulary } from "./vocabulary.js";
 import { PHRASE_MEASURES } from "../config/tuning.js";
@@ -152,6 +152,35 @@ export class EditorDocument {
     const problems = this.#stashLevel();
     this.#difficulty = difficulty;
     this.#readLevel(difficulty);
+    return problems;
+  }
+
+  /**
+   * Moves a difficulty into another difficulty's place, sliding the rest over.
+   *
+   * The ladder rule lives in {@link withLevelsReordered}; what this adds is the
+   * editor's half of it. The level being edited is stashed first, so a reorder
+   * carries this session's edits with the rung they are on rather than moving
+   * what is still on disk; and the selection follows the **notes**, not the
+   * number, so dragging the level you are looking at leaves it on screen under
+   * its new difficulty.
+   *
+   * Returns the reasons the level being left could not be written down, exactly
+   * as {@link selectLevel} does: a timeline the editor cannot spell does not
+   * block the move, but it does not vanish silently either.
+   */
+  moveLevel(from: number, to: number): readonly string[] {
+    if (from === to) return [];
+    // The ladder is read *before* the stash. A level being edited at a
+    // difficulty the file does not author yet becomes a rung the moment it is
+    // written down, and a move should mean what it meant when it was asked for.
+    const ladder = [...this.supportedLevels].sort((a, b) => a - b);
+    const problems = this.#stashLevel();
+    const following = difficultyAfterReorder(ladder, this.#difficulty, from, to);
+    this.#raw = withLevelsReordered(this.#raw, from, to, ladder);
+    this.#difficulty = following;
+    this.#readLevel(following);
+    this.#dirty = true;
     return problems;
   }
 

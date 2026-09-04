@@ -64,6 +64,43 @@ const ACCURACIES: readonly { label: string; mode: AutoplayMode }[] = [
 
 const SESSION_KEY = "goaterizer.editor.at";
 
+/** One rung of the difficulty ladder, measured with the row at rest. */
+type LevelSlot = {
+  readonly level: number;
+  readonly element: HTMLElement;
+  readonly left: number;
+  readonly centre: number;
+};
+
+/** One difficulty being dragged along the ladder. */
+type LevelDrag = {
+  readonly from: number;
+  /** The rung the pointer is nearest, which is where a release would drop it. */
+  over: number;
+  readonly pointerId: number;
+  readonly startX: number;
+  readonly slots: readonly LevelSlot[];
+};
+
+/**
+ * What a reorder did to the levels it stepped over, in the author's terms.
+ *
+ * The move itself is one sentence — L3 is now L5 — and the useful half is the
+ * other end of it: everything between slid one rung the other way.
+ */
+function describeShift(ladder: readonly number[], from: number, to: number): string {
+  const low = Math.min(from, to);
+  const high = Math.max(from, to);
+  const stepped = ladder.filter((level) => level !== from && level >= low && level <= high);
+  if (stepped.length === 0) return "";
+  const towards = from < to ? -1 : 1;
+  const moves = stepped.map((level) => {
+    const at = ladder.indexOf(level);
+    return `L${level}→L${ladder[at + towards]}`;
+  });
+  return ` — ${moves.join(", ")}`;
+}
+
 function must<T extends Element>(id: string, ctor: new () => T): T {
   const element = document.getElementById(id);
   if (!(element instanceof ctor)) throw new Error(`#${id} is missing or is not a ${ctor.name}`);
@@ -93,6 +130,8 @@ export class EditorScreen {
   #problems: readonly string[] = [];
   #validateTimer: ReturnType<typeof setTimeout> | null = null;
   #active = false;
+  /** A difficulty being dragged along the ladder, with the row measured at rest. */
+  #levelDrag: LevelDrag | null = null;
 
   constructor(host: EditorHost, playback: EditorPlayback, tempoId: TempoId) {
     this.#host = host;
@@ -203,6 +242,10 @@ export class EditorScreen {
     const row = must("editor-levels", HTMLDivElement);
     row.replaceChildren();
     for (const level of LEVELS) {
+      const slot = document.createElement("div");
+      slot.className = "level-slot";
+      slot.dataset["level"] = String(level);
+
       const button = document.createElement("button");
       button.type = "button";
       button.className = "chip";
@@ -220,8 +263,125 @@ export class EditorScreen {
         this.#remember();
         this.#refresh();
       });
-      row.append(button);
+
+      const handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "level-handle";
+      handle.tabIndex = -1;
+      handle.textContent = "⠿";
+      handle.addEventListener("pointerdown", (event) => this.#beginLevelDrag(level, handle, event));
+      // A handle is dragged, never pressed: without this a click that did not
+      // move would fall through and select the level under it, which is the one
+      // thing the row already does everywhere else.
+      handle.addEventListener("click", (event) => event.preventDefault());
+
+      slot.append(button, handle);
+      row.append(slot);
     }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Reordering the difficulty ladder                                  */
+  /* ---------------------------------------------------------------- */
+
+  /** The slots a level may be dragged onto: the ones the scenario authors. */
+  #levelSlots(): LevelSlot[] {
+    const authored = new Set(this.#document.supportedLevels);
+    return [...must("editor-levels", HTMLDivElement).querySelectorAll<HTMLElement>(".level-slot")]
+      .filter((element) => authored.has(Number(element.dataset["level"])))
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          level: Number(element.dataset["level"]),
+          element,
+          left: rect.left,
+          centre: rect.left + rect.width / 2,
+        };
+      });
+  }
+
+  #beginLevelDrag(level: number, handle: HTMLElement, event: PointerEvent): void {
+    if (event.button !== 0) return;
+    const slots = this.#levelSlots();
+    if (slots.length < 2 || !slots.some((slot) => slot.level === level)) return;
+    // Measured before anything moves, so the geometry a drag reasons about is
+    // the row at rest however far the pointer has travelled since.
+    event.preventDefault();
+    handle.setPointerCapture(event.pointerId);
+    this.#levelDrag = {
+      from: level,
+      over: level,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      slots,
+    };
+    this.#paintLevelDrag(0);
+  }
+
+  /** The rung nearest the pointer becomes the one a release would drop onto. */
+  #dragLevelTo(clientX: number): void {
+    const drag = this.#levelDrag;
+    if (!drag) return;
+    let nearest = drag.over;
+    let distance = Infinity;
+    for (const slot of drag.slots) {
+      const gap = Math.abs(slot.centre - clientX);
+      if (gap < distance) {
+        distance = gap;
+        nearest = slot.level;
+      }
+    }
+    drag.over = nearest;
+    this.#paintLevelDrag(clientX - drag.startX);
+  }
+
+  /**
+   * Shows the rotation the drop would apply, rather than only where the pointer is.
+   *
+   * The dragged slot follows the pointer; every slot the move steps over is
+   * offset to the place it would land, which is measured from the row itself so
+   * that a ladder with gaps in it — a scenario authoring 1, 3 and 5 — slides by
+   * the distance between its own rungs rather than by an assumed pitch.
+   */
+  #paintLevelDrag(dx: number): void {
+    const drag = this.#levelDrag;
+    if (!drag) return;
+    const fromIndex = drag.slots.findIndex((slot) => slot.level === drag.from);
+    const toIndex = drag.slots.findIndex((slot) => slot.level === drag.over);
+    drag.slots.forEach((slot, index) => {
+      let lands = index;
+      if (index === fromIndex) lands = toIndex;
+      else if (fromIndex < index && index <= toIndex) lands = index - 1;
+      else if (toIndex <= index && index < fromIndex) lands = index + 1;
+      const landing = drag.slots[lands];
+      const shift = index === fromIndex ? dx : (landing?.left ?? slot.left) - slot.left;
+      slot.element.style.transform = shift === 0 ? "" : `translateX(${shift}px)`;
+      slot.element.dataset["dragging"] = String(index === fromIndex);
+    });
+  }
+
+  #endLevelDrag(commit: boolean): void {
+    const drag = this.#levelDrag;
+    if (!drag) return;
+    this.#levelDrag = null;
+    for (const slot of drag.slots) {
+      slot.element.style.transform = "";
+      delete slot.element.dataset["dragging"];
+    }
+    if (!commit || drag.over === drag.from) return;
+
+    // The rungs the drag was measured against, which is what it just promised.
+    const ladder = drag.slots.map((slot) => slot.level);
+    const leaving = this.#document.difficulty;
+    const problems = this.#document.moveLevel(drag.from, drag.over);
+    const moved = `L${drag.from} is now L${drag.over}${describeShift(ladder, drag.from, drag.over)}`;
+    this.#status =
+      problems.length > 0
+        ? `${moved}, but L${leaving} moved as it is on disk: ${problems[0]}`
+        : moved;
+    this.#view.setDocument(this.#document);
+    this.#remember();
+    this.#refresh();
   }
 
   #wire(): void {
@@ -263,6 +423,19 @@ export class EditorScreen {
 
     const premise = must("editor-premise", HTMLTextAreaElement);
     premise.addEventListener("input", () => this.#document.setPremise(premise.value));
+
+    // The handle takes the pointer capture, so the rest of the drag arrives
+    // through it and bubbles to here — including the release outside the row,
+    // which is the one a listener on the slot would miss.
+    window.addEventListener("pointermove", (event) => {
+      if (this.#levelDrag?.pointerId === event.pointerId) this.#dragLevelTo(event.clientX);
+    });
+    window.addEventListener("pointerup", (event) => {
+      if (this.#levelDrag?.pointerId === event.pointerId) this.#endLevelDrag(true);
+    });
+    window.addEventListener("pointercancel", (event) => {
+      if (this.#levelDrag?.pointerId === event.pointerId) this.#endLevelDrag(false);
+    });
 
     window.addEventListener("keydown", (event) => {
       if (!this.#active) return;
@@ -539,13 +712,22 @@ export class EditorScreen {
     );
 
     const supported = new Set(document_.supportedLevels);
-    for (const button of must("editor-levels", HTMLDivElement).querySelectorAll("button")) {
-      const level = Number(button.textContent);
+    for (const slot of must("editor-levels", HTMLDivElement).querySelectorAll<HTMLElement>(
+      ".level-slot"
+    )) {
+      const level = Number(slot.dataset["level"]);
+      const authored = supported.has(level);
+      const button = slot.querySelector("button.chip") as HTMLButtonElement;
       button.dataset["selected"] = String(level === document_.difficulty);
-      button.dataset["authored"] = String(supported.has(level));
-      button.title = supported.has(level)
+      button.dataset["authored"] = String(authored);
+      button.title = authored
         ? `Level ${level}`
         : `Level ${level} — not authored yet; selecting it starts one`;
+      // Nothing to move, and nowhere to move it: a level the scenario does not
+      // author is not a rung, and a ladder of one has no order to change.
+      const handle = slot.querySelector("button.level-handle") as HTMLButtonElement;
+      handle.hidden = !authored || supported.size < 2;
+      handle.title = `Drag to move L${level} along the difficulty ladder`;
     }
 
     for (const chip of must("editor-palette", HTMLDivElement).querySelectorAll("button")) {

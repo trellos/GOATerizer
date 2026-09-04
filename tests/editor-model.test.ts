@@ -40,7 +40,14 @@ import {
   tileToPhrase,
   type EditorNote,
 } from "../src/editor/grid.js";
-import { buildLevel, starLadder, withLevel, withoutLevel } from "../src/editor/level.js";
+import {
+  buildLevel,
+  difficultyAfterReorder,
+  starLadder,
+  withLevel,
+  withLevelsReordered,
+  withoutLevel,
+} from "../src/editor/level.js";
 import { notesFromPrompt, promptFromNotes } from "../src/editor/prompt.js";
 import { laneVocabularyOf } from "../src/editor/vocabulary.js";
 
@@ -540,5 +547,135 @@ describe("adding and removing a difficulty", () => {
     const two = withLevel(one, 3, { difficulty: 3 });
     expect(two["supportedLevels"]).toEqual([2, 3]);
     expect(withoutLevel(two, 3)!["supportedLevels"]).toEqual([2]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+describe("reordering the difficulty ladder", () => {
+  /** A scenario that is nothing but a ladder, so a move is the only thing tested. */
+  const ladder = (levels: readonly number[]): Json => ({
+    id: "x",
+    supportedLevels: [...levels],
+    levels: Object.fromEntries(
+      levels.map((difficulty) => [
+        String(difficulty),
+        { difficulty, prompt: `was L${difficulty}` },
+      ])
+    ),
+  });
+
+  /** Which level's content each difficulty holds, read back off the file. */
+  const wasAt = (raw: Json): Record<string, unknown> =>
+    Object.fromEntries(
+      Object.entries(raw["levels"] as Json).map(([key, level]) => [
+        key,
+        (level as Json)["prompt"],
+      ])
+    );
+
+  it("slides the levels a move steps over one rung the other way", () => {
+    // The gesture the handles exist for: drop L3 onto L5, and 4 becomes 3, 5
+    // becomes 4, and what was 3 is now 5.
+    const moved = withLevelsReordered(ladder([1, 2, 3, 4, 5]), 3, 5);
+    expect(wasAt(moved)).toEqual({
+      "1": "was L1",
+      "2": "was L2",
+      "3": "was L4",
+      "4": "was L5",
+      "5": "was L3",
+    });
+  });
+
+  it("slides them the other way when a level is dragged down the ladder", () => {
+    const moved = withLevelsReordered(ladder([1, 2, 3, 4, 5]), 5, 2);
+    expect(wasAt(moved)).toEqual({
+      "1": "was L1",
+      "2": "was L5",
+      "3": "was L2",
+      "4": "was L3",
+      "5": "was L4",
+    });
+  });
+
+  it("rewrites the difficulty each level now says it is", () => {
+    // `loadScenario` refuses a level whose own `difficulty` disagrees with the
+    // key it was found under, so this is the one field a move has to touch.
+    const moved = withLevelsReordered(ladder([1, 2, 3]), 1, 3);
+    for (const [key, level] of Object.entries(moved["levels"] as Json)) {
+      expect((level as Json)["difficulty"]).toBe(Number(key));
+    }
+  });
+
+  it("permutes the rungs a scenario has, and does not invent new ones", () => {
+    // A ladder with holes in it keeps its own holes: a reorder changes which
+    // level sits on a rung, never which difficulties the scenario supports.
+    const moved = withLevelsReordered(ladder([1, 3, 5]), 1, 5);
+    expect(moved["supportedLevels"]).toEqual([1, 3, 5]);
+    expect(wasAt(moved)).toEqual({ "1": "was L3", "3": "was L5", "5": "was L1" });
+  });
+
+  it("leaves the file alone when the move is a no-op or off the ladder", () => {
+    const before = ladder([1, 2, 3]);
+    expect(wasAt(withLevelsReordered(before, 2, 2))).toEqual(wasAt(before));
+    expect(wasAt(withLevelsReordered(before, 2, 6))).toEqual(wasAt(before));
+    expect(wasAt(withLevelsReordered(before, 6, 2))).toEqual(wasAt(before));
+  });
+
+  it("says where a difficulty ends up, so the editor can stay on its notes", () => {
+    const rungs = [1, 2, 3, 4, 5];
+    expect(difficultyAfterReorder(rungs, 3, 3, 5)).toBe(5);
+    expect(difficultyAfterReorder(rungs, 4, 3, 5)).toBe(3);
+    expect(difficultyAfterReorder(rungs, 5, 3, 5)).toBe(4);
+    // Outside the span the move stepped over, nothing moved.
+    expect(difficultyAfterReorder(rungs, 1, 3, 5)).toBe(1);
+    expect(difficultyAfterReorder(rungs, 2, 3, 5)).toBe(2);
+    // A difficulty that is not a rung is not on the ladder at all — the editor
+    // can be sitting on a new, empty one while a move happens.
+    expect(difficultyAfterReorder(rungs, 7, 3, 5)).toBe(7);
+    // A ladder with gaps counts in rungs, not in numbers: 1 onto 5 steps over
+    // one rung, and that is the only level that moves.
+    expect(difficultyAfterReorder([1, 3, 5], 3, 1, 5)).toBe(1);
+    expect(difficultyAfterReorder([1, 3, 5], 5, 1, 5)).toBe(3);
+  });
+
+  it("moves only the rungs the drag was measured against", () => {
+    // A level written down on the way into the move — a new difficulty the
+    // author had notes on — is not one of the rungs the release meant, so it
+    // stays where it is while the rest rotate around it.
+    const before = ladder([1, 2, 3, 4, 5]);
+    const moved = withLevelsReordered(before, 2, 5, [1, 2, 3, 5]);
+    expect(wasAt(moved)).toEqual({
+      "1": "was L1",
+      "2": "was L3",
+      "3": "was L5",
+      "4": "was L4",
+      "5": "was L2",
+    });
+    expect(moved["supportedLevels"]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("moves the notes, keeps them on screen, and still loads", () => {
+    const rockyAscent = SCENARIO_SOURCES.find((source) => source.id === "rocky_ascent")!.raw as Json;
+    const document = new EditorDocument(rockyAscent, 3);
+    const shape = (notes: readonly EditorNote[]) =>
+      notes.map((entry) => [entry.startTick, entry.lane, entry.duration]);
+
+    const wasL3 = shape(document.notes);
+    const wasL4 = shape(new EditorDocument(rockyAscent, 4).notes);
+    expect(wasL3).not.toEqual(wasL4);
+
+    expect(document.moveLevel(3, 5)).toEqual([]);
+    // The editor follows the notes rather than the number: the same timeline is
+    // still on screen, under the difficulty it now is.
+    expect(document.difficulty).toBe(5);
+    expect(shape(document.notes)).toEqual(wasL3);
+
+    const { raw, problems } = document.toScenario();
+    expect(problems).toEqual([]);
+    const scenario = loadScenario(raw!, assetUrlResolver(raw!));
+    expect([...scenario.supportedLevels]).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(shape(new EditorDocument(raw!, 3).notes)).toEqual(wasL4);
+    expect(shape(new EditorDocument(raw!, 5).notes)).toEqual(wasL3);
   });
 });

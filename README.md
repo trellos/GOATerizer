@@ -316,6 +316,7 @@ produces is a diff you commit.
 | **Play** | Loops the timeline with the game's own kit and a synth for the notes. The beat is the one this level would get in a run, and both follow the edit: moving a note or switching difficulty changes what is playing without stopping the loop |
 | **Preview** | Hands the scenario — saved or not — to the real game for one attempt, autoplayed at 0/25/50/75/100%. Nothing is scored, and **Exit preview** comes straight back. It runs on injected input rather than the microphone, so it works with no mic, no permission and no recognizer — a preview asks whether the phrase plays, and that should not depend on the machine's audio stack |
 | **Levels** | 1–7. A difficulty the scenario has not authored is dimmed; selecting it starts one, with the scenario data of the nearest level it does author |
+| **Reorder** | Drag the ⠿ grip under a level sideways to move it along the ladder. The levels it steps over slide the other way and show where they will land before you let go — drop L3 on L5 and what was 4 is 3, what was 5 is 4, and L3 is now L5. Only the difficulties the scenario authors are rungs, so a drop lands on the nearest one and `supportedLevels` comes out of a reorder as it went in |
 | **Scenarios** | New… copies the open scenario (same class, same art, same notes) under a new name; ✎ renames; 🗑 deletes the file |
 
 Two things it will refuse, and both are the schema being honest rather than the
