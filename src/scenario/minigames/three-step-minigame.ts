@@ -122,9 +122,13 @@ const RAM_LIFT = 0.08;
 /** The swell past the new size on a growth step, and how long it lasts. */
 const GROWTH_PULSE = 0.2;
 const GROWTH_PULSE_BEATS = 0.3;
-/** The wolf's red flash on a growth step. */
-const WOLF_FLASH_BEATS = 0.4;
-const WOLF_FLASH = "#ff3b3b";
+/**
+ * The red flash: the animal that is *losing* the exchange flashes. A landed
+ * note grows the ram and flashes the wolf; a mistake grows the wolf and
+ * flashes the ram. Red is "this is bad for you", not "this just grew".
+ */
+const FLASH_BEATS = 0.4;
+const FLASH = "#ff3b3b";
 /** The tumble: how long the fall takes and where it ends, below the band. */
 export const TUMBLE_BEATS = 0.8;
 const TUMBLE_FLOOR_Y = 1.35;
@@ -353,8 +357,8 @@ class ThreeStepMinigame implements Minigame {
     if (targetArt !== undefined) {
       const restY = laneY(view, this.#aim ?? 0) + 0.12;
       const tumble = this.#tumbleAt(beat);
-      const flash =
-        this.#wolfGrewAtBeat === null ? 0 : decay(this.#wolfGrewAtBeat, WOLF_FLASH_BEATS, beat);
+      // The wolf flashes when the ram scores.
+      const flash = this.#ramGrewAtBeat === null ? 0 : decay(this.#ramGrewAtBeat, FLASH_BEATS, beat);
       sprites.push({
         key: "target",
         assetId: targetArt,
@@ -366,7 +370,7 @@ class ThreeStepMinigame implements Minigame {
         scale: ACTOR_SCALE * this.#growthScale(this.#wolfGrowth, this.#wolfGrewAtBeat, beat),
         anchor: "bottom",
         layer: "over",
-        ...(flash > 0 ? { tint: { colour: WOLF_FLASH, amount: flash * 0.8 } } : {}),
+        ...(flash > 0 ? { tint: { colour: FLASH, amount: flash * 0.8 } } : {}),
       });
     }
 
@@ -378,6 +382,8 @@ class ThreeStepMinigame implements Minigame {
       const restY = laneY(view, pose.lane) - RAM_LIFT * this.#ramGrowth;
       const restX = anchorX - view.measure.beatWidth * RAM_REST_BEATS;
       const position = this.#ramPosition(view, { x: restX, y: restY });
+      // The ram flashes when the wolf scores.
+      const flash = this.#wolfGrewAtBeat === null ? 0 : decay(this.#wolfGrewAtBeat, FLASH_BEATS, beat);
       sprites.push({
         key: "ram",
         assetId: pose.assetId,
@@ -386,6 +392,7 @@ class ThreeStepMinigame implements Minigame {
         scale: ACTOR_SCALE * this.#growthScale(this.#ramGrowth, this.#ramGrewAtBeat, beat),
         anchor: "bottom",
         layer: "over",
+        ...(flash > 0 ? { tint: { colour: FLASH, amount: flash * 0.8 } } : {}),
       });
     }
 

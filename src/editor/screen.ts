@@ -33,7 +33,7 @@ import {
   notesOverrunningLoop,
   tileToPhrase,
 } from "./grid.js";
-import { EditorPlayback, type Program } from "./playback.js";
+import { EditorPlayback, editorKeyFor, type Program } from "./playback.js";
 import { TimelineEditorView } from "./timeline-editor.js";
 
 type Json = Record<string, unknown>;
@@ -45,6 +45,8 @@ export type EditorHost = {
     scenario: ScenarioDefinition;
     difficulty: number;
     accuracy: AutoplayMode;
+    /** The mode to preview in; a pentatonic scenario asks for minor. */
+    mode: "major" | "minor";
   }): Promise<void>;
   /** Leave the editor for the start screen. */
   exit(): void;
@@ -667,6 +669,7 @@ export class EditorScreen {
       scenario: definition,
       difficulty: this.#document.difficulty,
       accuracy: this.#accuracy,
+      mode: editorKeyFor(this.#document.vocabulary).mode,
     });
   }
 

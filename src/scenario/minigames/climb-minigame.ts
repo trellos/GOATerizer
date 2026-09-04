@@ -179,7 +179,7 @@ class ClimbMinigame implements Minigame {
       case "good":
         if (!target) return;
         this.#reached = Math.max(this.#reached, target.index);
-        this.#actor.land(target.lane, target.startBeat);
+        this.#actor.land(target.lane, target.startBeat, target.startBeat + target.durationBeats);
         break;
       case "miss":
         if (target) this.#actor.fall(target.startBeat);

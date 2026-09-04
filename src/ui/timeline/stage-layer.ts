@@ -163,6 +163,7 @@ export function drawStageSprites(
     ctx.globalAlpha = opacity;
     ctx.translate(box.anchorX, box.anchorY);
     if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
+    if (sprite.flipX) ctx.scale(-1, 1);
     const tinted = sprite.tint && sprite.tint.amount > 0 ? tintedImage(image, sprite.tint) : null;
     ctx.drawImage(tinted ?? image, box.left, box.top, box.width, box.height);
     ctx.restore();

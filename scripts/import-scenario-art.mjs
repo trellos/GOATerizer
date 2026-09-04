@@ -133,11 +133,19 @@ function ram(sheet, column) {
   return trim(frame(load("sevarihk-mountain-goat", sheet), 4, 4, column, RIGHT));
 }
 
-/** One frame of the wolf: keyed off its opaque teal, trimmed, turned to face left. */
-function wolf(sheet, frames, column) {
+/**
+ * One frame of the wolf: keyed off its opaque teal, trimmed, facing the ram.
+ *
+ * The ram stands to the wolf's left, so the wolf faces left. The run sheet is
+ * drawn running right and is mirrored; the sit sheet is drawn facing left
+ * already and is not — mirroring both had the beaten wolf sitting with its
+ * back to the goat that beat it.
+ */
+function wolf(sheet, frames, column, { mirror }) {
   const sheetImage = load("alizard-pixel-wolf", sheet);
   const keyed = keyColour(sheetImage, cornerColour(sheetImage));
-  return flipX(trim(frame(keyed, frames, 1, column, 0)));
+  const cut = trim(frame(keyed, frames, 1, column, 0));
+  return mirror ? flipX(cut) : cut;
 }
 
 /**
@@ -168,8 +176,8 @@ const ASSETS = {
 
   // The victim, and the victim afterwards. A wolf that sits down is the
   // catalogue's "humiliated" state, already drawn, at no extra cost.
-  prop_butt_butt_bonk_target: wolf("wolf_run.png", 5, 2),
-  prop_butt_butt_bonk_target_hit: wolf("wolf_sit.png", 4, 3),
+  prop_butt_butt_bonk_target: wolf("wolf_run.png", 5, 2, { mirror: true }),
+  prop_butt_butt_bonk_target_hit: wolf("wolf_sit.png", 4, 3, { mirror: false }),
 
   // The same expanding ring caught early and late: a tight spark for the two
   // horn taps, the wide shockwave for the headbutt they set up.

@@ -564,8 +564,15 @@ export class GameApp {
     scenario: ScenarioDefinition;
     difficulty: number;
     accuracy: AutoplayMode;
+    mode: "major" | "minor";
   }): Promise<void> {
     this.#previewing = true;
+    // The editor says which mode to hear the scenario in — a blues lick wants
+    // the minor pentatonic. A run rolls its own; a preview is not a run.
+    if (this.#setup.key.mode !== options.mode) {
+      this.#setup.key = { ...this.#setup.key, mode: options.mode };
+      this.#timeline.setKey(this.#setup.key);
+    }
     this.#devScenarioId = options.scenario.id;
     this.#devLevel = options.difficulty;
     this.#showPreviewExit(true);

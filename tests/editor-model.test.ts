@@ -16,6 +16,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { EDITOR_KEY, editorKeyFor } from "../src/editor/playback.js";
+
 import { ATTEMPT_REPEATS, JUDGMENT_POINTS, PHRASE_BEATS } from "../src/config/tuning.js";
 import { loadScenario } from "../src/scenario/load.js";
 import {
@@ -899,5 +901,12 @@ describe("buildLevel and the family's review", () => {
     });
     expect(built.empty).toBe(true);
     expect(built.notices).toEqual([]);
+  });
+});
+
+describe("what the editor auditions in", () => {
+  it("plays a pentatonic scenario in the minor, so a blues lick sounds like one", () => {
+    expect(editorKeyFor({ representation: "pentatonic" }).mode).toBe("minor");
+    expect(editorKeyFor({ representation: "diatonic" })).toEqual(EDITOR_KEY);
   });
 });

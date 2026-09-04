@@ -40,6 +40,20 @@ import { tokenForLane, type LaneVocabulary } from "./vocabulary.js";
  */
 export const EDITOR_KEY: RunKey = { tonic: 0, mode: "major" };
 
+/**
+ * The key a vocabulary auditions in.
+ *
+ * A pentatonic scenario is a blues lick, and a blues lick in the *major*
+ * pentatonic (1 2 3 5 6) sounds like a major scale with two notes missing —
+ * which is what the designer heard and reported. The minor pentatonic
+ * (1 b3 4 5 b7) is the sound the family is authored for, so a pentatonic
+ * vocabulary auditions and previews in C minor. The run still rolls its own
+ * mode; this is a presentation choice, like `EDITOR_KEY` itself.
+ */
+export function editorKeyFor(vocabulary: { representation: "diatonic" | "pentatonic" }): RunKey {
+  return vocabulary.representation === "pentatonic" ? { tonic: 0, mode: "minor" } : EDITOR_KEY;
+}
+
 const TICK_MS = 25;
 const LOOKAHEAD_S = 0.15;
 
@@ -171,15 +185,13 @@ export class EditorPlayback {
     if (signature === this.#signature) return;
     this.#signature = signature;
 
+    const key = editorKeyFor(program.vocabulary);
     this.#events = program.notes.map((note) => {
-      const ref = resolveDegree(
-        parseDegreeToken(tokenForLane(program.vocabulary, note.lane)),
-        EDITOR_KEY.mode
-      );
+      const ref = resolveDegree(parseDegreeToken(tokenForLane(program.vocabulary, note.lane)), key.mode);
       return {
         startBeat: note.startTick / TICKS_PER_BEAT,
         durationBeats: DURATION_BEATS[note.duration],
-        midi: degreeToMidi(ref, EDITOR_KEY),
+        midi: degreeToMidi(ref, key),
       };
     });
 
@@ -247,11 +259,9 @@ export class EditorPlayback {
     const master = this.#audio.master;
     if (!context || !master) return;
     this.#plucks ??= this.#buildPlucks(context, master);
-    const ref = resolveDegree(
-      parseDegreeToken(tokenForLane(vocabulary, note.lane)),
-      EDITOR_KEY.mode
-    );
-    this.#plucks.pluck(degreeToMidi(ref, EDITOR_KEY), context.currentTime + 0.01, 0.25);
+    const key = editorKeyFor(vocabulary);
+    const ref = resolveDegree(parseDegreeToken(tokenForLane(vocabulary, note.lane)), key.mode);
+    this.#plucks.pluck(degreeToMidi(ref, key), context.currentTime + 0.01, 0.25);
   }
 
   /**

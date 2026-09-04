@@ -471,7 +471,7 @@ describe("PerformMinigame on the timeline", () => {
     expect(performIn(good.attempt).progress.crowd).toBe(Math.ceil(perFlourish / 2));
   });
 
-  it("flinches on a wrong note, bores the crowd for a beat, and takes nothing away", () => {
+  it("flinches on a wrong note, bores the crowd for a beat, and sends one waiting goat home", () => {
     const h = harness(1);
     const { flourish } = firstTargets(h.attempt);
     playUpTo(h, flourish);
@@ -481,22 +481,69 @@ describe("PerformMinigame on the timeline", () => {
     const earned = performIn(h.attempt).progress.crowd;
 
     const next = h.attempt.targets[flourish.opportunityIndex + 1]!;
+    // Stock the wings first, so the mistake costs a waiting goat, not a seat.
     h.advanceTo(next.startBeat);
-    h.playAt(next.midi + 1, next.startBeat); // a semitone off
-    h.advanceTo(next.startBeat + 0.05);
+    h.playAt(next.midi, next.startBeat);
+    h.advanceTo(next.startBeat + 0.01);
+    const waiting = performIn(h.attempt).progress.staged;
+    expect(waiting).toBeGreaterThan(0);
 
-    expect(spriteAt(h.attempt, "performer", next.startBeat + 0.05).rotationDeg).not.toBe(0);
+    const after = h.attempt.targets[flourish.opportunityIndex + 2]!;
+    h.advanceTo(after.startBeat);
+    h.playAt(after.midi + 1, after.startBeat); // a semitone off
+    h.advanceTo(after.startBeat + 0.05);
+
+    expect(spriteAt(h.attempt, "performer", after.startBeat + 0.05).rotationDeg).not.toBe(0);
+    // The wings pay first; the seated crowd is untouched.
+    expect(performIn(h.attempt).progress.staged).toBe(waiting - 1);
     expect(performIn(h.attempt).progress.crowd).toBe(earned);
     // Slumped, and unimpressed — sampled once the goat has finished walking
     // in, so the slump is not hidden under the walk.
-    const bored = crowdAt(h.attempt, next.startBeat + 0.6)[0]!;
+    const bored = crowdAt(h.attempt, after.startBeat + 0.6)[0]!;
     expect(bored.assetId).toBe(FRONTMAN.bindings.audienceStates[0]);
-    expect(bored.y).toBeGreaterThan(crowdAt(h.attempt, next.startBeat + 4)[0]!.y);
+    expect(bored.y).toBeGreaterThan(crowdAt(h.attempt, after.startBeat + 4)[0]!.y);
 
     // Settled — ticked on the minigame alone, so the targets after it do not
     // expire into fresh misses and fresh flinches.
-    performIn(h.attempt).update(next.startBeat + 0.75);
-    expect(spriteAt(h.attempt, "performer", next.startBeat + 0.75).rotationDeg).toBe(0);
+    performIn(h.attempt).update(after.startBeat + 0.75);
+    expect(spriteAt(h.attempt, "performer", after.startBeat + 0.75).rotationDeg).toBe(0);
+  });
+
+  it("with nobody waiting, a mistake sends a seated goat walking back to its wing", () => {
+    const h = harness(1);
+    const { flourish } = firstTargets(h.attempt);
+    playUpTo(h, flourish);
+    h.advanceTo(flourish.startBeat);
+    h.playAt(flourish.midi, flourish.startBeat);
+    h.advanceTo(flourish.startBeat + 0.01);
+    const minigame = performIn(h.attempt);
+    // Empty the wings by hand: every waiting goat is dismissed by a mistake.
+    let guard = 0;
+    while (minigame.progress.staged > 0 && guard++ < 20) {
+      minigame.onJudged({ id: 100 + guard, outcome: "wrong", opportunityIndex: null, playedMidi: 61, lane: 1, beat: 5 }, 5);
+    }
+    const seated = minigame.progress.crowd;
+    expect(seated).toBeGreaterThan(0);
+
+    minigame.onJudged({ id: 200, outcome: "wrong", opportunityIndex: null, playedMidi: 61, lane: 1, beat: 6 }, 6);
+    expect(minigame.progress.crowd).toBe(seated - 1);
+    // Still drawn, walking out, until the walk is over; then gone.
+    const leaving = (minigame.render(viewFor(h.attempt, 6.3)).sprites ?? []).filter((s) => s.key.startsWith("crowd-"));
+    expect(leaving).toHaveLength(seated);
+    minigame.update(6 + 1.5 + 0.01);
+    const gone = (minigame.render(viewFor(h.attempt, 8)).sprites ?? []).filter((s) => s.key.startsWith("crowd-"));
+    expect(gone).toHaveLength(seated - 1);
+  });
+
+  it("faces the crowd at the performer, on both sides", () => {
+    const { attempt } = playFlawlessly(4);
+    const performerX = spriteAt(attempt, "performer", ATTEMPT_BEATS + 4).x;
+    const crowd = crowdAt(attempt, ATTEMPT_BEATS + 4);
+    expect(crowd.length).toBeGreaterThan(1);
+    for (const goat of crowd) {
+      // The art faces left: a goat left of the act is mirrored to face right.
+      expect(goat.flipX ?? false).toBe(goat.x < performerX);
+    }
   });
 
   it("summons nobody for a missed flourish", () => {

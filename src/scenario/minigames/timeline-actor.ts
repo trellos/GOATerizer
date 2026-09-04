@@ -85,6 +85,14 @@ export type TimelineActorState = {
   landedBeat: number;
   /** Lane it jumped from, for the same reason. */
   fromLane: number | null;
+  /**
+   * Where the bar it stands on ends, in attempt beats, or null. The layer keeps
+   * the actor on that bar's trailing edge as it scrolls away, so it waits on
+   * the last note through a rest rather than hanging in the air.
+   */
+  standingEndBeat: number | null;
+  /** The same for the bar it jumped from, for the hop's start. */
+  fromEndBeat: number | null;
   fallen: readonly FallenActor[];
   /** The streak at which growth stops and the horns come in. */
   capStreak: number;
@@ -102,6 +110,8 @@ export class TimelineActor {
   readonly #look: ActorLook;
   #lane: number | null = null;
   #fromLane: number | null = null;
+  #standingEndBeat: number | null = null;
+  #fromEndBeat: number | null = null;
   #nextLane: number | null = null;
   #alive = false;
   #streak = 0;
@@ -126,6 +136,8 @@ export class TimelineActor {
       nextLane: this.#nextLane,
       landedBeat: this.#landedBeat,
       fromLane: this.#fromLane,
+      standingEndBeat: this.#standingEndBeat,
+      fromEndBeat: this.#fromEndBeat,
       fallen: this.#fallen,
       capStreak: this.#capStreak,
       grewAtBeat: this.#grewAtBeat,
@@ -180,9 +192,11 @@ export class TimelineActor {
    * wrong note could move the actor, one flub could strand it somewhere the
    * next platform is unreachable from, and a single mistake could end a run.
    */
-  land(lane: number, beat: number): void {
+  land(lane: number, beat: number, endBeat: number | null = null): void {
     this.#fromLane = this.#alive ? this.#lane : lane;
+    this.#fromEndBeat = this.#alive ? this.#standingEndBeat : endBeat;
     this.#lane = lane;
+    this.#standingEndBeat = endBeat;
     this.#landedBeat = beat;
     this.#alive = true;
     this.#streak += 1;
@@ -221,6 +235,8 @@ export class TimelineActor {
     this.#alive = false;
     this.#lane = null;
     this.#fromLane = null;
+    this.#standingEndBeat = null;
+    this.#fromEndBeat = null;
     this.#streak = 0;
     this.#grewAtBeat = null;
     this.#wobbledAtBeat = null;
@@ -232,6 +248,8 @@ export class TimelineActor {
     this.#alive = false;
     this.#lane = null;
     this.#fromLane = null;
+    this.#standingEndBeat = null;
+    this.#fromEndBeat = null;
     this.#nextLane = null;
     this.#streak = 0;
     this.#landedBeat = 0;

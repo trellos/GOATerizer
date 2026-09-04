@@ -436,6 +436,11 @@ export class TimelineView {
       this.#targetsByOpportunity.set(`${note.attemptKey}/${note.opportunityIndex}`, note);
     }
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
+    // The gleams go on last of the note furniture: a neighbour's underlay
+    // bleeds past its own bar and would otherwise paint over a corner.
+    for (const note of snapshot.targets) {
+      if (note.outcome === "perfect") this.#drawGleam(note, this.#targetRect(note, nowBeat), nowBeat);
+    }
     this.#drawActor(snapshot, nowBeat);
     this.#drawForeshadow(nowBeat);
     this.#drawStrikeLine();
@@ -457,22 +462,24 @@ export class TimelineView {
     if (opacity <= 0) return;
 
     const ctx = this.#ctx;
-    const font = Math.round(this.#labelFontPx * 1.25);
-    const small = Math.round(this.#labelFontPx * 0.8);
-    const pad = Math.round(font * 0.6);
-    const arrowW = Math.round(font * 1.6);
-    const arrowH = Math.round(font * 0.9);
-    const gap = Math.round(font * 0.5);
+    // The plate fills the air above the lanes: from just under the top of the
+    // canvas down to just above the band, so the call is readable in
+    // peripheral vision while the eye is on the strike line.
+    const top = 6;
+    const bottom = Math.max(top + 24, Math.round(this.#bandTop - 8));
+    const plateH = bottom - top;
+    const font = Math.max(18, Math.round(plateH * 0.5));
+    const pad = Math.round(plateH * 0.25);
+    const arrowW = Math.round(plateH * 0.8);
+    const arrowH = Math.round(plateH * 0.5);
+    const gap = Math.round(plateH * 0.2);
 
     ctx.save();
     this.#clipPlayfield();
     ctx.globalAlpha = opacity;
     ctx.font = `700 ${font}px ${MONO}`;
     const callWidth = ctx.measureText(notice.call).width;
-    ctx.font = `600 ${small}px ${MONO}`;
-    const nextWidth = ctx.measureText("NEXT").width;
-    const plateW = pad + nextWidth + gap + arrowW + gap + callWidth + pad;
-    const plateH = Math.round(font * 2);
+    const plateW = Math.round(pad + arrowW + gap + callWidth + pad);
     const margin = 12;
     const right = foreshadowX(this.#width - margin, this.#pixelsPerBeat, nowBeat, notice.scrollBeat);
     const left = right - plateW;
@@ -480,28 +487,20 @@ export class TimelineView {
       ctx.restore();
       return;
     }
-    // Above the lanes, clear of the top of the band; clamped for a very short pane.
-    const top = Math.max(6, Math.round(this.#bandTop - plateH - font * 0.6));
 
-    ctx.fillStyle = "rgba(6,8,11,0.68)";
-    this.#roundRect(left, top, plateW, plateH, 4);
+    ctx.fillStyle = "rgba(6,8,11,0.72)";
+    this.#roundRect(left, top, plateW, plateH, 6);
     ctx.fill();
     ctx.strokeStyle = THEME.perfect;
-    ctx.lineWidth = 1;
-    this.#roundRect(left + 0.5, top + 0.5, plateW - 1, plateH - 1, 4);
+    ctx.lineWidth = 2;
+    this.#roundRect(left + 1, top + 1, plateW - 2, plateH - 2, 6);
     ctx.stroke();
 
     const midY = top + plateH / 2;
-    ctx.textBaseline = "middle";
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#cfd8e3";
-    ctx.font = `600 ${small}px ${MONO}`;
-    ctx.fillText("NEXT", left + pad, midY);
-
     // The arrow: a pixel shaft and head, nudging right on each beat.
-    const nudge = foreshadowArrowNudge(nowBeat) * Math.max(2, font * 0.18);
-    const ax = left + pad + nextWidth + gap + nudge;
-    const shaftH = Math.max(2, Math.round(arrowH * 0.34));
+    const nudge = foreshadowArrowNudge(nowBeat) * Math.max(3, plateH * 0.06);
+    const ax = left + pad + nudge;
+    const shaftH = Math.max(3, Math.round(arrowH * 0.36));
     const headW = Math.round(arrowW * 0.45);
     ctx.fillStyle = THEME.perfect;
     ctx.fillRect(ax, Math.round(midY - shaftH / 2), arrowW - headW, shaftH);
@@ -512,9 +511,11 @@ export class TimelineView {
     ctx.closePath();
     ctx.fill();
 
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
     ctx.font = `700 ${font}px ${MONO}`;
     ctx.fillStyle = THEME.perfect;
-    ctx.fillText(notice.call, left + pad + nextWidth + gap + arrowW + gap, midY);
+    ctx.fillText(notice.call, left + pad + arrowW + gap, midY);
     ctx.restore();
   }
 
@@ -1026,8 +1027,6 @@ export class TimelineView {
 
     if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width, missed ? 0.4 : 1);
 
-    if (note.outcome === "perfect") this.#drawGleam(note, rect, nowBeat);
-
     ctx.restore();
   }
 
@@ -1065,15 +1064,16 @@ export class TimelineView {
     ctx.fill();
     ctx.restore();
 
-    // The sparkle in the corner: white core on a gold halo.
-    const size = rect.h * (0.35 + 0.45 * intensity);
-    const cx = right - rect.h * 0.25;
-    const cy = rect.y + rect.h * 0.2;
+    // The sparkle, tucked inside the bar's top-right corner: white core on a
+    // gold halo, never larger than the corner it sits in.
+    const size = rect.h * (0.22 + 0.14 * intensity);
+    const cx = right - rect.h * 0.34;
+    const cy = rect.y + rect.h * 0.3;
     ctx.globalAlpha = Math.min(1, 0.55 + 0.45 * intensity);
     ctx.fillStyle = THEME.perfect;
-    drawSparkle(ctx, cx, cy, size * 1.15);
+    drawSparkle(ctx, cx, cy, size * 1.2);
     ctx.fillStyle = "#fffbe6";
-    drawSparkle(ctx, cx, cy, size * 0.7);
+    drawSparkle(ctx, cx, cy, size * 0.75);
     ctx.restore();
   }
 

@@ -26,6 +26,7 @@ import {
 import { TimelineActor } from "../src/scenario/minigames/timeline-actor.js";
 import { ROCKY_ASCENT } from "../src/scenario/registry.js";
 import {
+  actorX,
   FALL_BEATS,
   fallenPose,
   GROWTH_PULSE_BEATS,
@@ -178,6 +179,42 @@ describe("growth", () => {
       plan: { measures: 8, beatsPerMeasure: 4, totalBeats: 32, phraseBeats: 16 },
       opportunities: h.attempt.targets.map((t, index) => ({ ...t, index })),
     })).toBe(h.attempt.targets.filter((t) => t.startBeat < 8).length);
+  });
+});
+
+describe("waiting through a rest", () => {
+  const ROW = 40;
+  const GEOMETRY: ActorGeometry = {
+    laneY: (lane) => 400 - lane * ROW,
+    strikeX: 600,
+    rowHeight: ROW,
+    floorY: 520,
+    xOfBeat: (beat) => 600 + (beat - 10) * 100, // beat 10 is at the strike line
+  };
+
+  it("stands in its usual place while its bar is still under it", () => {
+    // A bar ending 2 beats after now is well right of the strike line.
+    expect(actorX(GEOMETRY, 12)).toBe(600 - 34);
+  });
+
+  it("rides the trailing edge of its bar once the bar has scrolled past", () => {
+    // The bar ended 1.5 beats ago: its right edge is 150px left of the line.
+    const x = actorX(GEOMETRY, 8.5);
+    expect(x).toBeLessThan(600 - 34);
+    expect(x).toBeCloseTo(450 - 34 * 0.35, 6);
+  });
+
+  it("is pinned left of the line with no bar geometry to ride", () => {
+    expect(actorX({ ...GEOMETRY, xOfBeat: undefined }, 8.5)).toBe(600 - 34);
+    expect(actorX(GEOMETRY, null)).toBe(600 - 34);
+  });
+
+  it("remembers where each bar ends so the hop starts from the old one", () => {
+    const actor = new TimelineActor();
+    actor.land(1, 0, 1);
+    actor.land(2, 3, 4);
+    expect(actor.state.fromEndBeat).toBe(1);
+    expect(actor.state.standingEndBeat).toBe(4);
   });
 });
 

@@ -146,7 +146,9 @@ measure and out with its last, at exactly the timeline's speed. Offsets ("half
 a beat back") apply to it unchanged.
 
 **Tint.** `Sprite.tint` washes a colour over the sprite's own pixels — a red
-flash on a hit, gold on a win. `{ colour, amount }`, amount 0..1.
+flash on a hit, gold on a win. `{ colour, amount }`, amount 0..1. **Flip.**
+`Sprite.flipX` mirrors the art about its anchor, for a crowd that has to face
+both ways.
 
 **The next minigame.** Give your module a `rhythmCall` — the family's rhythm
 said out loud, "Ba Da Bing". The host shows it in the final measure of the
@@ -272,8 +274,9 @@ family: two little hops and a larger leap.
 
 Built (`src/scenario/minigames/three-step-minigame.ts`, Butt-Butt-BONK). The
 battle is visible: every landed note grows the ram a little and lifts it, every
-miss or wrong note grows the wolf and flashes it red (`Sprite.tint`), both with
-a pulse on the step. A star earned is a won fight, and on completion the wolf
+miss or wrong note grows the wolf, both with a pulse on the step, and the
+*loser* of each exchange flashes red (`Sprite.tint`) — the wolf when a note
+lands, the ram when one is missed. A star earned is a won fight, and on completion the wolf
 tumbles upside down below the band and lies there as the measures carry it
 off; a failed attempt leaves it standing, as big as it got. Both animals are
 anchored with `spanAnchorX`.
@@ -299,8 +302,9 @@ steps: a well-played *ordinary* note draws one goat to the nearest wing, where
 it waits on screen; on a flourish the performer strikes a `flourishPoses[]`
 entry for the note's length and the waiting goats walk over — Perfect releases
 up to `visual.goatsPerFlourish`, Good half, and a flourish with nobody waiting
-brings nobody. Bad notes flinch and bore the crowd; nothing earned is taken
-away, staged or seated. Blues Lick material is written
+brings nobody. A bad note flinches, bores the crowd, and **costs one goat**:
+the last one waiting in the wings, or with nobody waiting the last one seated,
+who walks back out to its wing. Everyone faces the performer (`Sprite.flipX`). Blues Lick material is written
 in pentatonic degrees (`p1..p6`, `src/music/degrees.ts`) — one octave, root to
 root, the same span the lanes show — resolved to lanes by the run's mode.
 

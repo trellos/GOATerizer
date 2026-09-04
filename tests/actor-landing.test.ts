@@ -54,6 +54,8 @@ function landed(overrides: Partial<TimelineActorState> = {}): TimelineActorState
     nextLane: 3,
     landedBeat: 0,
     fromLane: 2,
+    standingEndBeat: null,
+    fromEndBeat: null,
     fallen: [],
     capStreak: 12,
     grewAtBeat: null,

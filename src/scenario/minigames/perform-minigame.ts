@@ -107,6 +107,8 @@ export type CrowdMember = {
   arrivedAtBeat: number;
   /** The wing it walked in from: -1 left, 1 right. Absent: the slot's own side. */
   fromSide?: -1 | 1;
+  /** Set when a mistake sent it home: it walks back to its wing, then goes. */
+  leavingAtBeat?: number;
 };
 
 /**
@@ -274,7 +276,7 @@ export class PerformMinigame implements Minigame {
     return {
       successfulNotes: this.#successfulNotes,
       flourishesHit: this.#flourishesHit,
-      crowd: this.#crowd.length,
+      crowd: this.#seated().length,
       staged: this.#staged.length,
       impressed: this.#impressed,
       finished: this.#finished,
@@ -282,9 +284,14 @@ export class PerformMinigame implements Minigame {
     };
   }
 
-  /** The crowd, in arrival order. Read-only. */
+  /** The crowd, in arrival order, including anyone on their way out. Read-only. */
   get crowd(): readonly CrowdMember[] {
     return this.#crowd;
+  }
+
+  /** The crowd that is staying. */
+  #seated(): CrowdMember[] {
+    return this.#crowd.filter((member) => member.leavingAtBeat === undefined);
   }
 
   /** The goats waiting in the wings, in staging order. Read-only. */
@@ -319,6 +326,7 @@ export class PerformMinigame implements Minigame {
         this.#embarrassedAtBeat = beat;
         this.#sulkUntilBeat = beat + SULK_BEATS;
       }
+      this.#dismiss(beat);
       return;
     }
 
@@ -355,6 +363,9 @@ export class PerformMinigame implements Minigame {
   update(beat: number): void {
     this.#beat = beat;
     this.#effects = this.#effects.filter((effect) => beat - effect.bornAtBeat < effect.lifeBeats);
+    this.#crowd = this.#crowd.filter(
+      (member) => member.leavingAtBeat === undefined || beat - member.leavingAtBeat < WALK_BEATS
+    );
     if (this.#flourishStartedAtBeat !== null && beat - this.#flourishStartedAtBeat >= this.#flourishHoldBeats) {
       this.#flourishStartedAtBeat = null;
       this.#flourishPose = null;
@@ -465,6 +476,8 @@ export class PerformMinigame implements Minigame {
           anchor: "bottom",
           layer: "over",
           z: 1,
+          // The art faces left; a goat on the left wing turns to face the act.
+          flipX: goat.side < 0,
         });
       }
 
@@ -472,13 +485,18 @@ export class PerformMinigame implements Minigame {
         const slot = crowdSlot(member.slot);
         const homeX = performerX + slot.dx;
         const side = member.fromSide ?? (slot.dx < 0 ? -1 : 1);
-        const fromX = (side < 0 ? WING_X.left + STAGED_INSET : WING_X.right - STAGED_INSET) + wingShift;
-        const walking = beat - member.arrivedAtBeat < WALK_BEATS;
-        const x = slide(fromX, homeX, member.arrivedAtBeat, WALK_BEATS, beat);
+        const wingX = (side < 0 ? WING_X.left + STAGED_INSET : WING_X.right - STAGED_INSET) + wingShift;
+        const leaving = member.leavingAtBeat !== undefined;
+        // In from the wing on arrival; back out to it when dismissed.
+        const x = leaving
+          ? slide(homeX, wingX, member.leavingAtBeat ?? beat, WALK_BEATS, beat)
+          : slide(wingX, homeX, member.arrivedAtBeat, WALK_BEATS, beat);
+        const walking = leaving || beat - member.arrivedAtBeat < WALK_BEATS;
+        const walkedAt = leaving ? (member.leavingAtBeat ?? beat) : member.arrivedAtBeat;
 
         let y = CROWD_FEET_Y - slot.row * CROWD_ROW_SETBACK_Y;
         if (walking) {
-          y -= CROWD_WALK_HOP * Math.abs(Math.sin((beat - member.arrivedAtBeat) * Math.PI * 4));
+          y -= CROWD_WALK_HOP * Math.abs(Math.sin((beat - walkedAt) * Math.PI * 4));
         } else if (jumping) {
           y -= CROWD_JUMP * Math.abs(Math.sin((beat + member.id * 0.37) * Math.PI * 2));
         } else if (cheering) {
@@ -489,13 +507,16 @@ export class PerformMinigame implements Minigame {
 
         sprites.push({
           key: `crowd-${member.id}`,
-          assetId: stateId,
+          assetId: leaving ? (audience[0] ?? stateId) : stateId,
           x,
           y,
           scale: CROWD_SCALE * (1 - slot.row * CROWD_ROW_SHRINK),
           anchor: "bottom",
           layer: "over",
           z: 2 - slot.row,
+          // Everyone faces the act: the art faces left, so the crowd on the
+          // performer's left is mirrored. A goat walking out faces its wing.
+          flipX: leaving ? side > 0 : x < performerX,
         });
       }
     }
@@ -596,9 +617,27 @@ export class PerformMinigame implements Minigame {
    * together — a goat in the wings is a promise of a seat.
    */
   #stage(beat: number): void {
-    if (this.#crowd.length + this.#staged.length >= this.#crowdCapacity) return;
+    if (this.#seated().length + this.#staged.length >= this.#crowdCapacity) return;
     const side: -1 | 1 = this.#staged.length % 2 === 0 ? 1 : -1;
     this.#staged = [...this.#staged, { id: this.#nextId++, side, stagedAtBeat: beat }];
+  }
+
+  /**
+   * A mistake costs one goat: the last one waiting in the wings, or — with
+   * nobody waiting — the last one seated, who walks back out to its wing.
+   * The designer's rule, and the one thing here that takes something away.
+   */
+  #dismiss(beat: number): void {
+    if (this.#staged.length > 0) {
+      this.#staged = this.#staged.slice(0, -1);
+      return;
+    }
+    const seated = this.#seated();
+    const last = seated[seated.length - 1];
+    if (!last) return;
+    this.#crowd = this.#crowd.map((member) =>
+      member.id === last.id ? { ...member, leavingAtBeat: beat } : member
+    );
   }
 
   /** A flourish: up to `count` of the waiting goats walk in from their wings. */
@@ -606,11 +645,12 @@ export class PerformMinigame implements Minigame {
     const moving = this.#staged.slice(0, Math.max(0, count));
     this.#staged = this.#staged.slice(moving.length);
     for (const goat of moving) {
-      if (this.#crowd.length >= this.#crowdCapacity) return;
-      this.#crowd = [
-        ...this.#crowd,
-        { id: goat.id, slot: this.#crowd.length, arrivedAtBeat: beat, fromSide: goat.side },
-      ];
+      if (this.#seated().length >= this.#crowdCapacity) return;
+      // Slots are taken in seating order; a goat on its way out gives its up.
+      const taken = new Set(this.#seated().map((member) => member.slot));
+      let slot = 0;
+      while (taken.has(slot)) slot += 1;
+      this.#crowd = [...this.#crowd, { id: goat.id, slot, arrivedAtBeat: beat, fromSide: goat.side }];
     }
   }
 

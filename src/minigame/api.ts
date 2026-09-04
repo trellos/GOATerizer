@@ -211,6 +211,11 @@ export type Sprite = {
   /** Registration nudge, added to `y` in the same units. Default 0. */
   readonly offsetY?: number;
   /**
+   * Mirrored left-to-right about the anchor. Art is drawn facing one way; a
+   * crowd on both sides of a performer needs half of it turned to face him.
+   */
+  readonly flipX?: boolean;
+  /**
    * A colour washed over the sprite's own pixels — a red flash on a hit, a
    * gold glow on a win. `amount` is 0..1, the wash's opacity; 0 draws the art
    * untouched. Applied to the art's silhouette only, never to its transparent

@@ -301,17 +301,24 @@ describe("the battle", () => {
     expect(settled).toBeGreaterThan(0.62);
   });
 
-  it("grows the wolf and flashes it red on a miss or a wrong note, and the flash fades", () => {
+  it("flashes the loser red: the ram on a mistake, the wolf on a landed note", () => {
     const minigame = instance(group);
-    minigame.onJudged(judged(0, "miss", 0), 0);
+    minigame.onJudged(judged(0, "perfect", 0), 0);
+    // The wolf is losing: it flashes. The ram scored: it does not.
+    expect(spriteOf(minigame, "target", 0.05).tint?.colour).toBe("#ff3b3b");
+    expect(spriteOf(minigame, "ram", 0.05).tint).toBeUndefined();
+    expect(spriteOf(minigame, "target", 0.5).tint).toBeUndefined();
+
+    minigame.onJudged(judged(1, "miss", 1 / 3), 1);
     expect(battleOf(minigame).wolf).toBeGreaterThan(0);
-    const flashing = spriteOf(minigame, "target", 0.05);
-    expect(flashing.tint?.colour).toBe("#ff3b3b");
-    expect(flashing.tint?.amount).toBeGreaterThan(0);
-    expect(flashing.scale!).toBeGreaterThan(0.62);
-    const faded = spriteOf(minigame, "target", 0.5);
-    expect(faded.tint).toBeUndefined();
-    minigame.onJudged({ id: 9, outcome: "wrong", opportunityIndex: null, playedMidi: 61, lane: 1, beat: 0.6 }, 0.6);
+    // Now the ram is losing: it flashes, and the wolf, having grown, does not.
+    const ram = spriteOf(minigame, "ram", 1.05);
+    expect(ram.tint?.colour).toBe("#ff3b3b");
+    expect(ram.tint?.amount).toBeGreaterThan(0);
+    expect(spriteOf(minigame, "target", 1.05).tint).toBeUndefined();
+    expect(spriteOf(minigame, "target", 1.05).scale!).toBeGreaterThan(0.62);
+    expect(spriteOf(minigame, "ram", 1.5).tint).toBeUndefined();
+    minigame.onJudged({ id: 9, outcome: "wrong", opportunityIndex: null, playedMidi: 61, lane: 1, beat: 1.6 }, 1.6);
     expect(battleOf(minigame).wolf).toBeGreaterThan(1 / 3 - 1e-9);
   });
 

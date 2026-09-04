@@ -226,7 +226,24 @@ export type ActorGeometry = {
   rowHeight: number;
   /** Bottom of the lane band; fallen actors live under it. */
   floorY: number;
+  /**
+   * Canvas x of an attempt beat, the same mapping the notes use. Optional: a
+   * caller without it gets an actor pinned left of the strike line.
+   */
+  xOfBeat?: (beat: number) => number;
 };
+
+/**
+ * Where the actor stands along the timeline: its usual place left of the
+ * strike line, unless the bar it is standing on has scrolled past that — then
+ * it rides the bar's trailing edge, waiting there for the next note. A goat
+ * hanging in mid-air over a rest was the alternative.
+ */
+export function actorX(geometry: ActorGeometry, endBeat: number | null): number {
+  const home = geometry.strikeX - LEFT_OF_STRIKE_PX;
+  if (endBeat === null || !geometry.xOfBeat) return home;
+  return Math.min(home, geometry.xOfBeat(endBeat) - LEFT_OF_STRIKE_PX * 0.35);
+}
 
 /**
  * Renders the live actor and whatever has fallen off it.
@@ -244,7 +261,6 @@ export function drawTimelineActor(
   drawFallen(ctx, state, geometry, beat, sprites);
   if (!state.alive || state.lane === null) return;
 
-  const x = geometry.strikeX - LEFT_OF_STRIKE_PX;
   // Base size is a fraction of a row, so the actor scales with the timeline
   // rather than being a fixed number of pixels on every viewport.
   const scale =
@@ -252,9 +268,13 @@ export function drawTimelineActor(
 
   // The hop: a parabola between the lane it left and the lane it landed on,
   // resolved from the beat rather than a frame counter, so a dropped frame
-  // moves nothing.
+  // moves nothing. Along the timeline it goes from wherever it was riding
+  // the old bar to its place on the new one.
   const sinceLanding = Math.max(0, beat - state.landedBeat);
   const t = Math.min(1, sinceLanding / HOP_BEATS);
+  const toX = actorX(geometry, state.standingEndBeat);
+  const fromX = actorX(geometry, state.fromEndBeat);
+  const x = fromX + (toX - fromX) * t;
   const fromY = geometry.laneY(state.fromLane ?? state.lane);
   const toY = geometry.laneY(state.lane);
   const hopY = (at: number): number =>
