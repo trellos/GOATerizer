@@ -28,7 +28,13 @@ import {
   startGridOf,
   type EditorNote,
 } from "./grid.js";
-import { buildLevel, difficultyAfterReorder, withLevel, withLevelsReordered } from "./level.js";
+import {
+  buildLevel,
+  difficultyAfterReorder,
+  withLevel,
+  withLevelsReordered,
+  withoutLevel,
+} from "./level.js";
 import { notesFromPrompt } from "./prompt.js";
 import { laneVocabularyOf, type LaneVocabulary } from "./vocabulary.js";
 import { PHRASE_MEASURES } from "../config/tuning.js";
@@ -57,6 +63,17 @@ export class EditorDocument {
   #dirty = false;
   /** Problems reading the level, if any. Shown rather than thrown. */
   #readProblems: readonly string[] = [];
+  /**
+   * Levels emptied this session, by difficulty.
+   *
+   * The same bargain the loop handle strikes with notes outside it: a level
+   * whose notes are all deleted leaves the ladder, but its *scenario* data — the
+   * family's choreography, the prose a designer wrote — is kept, so putting a
+   * note back puts the level back rather than starting a new one from a
+   * neighbour's data. Emptying a level is only destructive once it is saved,
+   * and a save is a diff you commit.
+   */
+  readonly #emptied = new Map<number, Json>();
 
   constructor(raw: unknown, difficulty: number) {
     this.#raw = structuredClone(raw) as Json;
@@ -171,11 +188,16 @@ export class EditorDocument {
    */
   moveLevel(from: number, to: number): readonly string[] {
     if (from === to) return [];
-    // The ladder is read *before* the stash. A level being edited at a
-    // difficulty the file does not author yet becomes a rung the moment it is
-    // written down, and a move should mean what it meant when it was asked for.
-    const ladder = [...this.supportedLevels].sort((a, b) => a - b);
+    // The rungs are read *before* the stash: a move should mean what it meant
+    // when it was asked for, and the stash can change the ladder underneath it —
+    // a difficulty the file does not author yet becomes a rung the moment it is
+    // written down, and one whose notes have all been deleted stops being one.
+    // What is permuted is therefore the intersection: the rungs the drag saw
+    // that are still rungs afterwards, which is also what the two calls below
+    // have to agree about for the selection to follow the right level.
+    const asked = [...this.supportedLevels].sort((a, b) => a - b);
     const problems = this.#stashLevel();
+    const ladder = asked.filter((level) => this.supportedLevels.includes(level));
     const following = difficultyAfterReorder(ladder, this.#difficulty, from, to);
     this.#raw = withLevelsReordered(this.#raw, from, to, ladder);
     this.#difficulty = following;
@@ -227,7 +249,10 @@ export class EditorDocument {
    * leaves the file's existing level alone and says so instead.
    */
   #stashLevel(): string[] {
-    const template = this.levelAt(this.#difficulty) ?? this.#templateLevel(this.#difficulty);
+    const template =
+      this.levelAt(this.#difficulty) ??
+      this.#emptied.get(this.#difficulty) ??
+      this.#templateLevel(this.#difficulty);
     const built = buildLevel({
       existing: template,
       difficulty: this.#difficulty,
@@ -236,8 +261,40 @@ export class EditorDocument {
       loopMeasures: this.#loopMeasures,
       vocabulary: this.#vocabulary,
     });
+    if (built.empty) return this.#dropLevel();
     if (!built.level) return [...built.problems];
     this.#raw = withLevel(this.#raw, this.#difficulty, built.level);
+    this.#emptied.delete(this.#difficulty);
+    return [];
+  }
+
+  /**
+   * Takes an emptied difficulty off the ladder.
+   *
+   * A difficulty with no note opportunities is not one, so it stops being a
+   * level the scenario supports rather than becoming an error the author has to
+   * clear before anything can be saved. Deleting a level's notes is therefore
+   * how a level is deleted — there is no second gesture for it, and no way to
+   * end up unable to save because of a difficulty somebody started and left.
+   *
+   * The one refusal left is the last one: `loadScenario` needs at least one
+   * level, so a scenario cannot be emptied down to none.
+   */
+  #dropLevel(): string[] {
+    const existing = this.levelAt(this.#difficulty);
+    // Never authored, still not authored. Nothing happened and nothing is wrong.
+    if (!existing) return [];
+
+    const without = withoutLevel(this.#raw, this.#difficulty);
+    if (!without) {
+      return [
+        `L${this.#difficulty} is this scenario's only difficulty — a scenario with no levels ` +
+          "cannot be loaded, so this one cannot be left with no notes",
+      ];
+    }
+    this.#emptied.set(this.#difficulty, existing);
+    this.#raw = without;
+    this.#dirty = true;
     return [];
   }
 

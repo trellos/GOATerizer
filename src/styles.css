@@ -1240,6 +1240,16 @@ button.chip[data-selected="true"] {
   overflow-y: auto;
 }
 
+/*
+ * Red is reserved for a refusal. A list that only *tells* the author something —
+ * a difficulty that has left the ladder, notes outside the loop — is the same
+ * list in a neutral hand.
+ */
+.editor-problems[data-blocking="false"] {
+  border-color: var(--line);
+  background: var(--panel-raised);
+}
+
 #editor-status {
   color: var(--accent-strong);
   font-family: var(--mono);

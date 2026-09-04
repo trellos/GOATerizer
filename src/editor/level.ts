@@ -97,6 +97,16 @@ export type LevelBuild = {
   readonly level: AuthoredLevel | null;
   readonly noteOpportunityCount: number;
   readonly problems: readonly string[];
+  /**
+   * Whether the timeline is empty rather than unspellable.
+   *
+   * A difficulty with nothing to play is not a difficulty — an attempt with no
+   * note opportunities cannot be judged — so an empty timeline is the editor's
+   * spelling of "this scenario does not author this level". That is a thing to
+   * *do* (take it off the ladder) rather than a problem to report, which is why
+   * it arrives here as a state and not as a message.
+   */
+  readonly empty: boolean;
 };
 
 /**
@@ -118,14 +128,10 @@ export function buildLevel(options: {
   const prompt = promptFromNotes(notes, loopMeasures, vocabulary);
   const noteOpportunityCount = prompt.noteStartBeats.length;
   if (prompt.problems.length > 0) {
-    return { level: null, noteOpportunityCount, problems: prompt.problems };
+    return { level: null, noteOpportunityCount, problems: prompt.problems, empty: false };
   }
   if (noteOpportunityCount === 0) {
-    return {
-      level: null,
-      noteOpportunityCount,
-      problems: ["this level has no notes — an attempt with no opportunities cannot be judged"],
-    };
+    return { level: null, noteOpportunityCount, problems: [], empty: true };
   }
 
   const was = (existing ?? {}) as Json;
@@ -158,7 +164,7 @@ export function buildLevel(options: {
       })
     : level;
 
-  return { level: reconciled, noteOpportunityCount, problems: [] };
+  return { level: reconciled, noteOpportunityCount, problems: [], empty: false };
 }
 
 /**

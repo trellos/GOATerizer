@@ -518,10 +518,11 @@ describe("adding and removing a difficulty", () => {
     document.selectLevel(5);
     expect(document.notes).toEqual([]);
 
-    // Nothing to save yet: an attempt with no opportunities cannot be judged.
-    expect(document.toScenario().problems).toEqual([
-      "this level has no notes — an attempt with no opportunities cannot be judged",
-    ]);
+    // Starting a level and leaving it empty is not an error and does not block a
+    // save: a difficulty with nothing to play is simply not one, so nothing has
+    // been added and there is nothing to report.
+    expect(document.toScenario().problems).toEqual([]);
+    expect(document.supportedLevels).toEqual([1, 2, 3, 4]);
 
     document.addNote(0, 7, "quarter");
     document.addNote(12, 6, "quarter");
@@ -537,6 +538,72 @@ describe("adding and removing a difficulty", () => {
     const level = scenario.levels.get(5)!;
     expect(level.noteOpportunityCount).toBe(6);
     expect(level.stars.star3Threshold).toBe(6 * JUDGMENT_POINTS.perfect * ATTEMPT_REPEATS);
+  });
+
+  it("takes a level off the ladder when its notes are all deleted", () => {
+    const document = new EditorDocument(rockyDescent, 3);
+    expect(document.notes.length).toBeGreaterThan(0);
+
+    document.select(document.notes.map((entry) => entry.id));
+    expect(document.deleteSelection()).toBe(true);
+
+    // No notes, no difficulty. Deleting a level's notes *is* deleting the level.
+    expect(document.toScenario().problems).toEqual([]);
+    expect(document.supportedLevels).toEqual([1, 2, 4]);
+    const { raw } = document.toScenario();
+    expect(Object.keys((raw!["levels"] as Json))).toEqual(["1", "2", "4"]);
+    const scenario = loadScenario(raw!, assetUrlResolver(raw!));
+    expect([...scenario.supportedLevels]).toEqual([1, 2, 4]);
+  });
+
+  it("remembers an emptied level's own data until the session ends", () => {
+    const document = new EditorDocument(rockyDescent, 3);
+    const wasVisual = (document.levelAt(3) as Json)["visual"];
+    expect(wasVisual).toBeDefined();
+
+    document.select(document.notes.map((entry) => entry.id));
+    document.deleteSelection();
+    document.toScenario();
+    expect(document.levelAt(3)).toBeNull();
+
+    // Putting a note back puts *this* level back — its own choreography and
+    // prose, not a neighbour's copied in as if the level were brand new.
+    document.addNote(0, 7, "whole");
+    document.addNote(48, 6, "whole");
+    document.addNote(96, 5, "whole");
+    document.addNote(144, 4, "whole");
+    expect(document.toScenario().problems).toEqual([]);
+    expect(document.supportedLevels).toEqual([1, 2, 3, 4]);
+    // Still L3's own block — its steepness and the prose a designer wrote about
+    // it — rather than L2's, which is what `#templateLevel` would have offered a
+    // level it believed to be brand new.
+    const back = (document.levelAt(3) as Json)["visual"] as Json;
+    expect(back["steepness"]).toBe((wasVisual as Json)["steepness"]);
+    expect(back["routeCharacter"]).toBe((wasVisual as Json)["routeCharacter"]);
+    expect(back["steepness"]).not.toBe(
+      (((rockyDescent["levels"] as Json)["2"] as Json)["visual"] as Json)["steepness"]
+    );
+    // The family still fixes its own half against the notes that are there now.
+    expect(back["waypointCount"]).toBe(4);
+  });
+
+  it("refuses to empty a scenario's only difficulty", () => {
+    const oneLevel = {
+      ...structuredClone(rockyDescent),
+      supportedLevels: [1],
+      levels: { "1": structuredClone((rockyDescent["levels"] as Json)["1"]) },
+    } as Json;
+    const document = new EditorDocument(oneLevel, 1);
+
+    document.select(document.notes.map((entry) => entry.id));
+    document.deleteSelection();
+
+    const { raw, problems } = document.toScenario();
+    expect(raw).toBeNull();
+    expect(problems).toEqual([
+      "L1 is this scenario's only difficulty — a scenario with no levels cannot be loaded, " +
+        "so this one cannot be left with no notes",
+    ]);
   });
 
   it("drops a level out of supportedLevels, and refuses to drop the last one", () => {
@@ -653,6 +720,23 @@ describe("reordering the difficulty ladder", () => {
       "5": "was L2",
     });
     expect(moved["supportedLevels"]).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("does not move a level the same edit just emptied off the ladder", () => {
+    // Empty L2's notes and drag L1 onto L4 without clicking away first. The
+    // stash that carries the drag's edits also drops L2, so L2 is not a rung any
+    // more — the rest rotate around the gap, and the editor stays on the empty
+    // timeline it is looking at rather than being handed somebody else's notes.
+    const rockyDescent = SCENARIO_SOURCES.find((source) => source.id === "rocky_descent")!
+      .raw as Json;
+    const document = new EditorDocument(rockyDescent, 2);
+    document.select(document.notes.map((entry) => entry.id));
+    document.deleteSelection();
+
+    expect(document.moveLevel(1, 4)).toEqual([]);
+    expect(document.difficulty).toBe(2);
+    expect(document.notes).toEqual([]);
+    expect(document.supportedLevels).toEqual([1, 3, 4]);
   });
 
   it("moves the notes, keeps them on screen, and still loads", () => {

@@ -128,6 +128,8 @@ export class EditorScreen {
   #accuracy: AutoplayMode = "50";
   #status = "";
   #problems: readonly string[] = [];
+  /** Whether what is listed below the timeline would actually refuse a save. */
+  #blocked = false;
   #validateTimer: ReturnType<typeof setTimeout> | null = null;
   #active = false;
   /** A difficulty being dragged along the ladder, with the row measured at rest. */
@@ -608,14 +610,17 @@ export class EditorScreen {
     const { raw, problems } = this.#document.toScenario();
     if (!raw) {
       this.#problems = problems;
+      this.#blocked = true;
       return null;
     }
     try {
       const definition = loadScenario(raw, assetUrlResolver(raw));
       this.#problems = this.#document.readProblems;
+      this.#blocked = false;
       return definition;
     } catch (error) {
       this.#problems = [error instanceof Error ? error.message : String(error)];
+      this.#blocked = true;
       return null;
     }
   }
@@ -751,9 +756,22 @@ export class EditorScreen {
     } notes · ${document_.loopMeasures === PHRASE_MEASURES ? "4 bars" : `${document_.loopMeasures}-bar loop`}`;
 
     const overrunning = notesOverrunningLoop(document_.notes, document_.loopMeasures);
+    // Said only once the level has actually left the ladder, which is also when
+    // its button dims. A scenario's *last* level cannot leave, so emptying that
+    // one is refused instead and says so through `#problems` — this would only
+    // be a second, vaguer way of putting it.
+    const offTheLadder =
+      document_.liveNotes().length === 0 && !supported.has(document_.difficulty);
     const warnings = [
       ...document_.readProblems,
       ...this.#problems,
+      ...(offTheLadder
+        ? [
+            `L${document_.difficulty} has no notes${document_.notes.length > 0 ? " inside the loop" : ""}` +
+              " — a difficulty with no note opportunities cannot be judged, so it is not one of " +
+              "this scenario's levels. Add notes to put it on the ladder",
+          ]
+        : []),
       ...(overrunning.length > 0
         ? [
             `${overrunning.length} note(s) run past the end of the loop and will not be saved — ` +
@@ -769,6 +787,11 @@ export class EditorScreen {
         return item;
       })
     );
+    // Not everything worth saying below the timeline stops a save. A level that
+    // has left the ladder and notes the loop does not reach are statements about
+    // the file the editor *would* write, and reading them in the same red as a
+    // refusal is the tool crying wolf.
+    problems.dataset["blocking"] = String(this.#blocked);
     problems.hidden = warnings.length === 0;
 
     must("editor-status", HTMLElement).textContent = this.#status;
