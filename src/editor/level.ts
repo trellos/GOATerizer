@@ -97,6 +97,16 @@ export type LevelBuild = {
   readonly level: AuthoredLevel | null;
   readonly noteOpportunityCount: number;
   readonly problems: readonly string[];
+  /**
+   * Whether the timeline is empty rather than unspellable.
+   *
+   * A difficulty with nothing to play is not a difficulty — an attempt with no
+   * note opportunities cannot be judged — so an empty timeline is the editor's
+   * spelling of "this scenario does not author this level". That is a thing to
+   * *do* (take it off the ladder) rather than a problem to report, which is why
+   * it arrives here as a state and not as a message.
+   */
+  readonly empty: boolean;
 };
 
 /**
@@ -118,14 +128,10 @@ export function buildLevel(options: {
   const prompt = promptFromNotes(notes, loopMeasures, vocabulary);
   const noteOpportunityCount = prompt.noteStartBeats.length;
   if (prompt.problems.length > 0) {
-    return { level: null, noteOpportunityCount, problems: prompt.problems };
+    return { level: null, noteOpportunityCount, problems: prompt.problems, empty: false };
   }
   if (noteOpportunityCount === 0) {
-    return {
-      level: null,
-      noteOpportunityCount,
-      problems: ["this level has no notes — an attempt with no opportunities cannot be judged"],
-    };
+    return { level: null, noteOpportunityCount, problems: [], empty: true };
   }
 
   const was = (existing ?? {}) as Json;
@@ -158,7 +164,7 @@ export function buildLevel(options: {
       })
     : level;
 
-  return { level: reconciled, noteOpportunityCount, problems: [] };
+  return { level: reconciled, noteOpportunityCount, problems: [], empty: false };
 }
 
 /**
@@ -193,4 +199,91 @@ export function withoutLevel(raw: unknown, difficulty: number): Json | null {
     Array.isArray(scenario["supportedLevels"]) ? scenario["supportedLevels"] : []
   ).filter((entry) => entry !== difficulty);
   return scenario;
+}
+
+/**
+ * Moves one difficulty's level into another difficulty's place.
+ *
+ * A scenario's difficulties are a ladder, and this reorders the rungs: the
+ * level at `from` lands on `to` and everything the move steps over slides one
+ * rung the other way. Dragging L3 onto L5 leaves what was L4 as L3, what was L5
+ * as L4, and what was L3 as L5.
+ *
+ * The permutation runs over the levels the scenario **actually authors**, in
+ * difficulty order, so `supportedLevels` comes out of a reorder exactly as it
+ * went in — a scenario that authors 1-4 still authors 1-4, and one that authors
+ * 1, 3 and 5 keeps those three rungs rather than growing holes somewhere new.
+ * Only which level sits on which rung changes.
+ *
+ * `rungs` narrows that to a ladder the caller already has, which is how a drag
+ * that showed the author what it would do keeps its word: the row was measured
+ * when the drag began, and a rung that appeared since — a new difficulty
+ * written down on the way into the move — is left where it is rather than
+ * silently changing what the release meant. Difficulties the scenario does not
+ * author are ignored either way.
+ *
+ * Nothing is derived here and nothing is reconciled: a level is internally
+ * consistent about its own notes before the move and still is after it, and the
+ * only thing a move can invalidate is the `difficulty` field the loader checks
+ * against the key it was found under, which is rewritten as the level lands.
+ */
+export function withLevelsReordered(
+  raw: unknown,
+  from: number,
+  to: number,
+  rungs?: readonly number[]
+): Json {
+  const scenario = { ...((raw ?? {}) as Json) };
+  const supported = ladderOf(scenario);
+  const ladder = rungs ? supported.filter((level) => rungs.includes(level)) : supported;
+  const fromIndex = ladder.indexOf(from);
+  const toIndex = ladder.indexOf(to);
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return scenario;
+
+  const levels = { ...((scenario["levels"] ?? {}) as Json) };
+  const contents = ladder.map((difficulty) => levels[String(difficulty)]);
+  const [moved] = contents.splice(fromIndex, 1);
+  contents.splice(toIndex, 0, moved);
+
+  ladder.forEach((difficulty, index) => {
+    const level = contents[index];
+    levels[String(difficulty)] =
+      level && typeof level === "object" ? { ...(level as Json), difficulty } : level;
+  });
+
+  scenario["levels"] = levels;
+  scenario["supportedLevels"] = supported;
+  return scenario;
+}
+
+/**
+ * Where a difficulty ends up after {@link withLevelsReordered} moves another.
+ *
+ * The editor is looking at a level, not at a number, so a reorder should leave
+ * the same notes on screen under whatever difficulty they now are. A difficulty
+ * that is not one of `ladder`'s rungs did not take part in the move and does
+ * not move.
+ */
+export function difficultyAfterReorder(
+  ladder: readonly number[],
+  difficulty: number,
+  from: number,
+  to: number
+): number {
+  const at = ladder.indexOf(difficulty);
+  const fromIndex = ladder.indexOf(from);
+  const toIndex = ladder.indexOf(to);
+  if (at < 0 || fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return difficulty;
+  if (at === fromIndex) return to;
+  if (fromIndex < at && at <= toIndex) return ladder[at - 1] as number;
+  if (toIndex <= at && at < fromIndex) return ladder[at + 1] as number;
+  return difficulty;
+}
+
+/** The difficulties this scenario authors, in ladder order. */
+function ladderOf(scenario: Json): number[] {
+  const supported = Array.isArray(scenario["supportedLevels"]) ? scenario["supportedLevels"] : [];
+  return supported
+    .filter((entry): entry is number => typeof entry === "number")
+    .sort((a, b) => a - b);
 }
