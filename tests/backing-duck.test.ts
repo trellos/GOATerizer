@@ -419,6 +419,15 @@ class FakeGainNode {
   disconnect(): void {}
 }
 
+/**
+ * Enough of an `AudioContext` for a `BassPlayer` to be built.
+ *
+ * The nodes below the gain exist because the player now builds a
+ * `BassVoicePool` (`src/audio/bass-voice.ts`), which stands its overdrive up
+ * front. None of them is inspected — the duck is a property of the output gain
+ * and nothing else — so they are stubs, and the output stays `gains[0]`
+ * because the player creates it before the pool.
+ */
 class FakeAudioContext {
   currentTime = 3.5;
   readonly gains: FakeGainNode[] = [];
@@ -427,6 +436,23 @@ class FakeAudioContext {
     const node = new FakeGainNode();
     this.gains.push(node);
     return node;
+  }
+
+  createWaveShaper(): { curve: Float32Array | null; oversample: string; connect(): void } {
+    return { curve: null, oversample: "none", connect: () => {} };
+  }
+
+  createBiquadFilter(): {
+    type: string;
+    frequency: { value: number };
+    Q: { value: number };
+    connect(): void;
+  } {
+    return { type: "lowpass", frequency: { value: 0 }, Q: { value: 0 }, connect: () => {} };
+  }
+
+  createPeriodicWave(): object {
+    return {};
   }
 }
 

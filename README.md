@@ -93,10 +93,20 @@ npm test                  # vitest — the rules, headless, no microphone
 npm run typecheck         # tsc --noEmit
 npm run build             # typecheck + production build
 npm run validate:browser  # build, serve, drive real Chromium through a whole run
+npm run audio:demo        # render the backing band to WAVs you can listen to
 npm run art               # regenerate the placeholder pixel art
 npm run art:import        # cut vendored third-party art (art-sources/) into scenario assets
 npm run shoot:actors      # close-ups and animation strips of the timeline actors
 ```
+
+`npm run audio:demo` renders the drum kit and the bass through an
+`OfflineAudioContext` in headless Chromium — the shipped voice code, behind the
+game's own master chain — and writes four WAVs to `audio-demo/`: the kit and the
+bass each as several candidates on the same bars, the whole backing before
+against after, and the new mix built up a part at a time. It is the listening
+half of `npm run validate:browser`, which measures bands and onsets and cannot
+tell anybody whether a kit cuts through. `--out <dir>` and `--bpm <n>` are the
+only options.
 
 `node scripts/author-rocky-scenarios.mjs` re-derives the authored musical
 content of all four Rocky-family scenario files (phrases, star thresholds, and

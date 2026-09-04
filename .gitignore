@@ -12,6 +12,9 @@ validation-screenshots/
 # Close-ups and animation strips from `node scripts/shoot-actors.mjs`.
 actor-screenshots/
 
+# Rendered by `npm run audio:demo` for listening to, not for keeping.
+audio-demo/
+
 # Ad-hoc review screenshots and the throwaway scripts that make them.
 # `npm run validate:browser -- --keep` is the reproducible source of truth.
 ui-screenshots/
