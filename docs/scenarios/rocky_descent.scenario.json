@@ -414,8 +414,8 @@
             "y": 0.2
           },
           "destination": {
-            "x": 0.78,
-            "y": 0.82
+            "x": 0.7463,
+            "y": 0.76
           },
           "waypoints": [
             {
@@ -1104,8 +1104,8 @@
             "y": 0.1
           },
           "destination": {
-            "x": 0.7,
-            "y": 0.91
+            "x": 0.655,
+            "y": 0.85
           },
           "waypoints": [
             {
@@ -1286,8 +1286,8 @@
         {
           "index": 0,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
           "startBeat": 0,
           "startMeasure": 1,
           "beatWithinMeasure": 1,
@@ -1296,124 +1296,75 @@
         {
           "index": 1,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 0.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 1,
           "startMeasure": 1,
-          "beatWithinMeasure": 1.5,
+          "beatWithinMeasure": 2,
           "scaleDegree": "7"
         },
         {
           "index": 2,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 1,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 2,
           "startMeasure": 1,
-          "beatWithinMeasure": 2,
+          "beatWithinMeasure": 3,
           "scaleDegree": "6"
         },
         {
           "index": 3,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 1.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 2.5,
+          "beatWithinMeasure": 4,
           "scaleDegree": "5"
         },
         {
           "index": 4,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 2,
-          "startMeasure": 1,
-          "beatWithinMeasure": 3,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 4,
+          "startMeasure": 2,
+          "beatWithinMeasure": 1,
           "scaleDegree": "4"
         },
         {
           "index": 5,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 2.5,
-          "startMeasure": 1,
-          "beatWithinMeasure": 3.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 5,
+          "startMeasure": 2,
+          "beatWithinMeasure": 2,
           "scaleDegree": "3"
         },
         {
           "index": 6,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 3,
-          "startMeasure": 1,
-          "beatWithinMeasure": 4,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 6,
+          "startMeasure": 2,
+          "beatWithinMeasure": 3,
           "scaleDegree": "2"
         },
         {
           "index": 7,
           "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 3.5,
-          "startMeasure": 1,
-          "beatWithinMeasure": 4.5,
+          "duration": "quarter",
+          "durationBeats": 1,
+          "startBeat": 7,
+          "startMeasure": 2,
+          "beatWithinMeasure": 4,
           "scaleDegree": "1"
         },
         {
           "index": 8,
-          "type": "rest",
-          "duration": "half",
-          "durationBeats": 2,
-          "startBeat": 4,
-          "startMeasure": 2,
-          "beatWithinMeasure": 1
-        },
-        {
-          "index": 9,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3,
-          "scaleDegree": "b1"
-        },
-        {
-          "index": 10,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 6.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 3.5,
-          "scaleDegree": "7"
-        },
-        {
-          "index": 11,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "6"
-        },
-        {
-          "index": 12,
-          "type": "note",
-          "duration": "eighth",
-          "durationBeats": 0.5,
-          "startBeat": 7.5,
-          "startMeasure": 2,
-          "beatWithinMeasure": 4.5,
-          "scaleDegree": "5"
-        },
-        {
-          "index": 13,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1423,7 +1374,7 @@
           "scaleDegree": "b1"
         },
         {
-          "index": 14,
+          "index": 9,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1433,7 +1384,7 @@
           "scaleDegree": "7"
         },
         {
-          "index": 15,
+          "index": 10,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1443,7 +1394,7 @@
           "scaleDegree": "6"
         },
         {
-          "index": 16,
+          "index": 11,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1453,7 +1404,7 @@
           "scaleDegree": "5"
         },
         {
-          "index": 17,
+          "index": 12,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1463,7 +1414,7 @@
           "scaleDegree": "4"
         },
         {
-          "index": 18,
+          "index": 13,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1473,7 +1424,7 @@
           "scaleDegree": "3"
         },
         {
-          "index": 19,
+          "index": 14,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1483,7 +1434,7 @@
           "scaleDegree": "2"
         },
         {
-          "index": 20,
+          "index": 15,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1493,7 +1444,7 @@
           "scaleDegree": "1"
         },
         {
-          "index": 21,
+          "index": 16,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1503,7 +1454,7 @@
           "scaleDegree": "b1"
         },
         {
-          "index": 22,
+          "index": 17,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1513,7 +1464,7 @@
           "scaleDegree": "7"
         },
         {
-          "index": 23,
+          "index": 18,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1523,7 +1474,7 @@
           "scaleDegree": "6"
         },
         {
-          "index": 24,
+          "index": 19,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1533,7 +1484,7 @@
           "scaleDegree": "5"
         },
         {
-          "index": 25,
+          "index": 20,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1543,7 +1494,7 @@
           "scaleDegree": "4"
         },
         {
-          "index": 26,
+          "index": 21,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1553,7 +1504,7 @@
           "scaleDegree": "3"
         },
         {
-          "index": 27,
+          "index": 22,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1563,7 +1514,7 @@
           "scaleDegree": "2"
         },
         {
-          "index": 28,
+          "index": 23,
           "type": "note",
           "duration": "eighth",
           "durationBeats": 0.5,
@@ -1573,7 +1524,7 @@
           "scaleDegree": "1"
         }
       ],
-      "noteOpportunityCount": 28,
+      "noteOpportunityCount": 24,
       "authoredBeatCount": 16,
       "visual": {
         "routeCharacter": "a near-vertical drop interrupted once by a held breath, then two full sprints to the bottom",
@@ -1585,7 +1536,7 @@
         ],
         "exposure": "ridiculous",
         "destinationTreatment": "tiny safe ledge near the bottom edge of frame",
-        "waypointCount": 28,
+        "waypointCount": 24,
         "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_descent_step",
         "progressTrigger": "successful_note_judgment",
         "sustainBehavior": "after advancing on a sustained note, hold the current descent pose/position through the note duration",
@@ -1608,166 +1559,142 @@
               "rotationDeg": 0
             },
             {
-              "x": 0.4871,
-              "y": 0.1229,
-              "scale": 0.75,
+              "x": 0.4799,
+              "y": 0.1284,
+              "scale": 0.7761,
               "rotationDeg": -4
             },
             {
-              "x": 0.4457,
-              "y": 0.1543,
-              "scale": 0.9,
+              "x": 0.4626,
+              "y": 0.1652,
+              "scale": 0.8217,
               "rotationDeg": 3
             },
             {
-              "x": 0.4943,
-              "y": 0.1857,
-              "scale": 0.675,
+              "x": 0.5197,
+              "y": 0.2021,
+              "scale": 0.7533,
               "rotationDeg": -2
             },
             {
-              "x": 0.5429,
-              "y": 0.2171,
-              "scale": 0.825,
+              "x": 0.514,
+              "y": 0.239,
+              "scale": 0.6685,
               "rotationDeg": 5
             },
             {
-              "x": 0.5014,
-              "y": 0.2486,
-              "scale": 0.6,
+              "x": 0.4654,
+              "y": 0.2759,
+              "scale": 0.7304,
               "rotationDeg": 0
             },
             {
-              "x": 0.46,
-              "y": 0.28,
-              "scale": 0.75,
+              "x": 0.5107,
+              "y": 0.3128,
+              "scale": 0.8902,
               "rotationDeg": -4
             },
             {
-              "x": 0.5086,
-              "y": 0.3114,
-              "scale": 0.9,
+              "x": 0.5481,
+              "y": 0.3497,
+              "scale": 0.7076,
               "rotationDeg": 3
             },
             {
-              "x": 0.5571,
-              "y": 0.3429,
-              "scale": 0.675,
+              "x": 0.4995,
+              "y": 0.3866,
+              "scale": 0.737,
               "rotationDeg": -2
             },
             {
-              "x": 0.5157,
-              "y": 0.3743,
-              "scale": 0.825,
+              "x": 0.5018,
+              "y": 0.4234,
+              "scale": 0.6848,
               "rotationDeg": 5
             },
             {
-              "x": 0.4743,
-              "y": 0.4057,
-              "scale": 0.6,
+              "x": 0.5587,
+              "y": 0.4604,
+              "scale": 0.8609,
               "rotationDeg": 0
             },
             {
-              "x": 0.5229,
-              "y": 0.4371,
-              "scale": 0.75,
+              "x": 0.5336,
+              "y": 0.4973,
+              "scale": 0.6946,
               "rotationDeg": -4
             },
             {
-              "x": 0.5714,
-              "y": 0.4686,
-              "scale": 0.9,
+              "x": 0.4928,
+              "y": 0.5341,
+              "scale": 0.8054,
               "rotationDeg": 3
             },
             {
-              "x": 0.53,
-              "y": 0.5,
-              "scale": 0.675,
+              "x": 0.5498,
+              "y": 0.5711,
+              "scale": 0.6391,
               "rotationDeg": -2
             },
             {
-              "x": 0.4886,
-              "y": 0.5314,
-              "scale": 0.825,
+              "x": 0.5677,
+              "y": 0.608,
+              "scale": 0.8152,
               "rotationDeg": 5
             },
             {
-              "x": 0.5371,
-              "y": 0.5629,
-              "scale": 0.6,
+              "x": 0.5191,
+              "y": 0.6448,
+              "scale": 0.763,
               "rotationDeg": 0
             },
             {
-              "x": 0.5857,
-              "y": 0.5943,
-              "scale": 0.75,
+              "x": 0.5409,
+              "y": 0.6818,
+              "scale": 0.7924,
               "rotationDeg": -4
             },
             {
-              "x": 0.5443,
-              "y": 0.6257,
-              "scale": 0.9,
+              "x": 0.5979,
+              "y": 0.7186,
+              "scale": 0.6098,
               "rotationDeg": 3
             },
             {
-              "x": 0.5029,
-              "y": 0.6571,
-              "scale": 0.675,
+              "x": 0.5532,
+              "y": 0.7555,
+              "scale": 0.7696,
               "rotationDeg": -2
             },
             {
-              "x": 0.5514,
-              "y": 0.6886,
-              "scale": 0.825,
+              "x": 0.5319,
+              "y": 0.7925,
+              "scale": 0.8315,
               "rotationDeg": 5
             },
             {
-              "x": 0.6,
-              "y": 0.72,
-              "scale": 0.6,
+              "x": 0.5889,
+              "y": 0.8293,
+              "scale": 0.7467,
               "rotationDeg": 0
             },
             {
-              "x": 0.5586,
-              "y": 0.7514,
-              "scale": 0.75,
+              "x": 0.5873,
+              "y": 0.8662,
+              "scale": 0.6783,
               "rotationDeg": -4
             },
             {
-              "x": 0.5171,
-              "y": 0.7829,
-              "scale": 0.9,
+              "x": 0.5386,
+              "y": 0.9031,
+              "scale": 0.7239,
               "rotationDeg": 3
-            },
-            {
-              "x": 0.5657,
-              "y": 0.8143,
-              "scale": 0.675,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.6143,
-              "y": 0.8457,
-              "scale": 0.825,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.5729,
-              "y": 0.8771,
-              "scale": 0.6,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.5314,
-              "y": 0.9086,
-              "scale": 0.75,
-              "rotationDeg": -4
             },
             {
               "x": 0.58,
               "y": 0.94,
               "scale": 0.9,
-              "rotationDeg": 3
+              "rotationDeg": -2
             }
           ]
         }
@@ -1775,11 +1702,11 @@
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 126,
-        "star2Threshold": 448,
-        "star3Threshold": 560,
+        "passThreshold": 108,
+        "star2Threshold": 384,
+        "star3Threshold": 480,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 560 points are available. Pass is the 45% of a single pass (280) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL, generated by the minigame editor. An attempt plays this 4-measure phrase 2 times, so 480 points are available. Pass is 45% of a single clean pass and is deliberately NOT scaled by the repeat, so getting the phrase right the second time round redeems a bad first read. Two stars is 80% and three stars 100% of the full attempt, so three stars still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",

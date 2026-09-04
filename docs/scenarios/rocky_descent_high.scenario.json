@@ -263,13 +263,12 @@
         },
         {
           "index": 3,
-          "type": "note",
+          "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
           "startBeat": 3,
           "startMeasure": 1,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "7"
+          "beatWithinMeasure": 4
         },
         {
           "index": 4,
@@ -279,7 +278,7 @@
           "startBeat": 4,
           "startMeasure": 2,
           "beatWithinMeasure": 1,
-          "scaleDegree": "6"
+          "scaleDegree": "7"
         },
         {
           "index": 5,
@@ -289,7 +288,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "5"
+          "scaleDegree": "6"
         },
         {
           "index": 6,
@@ -299,17 +298,16 @@
           "startBeat": 6,
           "startMeasure": 2,
           "beatWithinMeasure": 3,
-          "scaleDegree": "6"
+          "scaleDegree": "5"
         },
         {
           "index": 7,
-          "type": "note",
+          "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
           "startBeat": 7,
           "startMeasure": 2,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "5"
+          "beatWithinMeasure": 4
         },
         {
           "index": 8,
@@ -319,7 +317,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "4"
+          "scaleDegree": "6"
         },
         {
           "index": 9,
@@ -343,13 +341,12 @@
         },
         {
           "index": 11,
-          "type": "note",
+          "type": "rest",
           "duration": "quarter",
           "durationBeats": 1,
           "startBeat": 11,
           "startMeasure": 3,
-          "beatWithinMeasure": 4,
-          "scaleDegree": "3"
+          "beatWithinMeasure": 4
         },
         {
           "index": 12,
@@ -359,7 +356,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "4"
+          "scaleDegree": "5"
         },
         {
           "index": 13,
@@ -369,7 +366,7 @@
           "startBeat": 13,
           "startMeasure": 4,
           "beatWithinMeasure": 2,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 14,
@@ -379,7 +376,7 @@
           "startBeat": 14,
           "startMeasure": 4,
           "beatWithinMeasure": 3,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 15,
@@ -389,10 +386,10 @@
           "startBeat": 15,
           "startMeasure": 4,
           "beatWithinMeasure": 4,
-          "scaleDegree": "1"
+          "scaleDegree": "2"
         }
       ],
-      "noteOpportunityCount": 16,
+      "noteOpportunityCount": 13,
       "authoredBeatCount": 16,
       "visual": {
         "routeDirection": "descending",
@@ -404,7 +401,7 @@
         ],
         "exposure": "low",
         "destinationTreatment": "high alpine lower landing marker",
-        "waypointCount": 16,
+        "waypointCount": 13,
         "waypointGeneration": "one authored waypoint per successful note opportunity; reuse prop_rocky_descent_high_step",
         "progressTrigger": "successful_note_judgment",
         "route": {
@@ -415,8 +412,8 @@
             "y": 0.2
           },
           "destination": {
-            "x": 0.78,
-            "y": 0.82
+            "x": 0.7463,
+            "y": 0.76
           },
           "waypoints": [
             {
@@ -426,94 +423,76 @@
               "rotationDeg": 0
             },
             {
-              "x": 0.2978,
-              "y": 0.2775,
-              "scale": 0.96,
+              "x": 0.3053,
+              "y": 0.2872,
+              "scale": 0.95,
               "rotationDeg": -4
             },
             {
-              "x": 0.3303,
-              "y": 0.3162,
-              "scale": 0.92,
+              "x": 0.3376,
+              "y": 0.3356,
+              "scale": 0.9022,
               "rotationDeg": 3
             },
             {
-              "x": 0.3461,
-              "y": 0.355,
-              "scale": 0.88,
+              "x": 0.3548,
+              "y": 0.3841,
+              "scale": 0.8852,
               "rotationDeg": -2
             },
             {
-              "x": 0.3555,
-              "y": 0.3937,
-              "scale": 0.84,
-              "rotationDeg": 5
-            },
-            {
-              "x": 0.3711,
+              "x": 0.3774,
               "y": 0.4325,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.4026,
-              "y": 0.4712,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.4522,
-              "y": 0.51,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.5137,
-              "y": 0.5487,
-              "scale": 0.88,
-              "rotationDeg": -2
-            },
-            {
-              "x": 0.5761,
-              "y": 0.5875,
-              "scale": 0.84,
+              "scale": 0.9341,
               "rotationDeg": 5
             },
             {
-              "x": 0.6282,
+              "x": 0.4204,
+              "y": 0.4809,
+              "scale": 0.95,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.485,
+              "y": 0.5294,
+              "scale": 0.9,
+              "rotationDeg": -4
+            },
+            {
+              "x": 0.5582,
+              "y": 0.5778,
+              "scale": 0.8962,
+              "rotationDeg": 3
+            },
+            {
+              "x": 0.6222,
               "y": 0.6262,
-              "scale": 1,
-              "rotationDeg": 0
-            },
-            {
-              "x": 0.6638,
-              "y": 0.665,
-              "scale": 0.96,
-              "rotationDeg": -4
-            },
-            {
-              "x": 0.6844,
-              "y": 0.7037,
-              "scale": 0.92,
-              "rotationDeg": 3
-            },
-            {
-              "x": 0.6981,
-              "y": 0.7425,
-              "scale": 0.88,
+              "scale": 0.945,
               "rotationDeg": -2
             },
             {
-              "x": 0.7159,
-              "y": 0.7812,
-              "scale": 0.84,
+              "x": 0.6655,
+              "y": 0.6746,
+              "scale": 0.9445,
               "rotationDeg": 5
+            },
+            {
+              "x": 0.6903,
+              "y": 0.7231,
+              "scale": 0.9,
+              "rotationDeg": 0
+            },
+            {
+              "x": 0.7116,
+              "y": 0.7715,
+              "scale": 0.85,
+              "rotationDeg": -4
             },
             {
               "x": 0.7463,
               "y": 0.82,
               "scale": 1,
-              "rotationDeg": 0
+              "rotationDeg": 3
             }
           ],
           "character": "sequenced descent: the route steps back up every third foothold"
@@ -522,11 +501,11 @@
       "stars": {
         "metric": "judgmentPoints",
         "metricNote": "Cumulative judgment points during the attempt: Perfect 10, Good 6, Miss 0 (src/config/tuning.ts JUDGMENT_POINTS). Thresholds are cumulative and lock once earned.",
-        "passThreshold": 72,
-        "star2Threshold": 256,
-        "star3Threshold": 320,
+        "passThreshold": 59,
+        "star2Threshold": 208,
+        "star3Threshold": 260,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 320 points are available. Pass is the 45% of a single pass (160) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL, generated by the minigame editor. An attempt plays this 4-measure phrase 2 times, so 260 points are available. Pass is 45% of a single clean pass and is deliberately NOT scaled by the repeat, so getting the phrase right the second time round redeems a bad first read. Two stars is 80% and three stars 100% of the full attempt, so three stars still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -607,7 +586,7 @@
           "startBeat": 5,
           "startMeasure": 2,
           "beatWithinMeasure": 2,
-          "scaleDegree": "4"
+          "scaleDegree": "5"
         },
         {
           "index": 6,
@@ -733,8 +712,8 @@
             "y": 0.14
           },
           "destination": {
-            "x": 0.846,
-            "y": 0.82
+            "x": 0.82,
+            "y": 0.76
           },
           "waypoints": [
             {
@@ -945,7 +924,7 @@
           "startBeat": 7,
           "startMeasure": 2,
           "beatWithinMeasure": 4,
-          "scaleDegree": "3"
+          "scaleDegree": "5"
         },
         {
           "index": 8,
@@ -955,7 +934,7 @@
           "startBeat": 8,
           "startMeasure": 3,
           "beatWithinMeasure": 1,
-          "scaleDegree": "5"
+          "scaleDegree": "4"
         },
         {
           "index": 9,
@@ -965,7 +944,7 @@
           "startBeat": 9,
           "startMeasure": 3,
           "beatWithinMeasure": 2,
-          "scaleDegree": "4"
+          "scaleDegree": "3"
         },
         {
           "index": 10,
@@ -975,7 +954,7 @@
           "startBeat": 10,
           "startMeasure": 3,
           "beatWithinMeasure": 3,
-          "scaleDegree": "3"
+          "scaleDegree": "4"
         },
         {
           "index": 11,
@@ -985,7 +964,7 @@
           "startBeat": 11,
           "startMeasure": 3,
           "beatWithinMeasure": 4,
-          "scaleDegree": "2"
+          "scaleDegree": "3"
         },
         {
           "index": 12,
@@ -995,7 +974,7 @@
           "startBeat": 12,
           "startMeasure": 4,
           "beatWithinMeasure": 1,
-          "scaleDegree": "4"
+          "scaleDegree": "2"
         },
         {
           "index": 13,
@@ -1052,7 +1031,7 @@
           },
           "destination": {
             "x": 0.7,
-            "y": 0.91
+            "y": 0.85
           },
           "waypoints": [
             {
@@ -1062,39 +1041,39 @@
               "rotationDeg": 0
             },
             {
-              "x": 0.3935,
+              "x": 0.3914,
               "y": 0.2013,
               "scale": 0.96,
               "rotationDeg": -4
             },
             {
-              "x": 0.4096,
+              "x": 0.407,
               "y": 0.2519,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.415,
+              "x": 0.4152,
               "y": 0.3025,
-              "scale": 0.88,
+              "scale": 0.8883,
               "rotationDeg": -2
             },
             {
-              "x": 0.4204,
+              "x": 0.4251,
               "y": 0.3531,
-              "scale": 0.84,
+              "scale": 0.8985,
               "rotationDeg": 5
             },
             {
-              "x": 0.4365,
-              "y": 0.4038,
-              "scale": 1,
+              "x": 0.4437,
+              "y": 0.4037,
+              "scale": 0.9351,
               "rotationDeg": 0
             },
             {
-              "x": 0.4679,
+              "x": 0.4733,
               "y": 0.4544,
-              "scale": 0.96,
+              "scale": 0.9459,
               "rotationDeg": -4
             },
             {
@@ -1104,45 +1083,45 @@
               "rotationDeg": 3
             },
             {
-              "x": 0.5521,
+              "x": 0.5465,
               "y": 0.5556,
-              "scale": 0.88,
+              "scale": 0.8958,
               "rotationDeg": -2
             },
             {
-              "x": 0.5835,
+              "x": 0.5757,
               "y": 0.6063,
-              "scale": 0.84,
+              "scale": 0.9061,
               "rotationDeg": 5
             },
             {
-              "x": 0.5996,
+              "x": 0.5944,
               "y": 0.6569,
-              "scale": 1,
+              "scale": 0.9377,
               "rotationDeg": 0
             },
             {
-              "x": 0.605,
+              "x": 0.6048,
               "y": 0.7075,
-              "scale": 0.96,
+              "scale": 0.9485,
               "rotationDeg": -4
             },
             {
-              "x": 0.6104,
+              "x": 0.614,
               "y": 0.7581,
               "scale": 0.92,
               "rotationDeg": 3
             },
             {
-              "x": 0.6265,
-              "y": 0.8088,
-              "scale": 0.88,
+              "x": 0.6304,
+              "y": 0.8087,
+              "scale": 0.8819,
               "rotationDeg": -2
             },
             {
-              "x": 0.6579,
+              "x": 0.6595,
               "y": 0.8594,
-              "scale": 0.84,
+              "scale": 0.8667,
               "rotationDeg": 5
             },
             {
@@ -1162,7 +1141,7 @@
         "star2Threshold": 256,
         "star3Threshold": 320,
         "provisional": true,
-        "note": "PROVISIONAL. The design left thresholds TBD. An attempt plays this four-measure phrase 2 times, so 320 points are available. Pass is the 45% of a single pass (160) that it always was — deliberately NOT scaled, so getting the phrase right the second time round redeems a bad first read, which is the whole reason for the repeat. Two stars is 80% and three stars 100% of the full attempt, so ★★★ still requires every note opportunity taken at Perfect."
+        "note": "PROVISIONAL, generated by the minigame editor. An attempt plays this 4-measure phrase 2 times, so 320 points are available. Pass is 45% of a single clean pass and is deliberately NOT scaled by the repeat, so getting the phrase right the second time round redeems a bad first read. Two stars is 80% and three stars 100% of the full attempt, so three stars still requires every note opportunity taken at Perfect."
       },
       "validation": {
         "status": "ok",
@@ -1410,7 +1389,7 @@
           },
           "destination": {
             "x": 0.58,
-            "y": 0.88
+            "y": 0.82
           },
           "waypoints": [
             {
