@@ -101,9 +101,10 @@ npm run shoot:actors      # close-ups and animation strips of the timeline actor
 
 `npm run audio:demo` renders the drum kit and the bass through an
 `OfflineAudioContext` in headless Chromium — the shipped voice code, behind the
-game's own master chain — and writes four WAVs to `audio-demo/`: the kit and the
-bass each as several candidates on the same bars, the whole backing before
-against after, and the new mix built up a part at a time. It is the listening
+game's own master chain — and writes five WAVs to `audio-demo/`: the kit and the
+bass each as several candidates on the same bars, the depths of the sub's slow
+drift, the whole backing before against after, and the new mix built up a part
+at a time. It is the listening
 half of `npm run validate:browser`, which measures bands and onsets and cannot
 tell anybody whether a kit cuts through. `--out <dir>` and `--bpm <n>` are the
 only options.

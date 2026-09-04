@@ -30,6 +30,7 @@
  *   drums-attempts.wav     four kits, same bars: pulse, then L5 and L7 sixteenths
  *   bass-attempts.wav      four bass voices, same four-bar line
  *   band-before-after.wav  the whole backing, old against new, under a guitar
+ *   bass-wobble.wav        how deep the sub's slow drift should be
  *   band-parts.wav         the new mix built up a part at a time, so "is the
  *                          guitar still on top of this" can be listened to
  *                          rather than assumed
@@ -151,6 +152,16 @@ const DRUM_BARS = [
   { pattern: "L7", variant: "sixteenth" },
 ];
 
+/**
+ * Eight bars for the drift comparison.
+ *
+ * The slower of the two modulators takes 3.8 seconds a cycle, so four bars is
+ * barely three of them and far too short to hear something *drift*. Eight bars
+ * at 100bpm is 19 seconds — enough for the pair to go out of step with the bar
+ * and come back near, which is the whole effect.
+ */
+const WOBBLE_BARS = Array.from({ length: 8 }, () => ({ pattern: "pulse" }));
+
 /** The band section: an L5 sixteenth groove for four bars. */
 const BAND_BARS = [
   { pattern: "L5", variant: "sixteenth" },
@@ -230,7 +241,9 @@ const RENDER = async (plan) => {
       const bass = line.generateBassLine(key, seeded());
       for (let bar = 0; bar < bars.length; bar += 1) {
         for (const note of bass.notes) {
-          const beat = note.startBeat - bar * 4;
+          // Modulo, so a section longer than the line's own four measures turns
+          // the loop round rather than falling silent after bar four.
+          const beat = note.startBeat - (bar % 4) * 4;
           if (beat < 0 || beat >= 4) continue;
           pool.play(note.midi, at(bar, beat), note.durationBeats * secondsPerBeat);
         }
@@ -408,6 +421,24 @@ try {
           drums: {},
           bass: { tone: {}, level: null },
           guitar: true,
+        },
+      ],
+    },
+    {
+      file: "bass-wobble.wav",
+      what: "the drift on the sub — eight bars each, same line, kit kept out of the way",
+      sections: [
+        { label: "steady — no drift at all", bars: WOBBLE_BARS, bass: { tone: { wobble: 0 } } },
+        {
+          label: "slight",
+          bars: WOBBLE_BARS,
+          bass: { tone: { wobble: 0.2 } },
+        },
+        { label: "as it ships — the sub swings to 65% and back", bars: WOBBLE_BARS, bass: { tone: {} } },
+        {
+          label: "deeper, and on the overdriven band too (audible on a laptop)",
+          bars: WOBBLE_BARS,
+          bass: { tone: { wobble: 0.55, gritWobble: 0.3 } },
         },
       ],
     },

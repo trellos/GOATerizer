@@ -423,8 +423,8 @@ class FakeGainNode {
  * Enough of an `AudioContext` for a `BassPlayer` to be built.
  *
  * The nodes below the gain exist because the player now builds a
- * `BassVoicePool` (`src/audio/bass-voice.ts`), which stands its overdrive up
- * front. None of them is inspected — the duck is a property of the output gain
+ * `BassVoicePool` (`src/audio/bass-voice.ts`), which stands its overdrive and its
+ * drift oscillators up front. None of them is inspected — the duck is a property of the output gain
  * and nothing else — so they are stubs, and the output stays `gains[0]`
  * because the player creates it before the pool.
  */
@@ -453,6 +453,22 @@ class FakeAudioContext {
 
   createPeriodicWave(): object {
     return {};
+  }
+
+  createOscillator(): {
+    type: string;
+    frequency: { value: number };
+    connect(): void;
+    start(): void;
+    stop(): void;
+  } {
+    return {
+      type: "sine",
+      frequency: { value: 0 },
+      connect: () => {},
+      start: () => {},
+      stop: () => {},
+    };
   }
 }
 

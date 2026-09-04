@@ -17,12 +17,24 @@ import { describe, expect, it } from "vitest";
 import { BassVoicePool, DEFAULT_BASS } from "../src/audio/bass-voice.js";
 import { DEFAULT_KIT, DrumKit } from "../src/audio/drum-voices.js";
 import { softClipCurve } from "../src/audio/soft-clip.js";
+import { TEMPOS } from "../src/config/tempos.js";
 
 /* -------------------------------------------------------------------------- */
 /* The recording double                                                        */
 /* -------------------------------------------------------------------------- */
 
-type Node = { kind: string; id: number; connections: unknown[]; gain?: { value: number } };
+type Node = {
+  kind: string;
+  id: number;
+  connections: unknown[];
+  gain?: { value: number };
+  /** Oscillators only: whatever their frequency param was last set to. */
+  frequency?: number;
+  onended?: () => void;
+  /** Sources only. Declared here so a `Node` can be asked without a cast. */
+  started?: number | null;
+  stopped?: number[];
+};
 type Source = Node & { started: number | null; stopped: number[] };
 
 function fakeContext() {
@@ -75,6 +87,9 @@ function fakeContext() {
         disconnect: () => undefined,
         start: (at: number) => (record.started = at),
         stop: (at: number) => record.stopped.push(at),
+        set onended(fn: () => void) {
+          record.onended = fn;
+        },
       },
     };
   };
@@ -96,12 +111,17 @@ function fakeContext() {
       };
     },
     createOscillator() {
+      const frequency = param();
       const built = sourceNode("osc", {
         type: "sine",
-        frequency: param(),
+        frequency,
         setPeriodicWave(wave: unknown) {
           (built.record as unknown as { wave: unknown }).wave = wave;
         },
+      });
+      Object.defineProperty(built.record, "frequency", {
+        get: () => frequency.value,
+        configurable: true,
       });
       return built.node;
     },
@@ -167,6 +187,21 @@ const poolOf = (tone = {}) => {
   );
   return { ...fake, pool };
 };
+
+/**
+ * The drift oscillators' frequencies, read off a built pool.
+ *
+ * Read rather than imported: they are private to the module, and what the tests
+ * below are about is the frequencies the pool actually runs at.
+ */
+function driftFrequencies(): number[] {
+  const { pool, nodes } = poolOf();
+  pool.play(33, 5, 0.5);
+  return nodes
+    .filter((node) => node.kind === "osc" && node.frequency !== undefined && node.frequency < 5)
+    .map((node) => node.frequency as number)
+    .sort((a, b) => a - b);
+}
 
 /* -------------------------------------------------------------------------- */
 /* The curve                                                                   */
@@ -367,8 +402,89 @@ describe("BassVoicePool", () => {
     const { pool, sources } = poolOf();
     pool.play(33, 8, 0.6);
     pool.cancelFrom(2);
-    expect(sources).toHaveLength(3);
-    for (const source of sources) expect(source.stopped).toContain(2);
+    const note = sources.filter((source) => source.started === 8);
+    expect(note).toHaveLength(3);
+    for (const source of note) expect(source.stopped).toContain(2);
+  });
+
+  it("leaves the drift running when a note is cancelled", () => {
+    // A reroll or a tempo change cancels the queued tail. The drift is not part
+    // of it — stopping it there would silence the modulation for the rest of the
+    // run, and an `OscillatorNode` cannot be restarted once stopped.
+    const { pool, nodes } = poolOf();
+    pool.play(33, 8, 0.6);
+    pool.cancelFrom(2);
+    const drift = nodes.filter((node) => node.kind === "osc" && (node.frequency ?? 99) < 5);
+    expect(drift).toHaveLength(2);
+    for (const lfo of drift) expect(lfo.stopped).toEqual([]);
+  });
+
+  it("drifts the sub with a pair of oscillators that run for the pool's life", () => {
+    // Not restarted per note, which is the whole point: a modulator that began
+    // with each note would be an envelope shape, identical every time, and the
+    // rumble would not breathe at all.
+    const { pool, nodes, count } = poolOf();
+    for (let beat = 1; beat <= 4; beat += 1) pool.play(33 + beat, beat, 0.6);
+    // Three oscillators per note, plus exactly two more however many notes are
+    // played: the drift, built once.
+    expect(count("osc")).toBe(4 * 3 + 2);
+    const slow = nodes.filter((node) => node.kind === "osc" && (node.frequency ?? 99) < 5);
+    expect(slow).toHaveLength(2);
+    expect(slow.every((lfo) => lfo.started === 0)).toBe(true);
+  });
+
+  it("builds no modulator at all for a still bass", () => {
+    const { pool, sources } = poolOf({ wobble: 0, gritWobble: 0 });
+    pool.play(33, 1, 0.6);
+    expect(sources.filter((source) => source.started === 0)).toHaveLength(0);
+  });
+
+  it("centres the drift, so the sub is never inverted and never louder", () => {
+    // The modulated level has to land in `sub * (1 - wobble) .. sub`. Half the
+    // depth comes off the layer's own gain and the modulator adds it back, so
+    // getting this wrong drives the gain negative — which is not quieter, it is
+    // the sub in anti-phase with itself.
+    const { pool, nodes } = poolOf();
+    pool.play(33, 1, 0.6);
+    const depth = DEFAULT_BASS.sub * DEFAULT_BASS.wobble;
+    const centred = DEFAULT_BASS.sub - depth / 2;
+    const levels = nodes.filter((node) => node.kind === "gain").map((node) => node.gain?.value);
+    expect(levels).toContainEqual(centred);
+    expect(levels).toContainEqual(depth / 2);
+    expect(centred - depth / 2).toBeCloseTo(DEFAULT_BASS.sub * (1 - DEFAULT_BASS.wobble), 9);
+  });
+
+  it("lets go of a note's modulation when the note ends", () => {
+    // The drift lives as long as the pool and points at a per-note param, so
+    // without this every note ever played is held alive by it — four a bar, for
+    // a whole run.
+    const { pool, sources } = poolOf();
+    pool.play(33, 1, 0.6);
+    const sub = sources.find((source) => source.started === 1 && source.onended);
+    expect(sub).toBeDefined();
+    expect(() => sub?.onended?.()).not.toThrow();
+  });
+
+  it("cannot lock to the beat at any tempo the game offers", () => {
+    // What "a frequency that is not an integer multiple of the tempo" has to
+    // mean in practice: at every tempo, neither drift period is near a whole
+    // number of beats, or the wobble is heard as a rhythm nobody authored. The
+    // numbers were picked by search against exactly this, so the check belongs
+    // next to them rather than in a comment.
+    for (const tempo of TEMPOS) {
+      const beatsPerSecond = tempo.bpm / 60;
+      for (const hz of driftFrequencies()) {
+        const beatsPerCycle = beatsPerSecond / hz;
+        const offGrid = Math.abs(beatsPerCycle - Math.round(beatsPerCycle));
+        expect(offGrid).toBeGreaterThan(0.12);
+      }
+    }
+  });
+
+  it("uses two frequencies in an irrational ratio, so the pair never repeats", () => {
+    const drift = driftFrequencies();
+    expect(drift).toHaveLength(2);
+    expect((drift[1] as number) / (drift[0] as number)).toBeCloseTo((1 + Math.sqrt(5)) / 2, 6);
   });
 
   it("leaves a note that is already sounding alone", () => {
