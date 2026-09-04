@@ -34,7 +34,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { Pixels } from "./lib/png.mjs";
+import { lcg, Pixels } from "./lib/png.mjs";
 import {
   cornerColour,
   flipX,
@@ -185,3 +185,136 @@ for (const [id, image] of Object.entries(ASSETS)) {
   process.stdout.write(`${id.padEnd(34)} ${image.width}x${image.height}\n`);
 }
 process.stdout.write(`\n${Object.keys(ASSETS).length} files -> ${path.relative(process.cwd(), OUT)}\n`);
+
+/* -------------------------------------------------------------------------- */
+/* The Rocky goat tiers                                                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The Scale family's goat gets more badass with difficulty
+ * (`ClimbMinigame.climberTiers`): L1-3 keep the generated 24x18 goat, and
+ * L4-L7 escalate through Sevarihk's ram. The pack ships four goat variants
+ * (white/brown x small/large horns), of which only the white large-horn `-m`
+ * sheets are vendored, so the escalation past tier 1 is dressing rather than
+ * a different animal: gold horns, then a crown, then a fire mane. Those
+ * ornaments are drawn here, over the CC-BY frames, and are original work for
+ * this repository. Fetching the brown and small-horn variants — which would
+ * let tiers 1-3 be three genuinely different goats — is recorded as an open
+ * thread in `docs/IDEAS.md`; the network policy of the session that built this
+ * refused the art host.
+ *
+ * Every tier is four walk frames, the same pose cycle as the base goat, so the
+ * layer swaps one for another without knowing a tier from a tier.
+ */
+const ROCKY_SCENARIOS = ["rocky_ascent", "rocky_ascent_high", "rocky_descent", "rocky_descent_high"];
+const GOLD = [236, 186, 70];
+const CROWN = [
+  "g.g.g.g",
+  "ggggggg",
+  ".ggggg.",
+];
+const CROWN_PALETTE = { g: [255, 211, 77, 255] };
+
+/** True for the ram's horn browns: warm, darker than its coat, not grey. */
+function isHorn([r, g, b, a]) {
+  return a > 0 && r > g && g > b && r - b > 34 && r < 215;
+}
+
+/** The ram with its horns recoloured gold, shading kept. */
+function goldHorns(image) {
+  const out = { width: image.width, height: image.height, data: image.data.slice() };
+  for (let i = 0; i < out.data.length; i += 4) {
+    const px = [out.data[i], out.data[i + 1], out.data[i + 2], out.data[i + 3]];
+    if (!isHorn(px)) continue;
+    const lum = (px[0] * 0.3 + px[1] * 0.59 + px[2] * 0.11) / 150;
+    for (let c = 0; c < 3; c += 1) out.data[i + c] = Math.max(0, Math.min(255, Math.round(GOLD[c] * lum)));
+  }
+  return out;
+}
+
+/** The topmost opaque row in each column, or -1 where the column is empty. */
+function topEdge(image) {
+  const tops = [];
+  for (let x = 0; x < image.width; x += 1) {
+    let top = -1;
+    for (let y = 0; y < image.height; y += 1) {
+      if (image.data[(y * image.width + x) * 4 + 3] > 0) {
+        top = y;
+        break;
+      }
+    }
+    tops.push(top);
+  }
+  return tops;
+}
+
+/** Room above the image for what gets stamped over its head. */
+function withHeadroom(image, rows) {
+  const canvas = new Pixels(image.width, image.height + rows);
+  const raised = over({ width: image.width, height: image.height + rows, data: canvas.data }, image, 0, rows);
+  return raised;
+}
+
+/** A gold crown on the head, which for a right-facing ram is the right-hand third. */
+function crowned(image) {
+  const raised = withHeadroom(image, CROWN.length + 1);
+  const tops = topEdge(raised);
+  // The head is the highest point in the right-hand 40% of the frame.
+  let headX = Math.round(raised.width * 0.7);
+  let headY = raised.height;
+  for (let x = Math.round(raised.width * 0.5); x < raised.width; x += 1) {
+    if (tops[x] >= 0 && tops[x] < headY) {
+      headY = tops[x];
+      headX = x;
+    }
+  }
+  const canvas = new Pixels(raised.width, raised.height);
+  canvas.data.set(raised.data);
+  canvas.stamp(headX - 3, headY - CROWN.length, CROWN, CROWN_PALETTE);
+  return { width: raised.width, height: raised.height, data: canvas.data };
+}
+
+/** Fire along the back: licks above the body's top edge, seeded so it is stable. */
+function fireMane(image, seed) {
+  const raised = withHeadroom(image, 7);
+  const tops = topEdge(raised);
+  const canvas = new Pixels(raised.width, raised.height);
+  canvas.data.set(raised.data);
+  const random = lcg(seed);
+  const from = Math.round(raised.width * 0.12);
+  const to = Math.round(raised.width * 0.55);
+  for (let x = from; x < to; x += 1) {
+    if (tops[x] < 0) continue;
+    const height = 2 + Math.floor(random() * 5);
+    for (let k = 1; k <= height; k += 1) {
+      const y = tops[x] - k;
+      if (y < 0) break;
+      const hot = k / height;
+      const colour = hot < 0.35 ? [255, 224, 102, 255] : hot < 0.7 ? [255, 138, 61, 255] : [255, 91, 43, 220];
+      canvas.set(x, y, colour);
+    }
+  }
+  return { width: raised.width, height: raised.height, data: canvas.data };
+}
+
+const WALK = [0, 1, 2, 3].map((column) => ram("bergschaf-laufanimation-m.png", column));
+const TIERS = {
+  1: WALK,
+  2: WALK.map(goldHorns),
+  3: WALK.map((frame) => crowned(goldHorns(frame))),
+  4: WALK.map((frame, i) => fireMane(crowned(goldHorns(frame)), 7 + i)),
+};
+
+let written = 0;
+for (const scenario of ROCKY_SCENARIOS) {
+  const dir = path.resolve(here, "..", "public", "assets", "scenarios", scenario.replace(/_/g, "-"));
+  mkdirSync(dir, { recursive: true });
+  for (const [tier, frames] of Object.entries(TIERS)) {
+    frames.forEach((image, i) => {
+      const id = `goat_${scenario}_t${tier}_advance_${String(i + 1).padStart(2, "0")}`;
+      writeFileSync(path.join(dir, `${id}.png`), toPng(image));
+      written += 1;
+    });
+  }
+}
+process.stdout.write(`${written} Rocky goat tier files -> public/assets/scenarios/rocky-*/\n`);

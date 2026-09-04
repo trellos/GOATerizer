@@ -34,6 +34,14 @@ import type { RepeatVisualState } from "../../scenario/minigames/repeat-minigame
 import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
 import type { AssetStore } from "../assets.js";
 import { drawTimelineActor, type ActorSprites } from "./actor-layer.js";
+import {
+  foreshadowArrowNudge,
+  foreshadowOpacity,
+  foreshadowX,
+  type ForeshadowNotice,
+} from "./foreshadow.js";
+import { gleamIntensity } from "./gleam.js";
+import { drawSparkle } from "./glyphs.js";
 import { drawRepeatPerformer, NO_REPEAT_SPRITES, type RepeatSprites } from "./repeat-layer.js";
 import { drawStageSprites, type StageGeometry } from "./stage-layer.js";
 import type {
@@ -121,7 +129,14 @@ const THEME = {
   target: "#3fb9d6",
   targetEdge: "#8be5f7",
   perfect: "#ffd34d",
-  good: "#59d98a",
+  /*
+   * Good is a *lesser* Perfect, and green did not read as lesser than gold —
+   * it read as a different flavour of success. Light grey does: the bar goes
+   * flat, the played bar inside it stays white and is outlined where the two
+   * overlap, so the player sees "you hit it, but the gold is missing".
+   */
+  good: "#b9c2cc",
+  goodEdge: "#d9e0e8",
   miss: "#6a737d",
   wrong: "#ff5b5b",
   played: "#e8eef5",
@@ -175,6 +190,10 @@ export class TimelineView {
   #repeatSprites: RepeatSprites = NO_REPEAT_SPRITES;
   #key: RunKey;
   #fingering: Fingering | null = null;
+  #snapPerfectPlayed = true;
+  #foreshadow: ForeshadowNotice | null = null;
+  /** This frame's targets by attempt and opportunity, for the played bars. */
+  #targetsByOpportunity = new Map<string, TargetNote>();
   #showFingeringLabels = false;
   #assets: AssetStore | null = null;
   #stageFor: StageSource | null = null;
@@ -248,6 +267,23 @@ export class TimelineView {
   /** Pregame shows the physical shape; the run shows scale degrees. */
   setShowFingeringLabels(show: boolean): void {
     this.#showFingeringLabels = show;
+  }
+
+  /**
+   * Whether a Perfect played bar is drawn flush with the note it landed in.
+   *
+   * On by default — it is the cleanest possible "you did that exactly right".
+   * It also hides how early or late the attack really was, which is the one
+   * thing a player with an uncompensated rig needs to see, so the dev panel can
+   * turn it off.
+   */
+  setSnapPerfectPlayed(snap: boolean): void {
+    this.#snapPerfectPlayed = snap;
+  }
+
+  /** The next-minigame notice, or null when there is nothing to foreshadow. */
+  setForeshadow(notice: ForeshadowNotice | null): void {
+    this.#foreshadow = notice;
   }
 
   /**
@@ -395,10 +431,91 @@ export class TimelineView {
     // Actors and effects, in front of the bars — but still under the played
     // row and the strike line, which stay above everything a minigame draws.
     this.#drawStage(stages, "over");
+    this.#targetsByOpportunity.clear();
+    for (const note of snapshot.targets) {
+      this.#targetsByOpportunity.set(`${note.attemptKey}/${note.opportunityIndex}`, note);
+    }
     for (const note of snapshot.played) this.#drawPlayed(note, nowBeat);
     this.#drawActor(snapshot, nowBeat);
+    this.#drawForeshadow(nowBeat);
     this.#drawStrikeLine();
     this.#drawGutter();
+  }
+
+  /**
+   * "NEXT → Ba Da Bing": the notice foreshadowing the next minigame's rhythm.
+   *
+   * Drawn by the host in the HUD's own language — a dark plate, mono type, a
+   * chunky pixel arrow — above the lane band in the top-right of the playfield.
+   * Timing and motion are `foreshadow.ts`: pinned through the final measure,
+   * then carried off left with the outgoing minigame's notes.
+   */
+  #drawForeshadow(nowBeat: number): void {
+    const notice = this.#foreshadow;
+    if (!notice) return;
+    const opacity = foreshadowOpacity(nowBeat, notice.revealBeat);
+    if (opacity <= 0) return;
+
+    const ctx = this.#ctx;
+    const font = Math.round(this.#labelFontPx * 1.25);
+    const small = Math.round(this.#labelFontPx * 0.8);
+    const pad = Math.round(font * 0.6);
+    const arrowW = Math.round(font * 1.6);
+    const arrowH = Math.round(font * 0.9);
+    const gap = Math.round(font * 0.5);
+
+    ctx.save();
+    this.#clipPlayfield();
+    ctx.globalAlpha = opacity;
+    ctx.font = `700 ${font}px ${MONO}`;
+    const callWidth = ctx.measureText(notice.call).width;
+    ctx.font = `600 ${small}px ${MONO}`;
+    const nextWidth = ctx.measureText("NEXT").width;
+    const plateW = pad + nextWidth + gap + arrowW + gap + callWidth + pad;
+    const plateH = Math.round(font * 2);
+    const margin = 12;
+    const right = foreshadowX(this.#width - margin, this.#pixelsPerBeat, nowBeat, notice.scrollBeat);
+    const left = right - plateW;
+    if (right < this.#playLeft) {
+      ctx.restore();
+      return;
+    }
+    // Above the lanes, clear of the top of the band; clamped for a very short pane.
+    const top = Math.max(6, Math.round(this.#bandTop - plateH - font * 0.6));
+
+    ctx.fillStyle = "rgba(6,8,11,0.68)";
+    this.#roundRect(left, top, plateW, plateH, 4);
+    ctx.fill();
+    ctx.strokeStyle = THEME.perfect;
+    ctx.lineWidth = 1;
+    this.#roundRect(left + 0.5, top + 0.5, plateW - 1, plateH - 1, 4);
+    ctx.stroke();
+
+    const midY = top + plateH / 2;
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#cfd8e3";
+    ctx.font = `600 ${small}px ${MONO}`;
+    ctx.fillText("NEXT", left + pad, midY);
+
+    // The arrow: a pixel shaft and head, nudging right on each beat.
+    const nudge = foreshadowArrowNudge(nowBeat) * Math.max(2, font * 0.18);
+    const ax = left + pad + nextWidth + gap + nudge;
+    const shaftH = Math.max(2, Math.round(arrowH * 0.34));
+    const headW = Math.round(arrowW * 0.45);
+    ctx.fillStyle = THEME.perfect;
+    ctx.fillRect(ax, Math.round(midY - shaftH / 2), arrowW - headW, shaftH);
+    ctx.beginPath();
+    ctx.moveTo(ax + arrowW - headW, midY - arrowH / 2);
+    ctx.lineTo(ax + arrowW, midY);
+    ctx.lineTo(ax + arrowW - headW, midY + arrowH / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.font = `700 ${font}px ${MONO}`;
+    ctx.fillStyle = THEME.perfect;
+    ctx.fillText(notice.call, left + pad + nextWidth + gap + arrowW + gap, midY);
+    ctx.restore();
   }
 
   /**
@@ -486,7 +603,8 @@ export class TimelineView {
     art: { assetId: string; scale?: number; opacity?: number },
     x: number,
     y: number,
-    width: number
+    width: number,
+    dim = 1
   ): void {
     const image = this.#assets?.get(art.assetId);
     if (!image) return;
@@ -494,7 +612,7 @@ export class TimelineView {
     const h = this.#rowHeight * (art.scale ?? 1);
     const w = image.width * (h / image.height);
     ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1));
+    ctx.globalAlpha = Math.max(0, Math.min(1, art.opacity ?? 1)) * dim;
     ctx.drawImage(image, x + width / 2 - w / 2, y - h / 2, w, h);
     ctx.restore();
   }
@@ -861,24 +979,31 @@ export class TimelineView {
     // far as it likes and still never reach the gutter labels.
     this.#clipPlayfield();
 
-    if (art?.underlay) this.#drawNoteArt(art.underlay, x, y, width);
+    const missed = note.outcome === "miss";
+    if (art?.underlay) this.#drawNoteArt(art.underlay, x, y, width, missed ? 0.4 : 1);
 
-    const body = art?.body ? this.#assets?.get(art.body.assetId) : null;
-    if (body) {
+    const body = art?.body && !missed ? this.#assets?.get(art.body.assetId) : null;
+    if (missed) {
+      // A missed note is an empty frame: the outline of what should have been
+      // played, with nothing in it. Whatever skin the family gave the bar goes
+      // too — an outlined ledge that still looks like a ledge is not a miss.
+      ctx.strokeStyle = THEME.miss;
+      ctx.lineWidth = 1.5;
+      this.#roundRect(x + 0.75, rect.y + 0.75, width - 1.5, height - 1.5, 2);
+      ctx.stroke();
+    } else if (body) {
       // Stretched to the rect exactly, so note duration stays honest whatever
       // is drawn around it.
       ctx.save();
-      ctx.globalAlpha =
-        Math.max(0, Math.min(1, art?.body?.opacity ?? 1)) * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.globalAlpha = Math.max(0, Math.min(1, art?.body?.opacity ?? 1));
       ctx.drawImage(body, x, rect.y, width, height);
       ctx.restore();
     } else {
-      ctx.globalAlpha = note.outcome === "miss" ? 0.4 : 1;
       ctx.fillStyle = colour;
       this.#roundRect(x, rect.y, width, height, 2);
       ctx.fill();
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = note.outcome ? colour : THEME.targetEdge;
+      ctx.strokeStyle =
+        note.outcome === "good" ? THEME.goodEdge : note.outcome ? colour : THEME.targetEdge;
       ctx.lineWidth = 1;
       this.#roundRect(x + 0.5, rect.y + 0.5, width - 1, height - 1, 2);
       ctx.stroke();
@@ -893,23 +1018,83 @@ export class TimelineView {
     // A minigame that wants full control supplies an opaque body per outcome
     // and paints over this.
     if (body) {
-      ctx.globalAlpha = JUDGMENT_WASH * (note.outcome === "miss" ? 0.4 : 1);
+      ctx.globalAlpha = JUDGMENT_WASH;
       ctx.fillStyle = colour;
       ctx.fillRect(x, rect.y, width, height);
       ctx.globalAlpha = 1;
     }
 
-    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width);
+    if (art?.overlay) this.#drawNoteArt(art.overlay, x, y, width, missed ? 0.4 : 1);
 
+    if (note.outcome === "perfect") this.#drawGleam(note, rect, nowBeat);
+
+    ctx.restore();
+  }
+
+  /**
+   * The glint on a Perfect note. See `gleam.ts` for the timing; this is only
+   * the drawing — a four-point sparkle in the bar's top-right corner and a
+   * sheen across it, both scaled by how bright the glint is right now.
+   */
+  #drawGleam(
+    note: TargetNote,
+    rect: { x: number; y: number; w: number; h: number },
+    nowBeat: number
+  ): void {
+    const intensity = gleamIntensity(note.id, nowBeat);
+    if (intensity <= 0) return;
+    const ctx = this.#ctx;
+    const right = rect.x + rect.w;
+    if (right < this.#playLeft || rect.x > this.#width) return;
+
+    ctx.save();
+    // The sheen: a soft diagonal band sweeping the bar, brightest at the peak.
+    ctx.globalAlpha = 0.35 * intensity;
+    ctx.fillStyle = "#fff6c4";
+    const band = Math.max(3, rect.h * 0.5);
+    const sweep = rect.x + rect.w * (1 - intensity) - band;
+    ctx.beginPath();
+    ctx.moveTo(sweep, rect.y + rect.h);
+    ctx.lineTo(sweep + band, rect.y + rect.h);
+    ctx.lineTo(sweep + band + rect.h * 0.6, rect.y);
+    ctx.lineTo(sweep + rect.h * 0.6, rect.y);
+    ctx.closePath();
+    ctx.save();
+    this.#roundRect(rect.x, rect.y, rect.w, rect.h, 2);
+    ctx.clip();
+    ctx.fill();
+    ctx.restore();
+
+    // The sparkle in the corner: white core on a gold halo.
+    const size = rect.h * (0.35 + 0.45 * intensity);
+    const cx = right - rect.h * 0.25;
+    const cy = rect.y + rect.h * 0.2;
+    ctx.globalAlpha = Math.min(1, 0.55 + 0.45 * intensity);
+    ctx.fillStyle = THEME.perfect;
+    drawSparkle(ctx, cx, cy, size * 1.15);
+    ctx.fillStyle = "#fffbe6";
+    drawSparkle(ctx, cx, cy, size * 0.7);
     ctx.restore();
   }
 
   #drawPlayed(note: PlayedNote, nowBeat: number): void {
     const ctx = this.#ctx;
     const endBeat = note.endBeat ?? nowBeat;
-    const x = this.#x(note.startBeat, nowBeat);
-    const width = Math.max(4, (endBeat - note.startBeat) * this.#pixelsPerBeat);
+    let x = this.#x(note.startBeat, nowBeat);
+    let width = Math.max(4, (endBeat - note.startBeat) * this.#pixelsPerBeat);
     const colour = this.#outcomeColour(note);
+    const target = note.target
+      ? this.#targetsByOpportunity.get(`${note.target.attemptKey}/${note.target.opportunityIndex}`)
+      : undefined;
+    const targetRect = target ? this.#targetRect(target, nowBeat) : null;
+
+    // A Perfect sits flush with the note it landed in: same left edge, same
+    // right edge. That is the whole message — "exactly that" — and it is what
+    // makes a gold bar with a white centre read as the best possible result.
+    if (this.#snapPerfectPlayed && note.outcome === "perfect" && targetRect) {
+      x = targetRect.x;
+      width = targetRect.w;
+    }
 
     ctx.save();
     this.#clipPlayfield();
@@ -925,6 +1110,18 @@ export class TimelineView {
         ctx.strokeStyle = "rgba(8,10,14,0.85)";
         ctx.lineWidth = 1;
         ctx.strokeRect(x + 0.5, y - height / 2 + 0.5, Math.max(1, width - 1), height - 1);
+        // A Good is outlined where it overlaps its grey note: the played bar
+        // looks a little thicker inside the bar, which is the "you got there,
+        // roughly" read that green never carried.
+        if (note.outcome === "good" && targetRect) {
+          const left = Math.max(x, targetRect.x);
+          const right = Math.min(x + width, targetRect.x + targetRect.w);
+          if (right - left > 2) {
+            ctx.strokeStyle = THEME.played;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(left + 1, y - height / 2 - 1, right - left - 2, height + 2);
+          }
+        }
       } else {
         // Non-diatonic: between the clean lanes, and deliberately fuzzy. It is
         // a mistake, it must remain visible, and it must not look like a lane.

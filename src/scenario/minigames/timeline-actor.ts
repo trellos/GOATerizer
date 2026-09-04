@@ -17,8 +17,38 @@
  * Pure. No canvas, no audio, no DOM — `ui/timeline/actor-layer.ts` draws it.
  */
 
-/** How long a streak has to run before the actor stops growing. */
+/**
+ * How long a streak has to run before the actor stops growing, by default.
+ *
+ * A family may pass its own cap: `ClimbMinigame` sets it to the number of
+ * notes in the first two measures of the phrase, so two clean measures max the
+ * goat at every difficulty — few notes at L1, many at L6, the same *achievement*
+ * either way.
+ */
 export const ACTOR_SIZE_CAP_STREAK = 12;
+
+/** What trails the actor through a jump, and how the streak is dressed. */
+export type PlumeKind = "dust" | "sparks" | "fire";
+
+/**
+ * How the actor is drawn: which poses, which poses once it has grown its
+ * horns, and what its jumps trail. Art-facing, so it lives with the state the
+ * layer already reads rather than being a second thing to hand across.
+ */
+export type ActorLook = {
+  /** How many of the prototype layer's sprites are the base pose cycle. */
+  poseCount: number;
+  /** Whether a second, horned pose cycle follows them. */
+  hasHornedPoses: boolean;
+  plume: PlumeKind;
+};
+
+export type TimelineActorOptions = {
+  capStreak?: number;
+  look?: ActorLook;
+};
+
+export const DEFAULT_LOOK: ActorLook = { poseCount: 0, hasHornedPoses: false, plume: "dust" };
 
 /** Unbroken notes past the cap that each further decoration costs. */
 const NOTES_PER_DECORATION = 4;
@@ -35,6 +65,7 @@ export type FallenActor = {
   lane: number;
   /** Size it had reached, 0..1. */
   size: number;
+  /** The beat it fell on: the tumble to the floor starts here. */
   bornBeat: number;
 };
 
@@ -55,17 +86,35 @@ export type TimelineActorState = {
   /** Lane it jumped from, for the same reason. */
   fromLane: number | null;
   fallen: readonly FallenActor[];
+  /** The streak at which growth stops and the horns come in. */
+  capStreak: number;
+  /** Beat of the last landing that made the actor bigger, or null. */
+  grewAtBeat: number | null;
+  /** Whether the streak has reached the cap: horned poses, richer plume. */
+  horned: boolean;
+  /** Beat of the last wrong note, which shakes the actor without killing it. */
+  wobbledAtBeat: number | null;
+  look: ActorLook;
 };
 
 export class TimelineActor {
+  readonly #capStreak: number;
+  readonly #look: ActorLook;
   #lane: number | null = null;
   #fromLane: number | null = null;
   #nextLane: number | null = null;
   #alive = false;
   #streak = 0;
   #landedBeat = 0;
+  #grewAtBeat: number | null = null;
+  #wobbledAtBeat: number | null = null;
   #fallen: FallenActor[] = [];
   #nextId = 1;
+
+  constructor(options: TimelineActorOptions = {}) {
+    this.#capStreak = Math.max(1, Math.floor(options.capStreak ?? ACTOR_SIZE_CAP_STREAK));
+    this.#look = options.look ?? DEFAULT_LOOK;
+  }
 
   get state(): TimelineActorState {
     return {
@@ -78,7 +127,16 @@ export class TimelineActor {
       landedBeat: this.#landedBeat,
       fromLane: this.#fromLane,
       fallen: this.#fallen,
+      capStreak: this.#capStreak,
+      grewAtBeat: this.#grewAtBeat,
+      horned: this.#alive && this.#streak >= this.#capStreak,
+      wobbledAtBeat: this.#wobbledAtBeat,
+      look: this.#look,
     };
+  }
+
+  get capStreak(): number {
+    return this.#capStreak;
   }
 
   /**
@@ -92,7 +150,7 @@ export class TimelineActor {
    */
   get size(): number {
     if (!this.#alive) return 0;
-    return Math.min(1, Math.sqrt(this.#streak / ACTOR_SIZE_CAP_STREAK));
+    return Math.min(1, Math.sqrt(this.#streak / this.#capStreak));
   }
 
   /**
@@ -104,8 +162,8 @@ export class TimelineActor {
    * whole streak stays one readable object.
    */
   get decorations(): number {
-    if (!this.#alive || this.#streak <= ACTOR_SIZE_CAP_STREAK) return 0;
-    const past = this.#streak - ACTOR_SIZE_CAP_STREAK;
+    if (!this.#alive || this.#streak <= this.#capStreak) return 0;
+    const past = this.#streak - this.#capStreak;
     return Math.min(MAX_DECORATIONS, Math.floor(past / NOTES_PER_DECORATION) + 1);
   }
 
@@ -128,6 +186,24 @@ export class TimelineActor {
     this.#landedBeat = beat;
     this.#alive = true;
     this.#streak += 1;
+    // Growth is what the pulse announces, so it fires only while there is
+    // growth to announce; past the cap a landing is a landing.
+    if (this.#streak <= this.#capStreak) this.#grewAtBeat = beat;
+  }
+
+  /**
+   * A wrong note. The actor is shaken, not killed.
+   *
+   * A wrong note does not consume its target (GDD §5.2): the note is still
+   * open, the player can still land it, and if they do not it expires as a
+   * miss — which is what fells the actor. Killing on the wrong note itself
+   * charged one fumble twice, and worse, it charged notes the recognizer
+   * briefly misheard and then corrected: the goat vanished on a note the
+   * player had in fact played right.
+   */
+  wobble(beat: number): void {
+    if (!this.#alive) return;
+    this.#wobbledAtBeat = beat;
   }
 
   /**
@@ -146,6 +222,8 @@ export class TimelineActor {
     this.#lane = null;
     this.#fromLane = null;
     this.#streak = 0;
+    this.#grewAtBeat = null;
+    this.#wobbledAtBeat = null;
   }
 
   /** New attempt: the floor is swept and the streak starts again. */
@@ -157,5 +235,7 @@ export class TimelineActor {
     this.#nextLane = null;
     this.#streak = 0;
     this.#landedBeat = 0;
+    this.#grewAtBeat = null;
+    this.#wobbledAtBeat = null;
   }
 }

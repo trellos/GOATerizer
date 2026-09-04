@@ -222,6 +222,17 @@ describe("minigame registry", () => {
     expect(minigameById("PerformMinigame")?.apiVersion).toBe(MINIGAME_API_VERSION);
   });
 
+  it("gives every registered family a rhythm call, in its own words", () => {
+    const calls = registeredMinigameIds().map((id) => [id, minigameById(id)?.rhythmCall]);
+    for (const [id, call] of calls) {
+      expect(call, `${id} has no rhythmCall`).toBeTruthy();
+    }
+    expect(minigameById("ThreeStepMinigame")?.rhythmCall).toBe("Ba Da Bing");
+    expect(minigameById("PerformMinigame")?.rhythmCall).toBe("Boom Chika");
+    expect(minigameById("ClimbMinigame")?.rhythmCall).toBe("Do Ray Me");
+    expect(minigameById("RepeatMinigame")?.rhythmCall).toBe("Boom Boom Boom Boom");
+  });
+
   it("refuses a scenario whose minigame nobody registered, and says which exist", () => {
     const orphan = { ...structuredClone(RAW_SCENARIO_SHAPE), minigameClass: "BattleMinigame" };
     expect(() => loadScenario(orphan, (id) => `/${id}.png`)).toThrow(

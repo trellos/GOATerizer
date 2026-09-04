@@ -163,7 +163,58 @@ export function drawStageSprites(
     ctx.globalAlpha = opacity;
     ctx.translate(box.anchorX, box.anchorY);
     if (sprite.rotationDeg) ctx.rotate((sprite.rotationDeg * Math.PI) / 180);
-    ctx.drawImage(image, box.left, box.top, box.width, box.height);
+    const tinted = sprite.tint && sprite.tint.amount > 0 ? tintedImage(image, sprite.tint) : null;
+    ctx.drawImage(tinted ?? image, box.left, box.top, box.width, box.height);
     ctx.restore();
   }
+}
+
+/** One scratch canvas, reused: a tint is a per-frame wash, not an asset. */
+let scratch: CanvasRenderingContext2D | null = null;
+
+/**
+ * The image with `tint.colour` washed over its opaque pixels at `tint.amount`,
+ * or null where there is no document to make a scratch canvas in (tests).
+ */
+export function tintedImage(
+  image: HTMLImageElement,
+  tint: { readonly colour: string; readonly amount: number }
+): HTMLCanvasElement | null {
+  if (typeof document === "undefined") return null;
+  if (!scratch) scratch = document.createElement("canvas").getContext("2d");
+  if (!scratch) return null;
+  applyTint(scratch, image, tint);
+  return scratch.canvas;
+}
+
+/**
+ * Paints `image` into `scratch` at its natural size with the tint washed over
+ * its silhouette. `source-atop` keeps the fill inside the art's own pixels, so
+ * a tinted goat is a red goat rather than a red box, and drawing at natural
+ * size means the caller's scaling is what scales it — the wash never softens
+ * the pixel art. Exported for the test that pins the compositing order.
+ */
+export function applyTint(
+  scratch: CanvasRenderingContext2D,
+  image: { readonly width: number; readonly height: number },
+  tint: { readonly colour: string; readonly amount: number }
+): void {
+  const width = Math.max(1, image.width);
+  const height = Math.max(1, image.height);
+  const canvas = scratch.canvas;
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width;
+    canvas.height = height;
+  }
+  scratch.save();
+  scratch.globalCompositeOperation = "source-over";
+  scratch.globalAlpha = 1;
+  scratch.clearRect(0, 0, width, height);
+  scratch.imageSmoothingEnabled = false;
+  scratch.drawImage(image as HTMLImageElement, 0, 0, width, height);
+  scratch.globalCompositeOperation = "source-atop";
+  scratch.globalAlpha = Math.max(0, Math.min(1, tint.amount));
+  scratch.fillStyle = tint.colour;
+  scratch.fillRect(0, 0, width, height);
+  scratch.restore();
 }

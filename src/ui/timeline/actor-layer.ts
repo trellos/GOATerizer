@@ -36,7 +36,13 @@
  * fallback for an asset that failed to load.
  */
 
-import type { TimelineActorState } from "../../scenario/minigames/timeline-actor.js";
+import type {
+  FallenActor,
+  PlumeKind,
+  TimelineActorState,
+} from "../../scenario/minigames/timeline-actor.js";
+import { drawStar } from "./glyphs.js";
+import { tintedImage } from "./stage-layer.js";
 
 const ACTOR = {
   fallback: "#efe6d4",
@@ -58,6 +64,43 @@ const LEFT_OF_STRIKE_PX = 34;
  * to know that or it silently measures the wrong window.
  */
 export const HOP_BEATS = 0.28;
+
+/**
+ * The growth pulse: a landing that made the actor bigger swells it past its
+ * new size and back, so the eye is drawn to the fact that something grew.
+ * Starts once the hop is over — the landing is what grows it.
+ */
+export const GROWTH_PULSE_BEATS = 0.3;
+const GROWTH_PULSE = 0.22;
+
+/** How long a wrong note shakes the actor, and how red it goes. */
+export const WOBBLE_BEATS = 0.4;
+const WOBBLE_TINT = "#ff3b3b";
+
+/**
+ * How long a felled actor takes to hit the floor.
+ *
+ * It used to simply reappear on the floor strip at half opacity, which from
+ * the couch was indistinguishable from vanishing. Now it blinks red and drops
+ * — the mistake is *shown* — and the floor it lands on is drawn at full
+ * strength, so a bad patch leaves a visible crowd of goats milling about until
+ * the next minigame sweeps them.
+ */
+export const FALL_BEATS = 0.7;
+const FALL_TINT = "#ff3b3b";
+
+/**
+ * What trails the goat through a jump, by tier: a few dust motes at the
+ * bottom of the ladder, gold sparks in the middle, fire at the top. Horns
+ * (the streak at its cap) add half again as many.
+ */
+const PLUMES: Record<PlumeKind, { motes: number; colours: readonly string[] }> = {
+  dust: { motes: 4, colours: ["#f0e6d0"] },
+  sparks: { motes: 7, colours: ["#ffd34d", "#fff6c4"] },
+  fire: { motes: 10, colours: ["#ff8a3d", "#ffe066", "#ff5b2b"] },
+};
+/** Beats between one plume mote and the next along the trail. */
+const PLUME_STEP = 0.07;
 
 /**
  * How big the goat is, as a multiple of a lane row: floor, plus what the streak
@@ -172,6 +215,8 @@ const DUST_RIGHT_MARGIN = 6;
  */
 export type ActorSprites = {
   poses: readonly HTMLImageElement[];
+  /** The pose cycle once the actor has grown its horns. Optional. */
+  hornedPoses?: readonly HTMLImageElement[];
 };
 
 export type ActorGeometry = {
@@ -202,7 +247,8 @@ export function drawTimelineActor(
   const x = geometry.strikeX - LEFT_OF_STRIKE_PX;
   // Base size is a fraction of a row, so the actor scales with the timeline
   // rather than being a fixed number of pixels on every viewport.
-  const scale = geometry.rowHeight * (SIZE_FLOOR_ROWS + state.size * SIZE_STREAK_ROWS);
+  const scale =
+    geometry.rowHeight * (SIZE_FLOOR_ROWS + state.size * SIZE_STREAK_ROWS) * growthPulse(state, beat);
 
   // The hop: a parabola between the lane it left and the lane it landed on,
   // resolved from the beat rather than a frame counter, so a dropped frame
@@ -211,7 +257,9 @@ export function drawTimelineActor(
   const t = Math.min(1, sinceLanding / HOP_BEATS);
   const fromY = geometry.laneY(state.fromLane ?? state.lane);
   const toY = geometry.laneY(state.lane);
-  const y = fromY + (toY - fromY) * t - Math.sin(t * Math.PI) * geometry.rowHeight * 0.55;
+  const hopY = (at: number): number =>
+    fromY + (toY - fromY) * at - Math.sin(at * Math.PI) * geometry.rowHeight * 0.55;
+  const y = hopY(t);
 
   // Between notes, lean at the lane the next one is on. Same animation budget
   // as an idle, and it points at what is coming.
@@ -219,6 +267,10 @@ export function drawTimelineActor(
     state.nextLane !== null && t >= 1
       ? Math.max(-1, Math.min(1, (geometry.laneY(state.nextLane) - toY) / (geometry.rowHeight * 3)))
       : 0;
+
+  // The plume: what the jump leaves behind it. The world scrolls left, so the
+  // trail is the arc already flown, drifting leftward and fading.
+  if (t < 1) drawPlume(ctx, x, hopY, t, scale, state);
 
   // Everything that marks the arrival is drawn at the lane it landed on and
   // under the goat, so it reads as kicked up by the landing rather than as
@@ -233,15 +285,152 @@ export function drawTimelineActor(
     drawLandingDust(ctx, x, toY, scale, land, state.streak, weight, LEFT_OF_STRIKE_PX - DUST_RIGHT_MARGIN);
   }
 
+  const wobble = wobbleAt(state, beat);
+
   // One pose per landing, so consecutive steps do not look identical. Keyed off
   // the streak rather than a counter of its own: the streak is already the
   // number of steps this actor has taken.
-  drawGoat(ctx, x, y, scale, -lean, poseFor(sprites, state.streak), state.decorations, {
-    squash: squashAt(t, land, weight),
-    grounded: t >= 1,
-    shadowAlpha: weight.shadowAlpha,
-    shadowSpread: weight.shadowSpread,
-  });
+  drawGoat(
+    ctx,
+    x,
+    y,
+    scale,
+    -lean + wobble.tilt,
+    poseFor(sprites, state.streak, state.horned),
+    state.decorations,
+    {
+      squash: squashAt(t, land, weight),
+      grounded: t >= 1,
+      shadowAlpha: weight.shadowAlpha,
+      shadowSpread: weight.shadowSpread,
+    },
+    { tint: wobble.tint }
+  );
+}
+
+/**
+ * The swell past the new size after a landing that grew the actor: 1 outside
+ * the pulse, up to `1 + GROWTH_PULSE` at its middle. Beat-derived.
+ */
+export function growthPulse(state: TimelineActorState, beat: number): number {
+  if (state.grewAtBeat === null) return 1;
+  const since = beat - state.grewAtBeat - HOP_BEATS;
+  if (since < 0 || since >= GROWTH_PULSE_BEATS) return 1;
+  return 1 + GROWTH_PULSE * Math.sin((since / GROWTH_PULSE_BEATS) * Math.PI);
+}
+
+/**
+ * The shake after a wrong note: a quick side-to-side tilt and a red flash
+ * that blinks off over the shake. Nothing else happens — the note is still
+ * open, and the actor is still standing where it was.
+ */
+export function wobbleAt(
+  state: TimelineActorState,
+  beat: number
+): { tilt: number; tint: { colour: string; amount: number } | null } {
+  if (state.wobbledAtBeat === null) return { tilt: 0, tint: null };
+  const since = beat - state.wobbledAtBeat;
+  if (since < 0 || since >= WOBBLE_BEATS) return { tilt: 0, tint: null };
+  const t = since / WOBBLE_BEATS;
+  const tilt = Math.sin(t * Math.PI * 3) * 0.28 * (1 - t);
+  const on = Math.floor(t * 6) % 2 === 0;
+  return { tilt, tint: { colour: WOBBLE_TINT, amount: on ? 0.65 * (1 - t) : 0.15 * (1 - t) } };
+}
+
+/**
+ * Where a fallen actor is right now.
+ *
+ * For `FALL_BEATS` after it fell it tumbles from the lane it stood on to the
+ * floor, spinning and blinking red; then it lies on the floor at full size
+ * and full opacity, wandering, and turning round every few beats so the floor
+ * reads as a herd rather than a row. Pure, so a test can pin the drop.
+ */
+export function fallenPose(
+  actor: FallenActor,
+  index: number,
+  geometry: ActorGeometry,
+  beat: number
+): {
+  x: number;
+  y: number;
+  /** Radians. */
+  rotation: number;
+  tint: { colour: string; amount: number } | null;
+  flipX: boolean;
+  scale: number;
+  falling: boolean;
+} {
+  const spread = geometry.rowHeight * 1.6;
+  const restX = geometry.strikeX - LEFT_OF_STRIKE_PX - spread + index * spread * 0.42;
+  const wander = Math.sin(beat * 0.6 + actor.id * 1.7) * geometry.rowHeight * 0.35;
+  // Bigger with the live actor, but not by as much: the floor is a histogram
+  // and it has to stay legible as a crowd rather than becoming a second row
+  // of protagonists.
+  const scale = geometry.rowHeight * (0.7 + actor.size * 0.5);
+  const since = beat - actor.bornBeat;
+  const t = Math.max(0, Math.min(1, since / FALL_BEATS));
+  if (t < 1) {
+    const from = geometry.laneY(actor.lane);
+    const fromX = geometry.strikeX - LEFT_OF_STRIKE_PX;
+    const blinkOn = Math.floor(t * 4) % 2 === 0;
+    return {
+      x: fromX + (restX - fromX) * t,
+      // Accelerating: it drops, it does not float down.
+      y: from + (geometry.floorY - from) * t * t,
+      rotation: t * Math.PI * 3,
+      tint: { colour: FALL_TINT, amount: blinkOn ? 0.7 : 0.2 },
+      flipX: false,
+      scale,
+      falling: true,
+    };
+  }
+  const flipX = Math.floor((beat - actor.bornBeat + actor.id * 1.3) / 3) % 2 === 1;
+  return {
+    x: restX + wander,
+    y: geometry.floorY,
+    rotation: 0,
+    tint: null,
+    flipX,
+    scale,
+    falling: false,
+  };
+}
+
+/**
+ * The trail behind a jump: motes laid along the arc already flown, each one
+ * drifting further left (the world scrolls that way) and fading with age.
+ */
+function drawPlume(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  hopY: (t: number) => number,
+  t: number,
+  scale: number,
+  state: TimelineActorState
+): void {
+  const plume = PLUMES[state.look.plume];
+  const motes = Math.round(plume.motes * (state.horned ? 1.5 : 1));
+  ctx.save();
+  for (let k = 1; k <= motes; k += 1) {
+    const at = t - (k * PLUME_STEP) / HOP_BEATS;
+    if (at < 0) break;
+    const age = k / (motes + 1);
+    const colour = plume.colours[k % plume.colours.length] ?? plume.colours[0] ?? ACTOR.dust;
+    ctx.globalAlpha = (1 - age) * 0.85;
+    ctx.fillStyle = colour;
+    const spin = (k * 2.399 + state.streak * 0.7) % 1;
+    const mote = scale * (0.07 + spin * 0.05) * (1 - age * 0.6);
+    ctx.beginPath();
+    ctx.arc(
+      x - scale * 0.18 - k * scale * 0.11,
+      hopY(at) - scale * 0.3 + (spin - 0.5) * scale * 0.2,
+      Math.max(0.5, mote),
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 /**
@@ -264,8 +453,9 @@ export function squashAt(hop: number, land: number, weight: LandingWeight): numb
   return weight.squash * Math.exp(-spring / weight.decay) * Math.cos(spring * weight.wobble);
 }
 
-function poseFor(sprites: ActorSprites, step: number): HTMLImageElement | null {
-  const poses = sprites.poses;
+function poseFor(sprites: ActorSprites, step: number, horned = false): HTMLImageElement | null {
+  const horns = sprites.hornedPoses ?? [];
+  const poses = horned && horns.length > 0 ? horns : sprites.poses;
   if (poses.length === 0) return null;
   return poses[Math.abs(step) % poses.length] ?? null;
 }
@@ -294,6 +484,15 @@ const RESTING: Juice = { squash: 0, grounded: true, shadowAlpha: 0.3, shadowSpre
  * Drawn bottom-anchored: the bar's top edge is the ground, which is what makes
  * a scale run read as a staircase rather than as a sprite tracking a line.
  */
+type GoatExtras = {
+  /** A wash over the body's own pixels: the red of a wrong note or a fall. */
+  tint?: { colour: string; amount: number } | null;
+  /** Whole-body rotation in radians, about the feet. A tumble. */
+  rotation?: number;
+  /** Mirrored, for a fallen goat that has turned round. */
+  flipX?: boolean;
+};
+
 function drawGoat(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -302,10 +501,13 @@ function drawGoat(
   lean: number,
   pose: HTMLImageElement | null,
   decorations: number,
-  juice: Juice = RESTING
+  juice: Juice = RESTING,
+  extras: GoatExtras = {}
 ): void {
   ctx.save();
   ctx.translate(x, baseY);
+  if (extras.rotation) ctx.rotate(extras.rotation);
+  if (extras.flipX) ctx.scale(-1, 1);
 
   // A contact shadow, and it widens exactly as the body squashes. Two jobs: it
   // plants the goat on the bar instead of letting it float a pixel above one,
@@ -342,7 +544,9 @@ function drawGoat(
   if (pose && pose.width > 0) {
     const height = scale * 0.72;
     const width = height * (pose.width / pose.height);
-    ctx.drawImage(pose, -width / 2, -height, width, height);
+    const tint = extras.tint;
+    const image = tint && tint.amount > 0 ? (tintedImage(pose, tint) ?? pose) : pose;
+    ctx.drawImage(image, -width / 2, -height, width, height);
   } else {
     // The asset failed to load. A block is honest about that; inventing a goat
     // here would hide a missing file behind something that looks deliberate.
@@ -461,20 +665,6 @@ function drawLandingDust(
   ctx.restore();
 }
 
-function drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
-  ctx.beginPath();
-  for (let i = 0; i < 10; i += 1) {
-    const angle = (i / 10) * Math.PI * 2 - Math.PI / 2;
-    const radius = i % 2 === 0 ? r : r * 0.45;
-    const px = x + Math.cos(angle) * radius;
-    const py = y + Math.sin(angle) * radius;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.fill();
-}
-
 /**
  * The floor of fallen actors.
  *
@@ -491,18 +681,19 @@ function drawFallen(
 ): void {
   if (state.fallen.length === 0) return;
   ctx.save();
-  ctx.globalAlpha = 0.5;
-
   state.fallen.forEach((actor, index) => {
-    const spread = geometry.rowHeight * 1.6;
-    const wander = Math.sin(beat * 0.6 + actor.id * 1.7) * geometry.rowHeight * 0.35;
-    const x = geometry.strikeX - LEFT_OF_STRIKE_PX - spread + index * spread * 0.42 + wander;
-    // Bigger with the live actor, but not by as much: the floor is a histogram
-    // and it has to stay legible as a crowd rather than becoming a second row
-    // of protagonists.
-    const scale = geometry.rowHeight * (0.5 + actor.size * 0.4);
-    drawGoat(ctx, x, geometry.floorY, scale, 0, poseFor(sprites, actor.id), 0);
+    const pose = fallenPose(actor, index, geometry, beat);
+    drawGoat(
+      ctx,
+      pose.x,
+      pose.y,
+      pose.scale,
+      0,
+      poseFor(sprites, actor.id),
+      0,
+      pose.falling ? { ...RESTING, grounded: false } : RESTING,
+      { tint: pose.tint, rotation: pose.rotation, flipX: pose.flipX }
+    );
   });
-
   ctx.restore();
 }

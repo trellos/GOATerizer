@@ -16,9 +16,11 @@ import { MINIGAME_API_VERSION } from "../src/minigame/api.js";
 import {
   stepOf,
   THREE_STEP_MINIGAME,
+  ThreeStepMinigame,
   threeStepConfig,
   threeStepGroups,
   threeStepLevel,
+  TUMBLE_BEATS,
 } from "../src/scenario/minigames/three-step-minigame.js";
 import { BUTT_BUTT_BONK, SCENARIOS } from "../src/scenario/registry.js";
 import { subdivisionsOf } from "../src/game/subdivisions.js";
@@ -188,6 +190,23 @@ describe("the authored escalation", () => {
     }
   });
 
+  it("rides in with its first measure and out with its last, rather than standing at the line early", () => {
+    const group = [opportunity(0, 0), opportunity(1, 1 / 3), opportunity(2, 2 / 3)];
+    const minigame = instance(group);
+    minigame.onJudged(judged(0, "perfect", 0), 0);
+    const wolfAt = (span: { from: number; to: number }, beat: number) => {
+      const sprites = minigame.render({ ...view(beat), span }).sprites ?? [];
+      return sprites.find((sprite) => sprite.key === "target")!;
+    };
+    const ahead = 0.1 * 0.35; // TARGET_AHEAD_BEATS * beatWidth
+    // During play: at the strike line.
+    expect(wolfAt({ from: -0.5, to: 1.1 }, 0.7).x).toBeCloseTo(0.3 + ahead, 9);
+    // Before its measures reach the line: at its own first measure line.
+    expect(wolfAt({ from: 0.9, to: 2.5 }, -6).x).toBeCloseTo(0.9 + ahead, 9);
+    // After its last measure has passed: leaving with it.
+    expect(wolfAt({ from: -1.6, to: 0.1 }, 34).x).toBeCloseTo(0.1 + ahead, 9);
+  });
+
   it("bounds the effect list under a dense passage", () => {
     const opportunities: Opportunity[] = [];
     for (let i = 0; i < 60; i += 1) {
@@ -247,6 +266,88 @@ describe("the headbutt is a round trip", () => {
       previous = x;
     }
     expect(biggestStep).toBeLessThan((LANDING_X - REST_X) / 4);
+  });
+});
+
+describe("the battle", () => {
+  const group = [opportunity(0, 0), opportunity(1, 1 / 3), opportunity(2, 2 / 3)];
+  const spriteOf = (minigame: ReturnType<typeof instance>, key: string, beat: number) => {
+    const sprite = minigame.render(view(beat)).sprites?.find((s) => s.key === key);
+    if (!sprite) throw new Error(`no ${key} on stage`);
+    return sprite;
+  };
+  const battleOf = (minigame: ReturnType<typeof instance>) => (minigame as ThreeStepMinigame).battle;
+
+  it("grows the ram on a landed note, and lifts it, and never shrinks it on a miss", () => {
+    const minigame = instance(group);
+    minigame.onJudged(judged(0, "perfect", 0), 0);
+    expect(battleOf(minigame).ram).toBeGreaterThan(0);
+    const ramNow = spriteOf(minigame, "ram", 2);
+    // Bigger than the family's base scale, once the pulse has passed, and
+    // lifted off its lane.
+    expect(ramNow.scale!).toBeGreaterThan(0.62);
+    expect(ramNow.y).toBeLessThan(1 - 0.5 / 8);
+    const grown = battleOf(minigame).ram;
+    minigame.onJudged(judged(1, "miss", 1 / 3), 1 / 3);
+    expect(battleOf(minigame).ram).toBe(grown);
+  });
+
+  it("pulses on the step that grew it, then settles at its new size", () => {
+    const minigame = instance(group);
+    minigame.onJudged(judged(0, "perfect", 0), 0);
+    const mid = spriteOf(minigame, "ram", 0.15).scale!;
+    const settled = spriteOf(minigame, "ram", 1).scale!;
+    expect(mid).toBeGreaterThan(settled);
+    expect(settled).toBeGreaterThan(0.62);
+  });
+
+  it("grows the wolf and flashes it red on a miss or a wrong note, and the flash fades", () => {
+    const minigame = instance(group);
+    minigame.onJudged(judged(0, "miss", 0), 0);
+    expect(battleOf(minigame).wolf).toBeGreaterThan(0);
+    const flashing = spriteOf(minigame, "target", 0.05);
+    expect(flashing.tint?.colour).toBe("#ff3b3b");
+    expect(flashing.tint?.amount).toBeGreaterThan(0);
+    expect(flashing.scale!).toBeGreaterThan(0.62);
+    const faded = spriteOf(minigame, "target", 0.5);
+    expect(faded.tint).toBeUndefined();
+    minigame.onJudged({ id: 9, outcome: "wrong", opportunityIndex: null, playedMidi: 61, lane: 1, beat: 0.6 }, 0.6);
+    expect(battleOf(minigame).wolf).toBeGreaterThan(1 / 3 - 1e-9);
+  });
+
+  it("caps growth at full size", () => {
+    const minigame = instance(group);
+    for (let i = 0; i < 20; i += 1) minigame.onJudged(judged(0, "perfect", i), i);
+    expect(battleOf(minigame).ram).toBe(1);
+  });
+
+  it("tumbles the wolf upside down off the bottom when the fight is won, and leaves it there", () => {
+    const minigame = instance(group);
+    minigame.onStarEarned(1, 2);
+    expect(battleOf(minigame).won).toBe(true);
+    const standing = spriteOf(minigame, "target", 15.9);
+    minigame.onComplete(true, 1, 16);
+    expect(battleOf(minigame).tumbling).toBe(true);
+    const mid = spriteOf(minigame, "target", 16 + TUMBLE_BEATS / 2);
+    expect(mid.rotationDeg!).toBeGreaterThan(0);
+    expect(mid.rotationDeg!).toBeLessThan(180);
+    expect(mid.y).toBeGreaterThan(standing.y);
+    const down = spriteOf(minigame, "target", 16 + TUMBLE_BEATS + 0.01);
+    expect(down.rotationDeg).toBe(180);
+    expect(down.y).toBeGreaterThan(1);
+    // Still there, still down, well after — it rides out with the measures.
+    const later = spriteOf(minigame, "target", 19);
+    expect(later.rotationDeg).toBe(180);
+    expect(later.y).toBe(down.y);
+  });
+
+  it("leaves the wolf standing after a failed attempt", () => {
+    const minigame = instance(group);
+    minigame.onComplete(false, 0, 16);
+    expect(battleOf(minigame).tumbling).toBe(false);
+    const wolf = spriteOf(minigame, "target", 17);
+    expect(wolf.rotationDeg ?? 0).toBe(0);
+    expect(wolf.y).toBe(spriteOf(minigame, "target", 15).y);
   });
 });
 

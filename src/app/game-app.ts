@@ -63,6 +63,7 @@ import {
   BEATS_PER_MEASURE,
   EXTRA_INPUT_LATENCY_MS,
   RUN_LEAD_IN_BEATS,
+  TIMELINE_HISTORY_BEATS,
   TRANSITION_BEATS,
 } from "../config/tuning.js";
 import { AttemptRuntime, type AttemptEvent } from "../game/attempt.js";
@@ -102,6 +103,7 @@ import { ScenarioBackdropView, type BackdropPanel } from "../ui/scenario-backdro
 import { trophyLabel, trophySvg } from "../ui/trophy.js";
 import type { ActorSprites } from "../ui/timeline/actor-layer.js";
 import { requireMinigame } from "../minigame/registry.js";
+import type { ForeshadowNotice } from "../ui/timeline/foreshadow.js";
 import type { RepeatVisualState } from "../scenario/minigames/repeat-minigame.js";
 import type { TimelineActorState } from "../scenario/minigames/timeline-actor.js";
 import { NO_REPEAT_SPRITES } from "../ui/timeline/repeat-layer.js";
@@ -293,6 +295,7 @@ export class GameApp {
    * slides — the payoff has to stay readable through the transition.
    */
   #previous: ActiveAttempt | null = null;
+  #snapPerfectPlayed = true;
   #slideStartBeat: number | null = null;
   #attemptCounter = 0;
 
@@ -827,8 +830,13 @@ export class GameApp {
       onMinigameCellToggle: (scenarioId, level) => this.#onMinigameCellToggle(scenarioId, level),
       onMinigameDifficultySelect: (level) => this.#onMinigameDifficultySelect(level),
       onMinigameCellPin: (scenarioId, level) => this.#onMinigameCellPin(scenarioId, level),
+      onSnapPerfectPlayed: (snap) => this.#setSnapPerfectPlayed(snap),
     });
     this.#debug.setEnabled(this.#devMode);
+    // `?snapPlayed=0` turns off the Perfect played bar snapping to its note.
+    // On by default: it is how the player is told they nailed it. Off is for
+    // reading lateness, which snapping hides (`docs/IDEAS.md`).
+    this.#setSnapPerfectPlayed(!(this.#devMode && params.get("snapPlayed") === "0"));
     // A trim remembered from a previous session has to show in the panel, or
     // the input reads 0 while a real compensation is being applied.
     this.#debug.setLatencyTrim(this.#latencyTrimMs);
@@ -1638,7 +1646,8 @@ export class GameApp {
           this.#timeline.markPlayedOutcome(
             judgment.attackId,
             judgment.type === "PerfectNote" ? "perfect" : "good",
-            false
+            false,
+            { attemptKey: attempt.timelineKey, opportunityIndex: judgment.target.opportunityIndex }
           );
         } else if (judgment.type === "MissedNote") {
           this.#timeline.markTargetOutcome(
@@ -1703,12 +1712,21 @@ export class GameApp {
     // front of them.
     this.#resetDuck();
     this.#refreshDrumBeat();
-    this.#timeline.removeTargets(attempt.timelineKey);
+    // The finished attempt's targets stay on the timeline: its family keeps
+    // rendering while its last measure scrolls away, and `TimelineModel.prune`
+    // drops it once the whole thing has left the left edge.
     if (!this.#current) {
       this.#finishRun("content-limit");
       return;
     }
     this.#queueNextAttempt();
+  }
+
+  /** Whether a Perfect played bar sits flush with its note. Dev-toggleable. */
+  #setSnapPerfectPlayed(snap: boolean): void {
+    this.#snapPerfectPlayed = snap;
+    this.#gameView?.setSnapPerfectPlayed(snap);
+    this.#debug?.setSnapPerfectPlayed(snap);
   }
 
   /** Full band again: the ladder and the gain it drives, together. */
@@ -1889,7 +1907,16 @@ export class GameApp {
       // The attempt's own minigame says what its layer needs; the host does not
       // look at scenario data to find out. `prototypeLayer` is the last place a
       // family is named here and goes when the actors move into `Stage`.
-      const attempt = this.#current?.runtime;
+      // The current attempt's layer, or — while a finished attempt is still
+      // scrolling out and the new one has no prototype layer of its own — the
+      // outgoing one's, so a climber and its fallen pile leave with their
+      // measures rather than popping at the handover.
+      const outgoing =
+        this.#previous && this.#timeline.attemptKeys.includes(this.#previous.timelineKey)
+          ? this.#previous.runtime
+          : null;
+      const attempt =
+        this.#current?.runtime.minigame.prototypeLayer?.() ? this.#current.runtime : (outgoing ?? this.#current?.runtime);
       const layer = attempt?.minigame.prototypeLayer?.() ?? null;
       const images = (layer?.sprites ?? [])
         .map((id) => this.#assets.get(id))
@@ -1899,7 +1926,12 @@ export class GameApp {
         layer?.kind === "actor" ? (layer.state as TimelineActorState) : null,
         attempt ? attempt.toAttemptBeat(beat) : 0
       );
-      this.#gameView?.setActorSprites(layer?.kind === "actor" ? { poses: images } : EMPTY_SPRITES);
+      const look = layer?.kind === "actor" ? (layer.state as TimelineActorState).look : null;
+      this.#gameView?.setActorSprites(
+        layer?.kind === "actor" && look
+          ? { poses: images.slice(0, look.poseCount), hornedPoses: images.slice(look.poseCount) }
+          : EMPTY_SPRITES
+      );
       this.#gameView?.setRepeat(
         layer?.kind === "repeat" ? (layer.state as RepeatVisualState) : null
       );
@@ -1908,12 +1940,41 @@ export class GameApp {
           ? { can: images[0] ?? null, crushed: images[1] ?? null }
           : NO_REPEAT_SPRITES
       );
+      this.#gameView?.setForeshadow(this.#foreshadowNotice(beat));
       this.#gameView?.render(this.#timeline, beat);
       this.#renderStrip(beat);
       this.#energy?.render(beat);
     }
 
     this.#updateDebug(beat);
+  }
+
+  /**
+   * The "NEXT → …" notice for the timeline, if one is due.
+   *
+   * Announced in the current attempt's final measure, and kept after the
+   * handover until the *previous* attempt's plate has scrolled off — which is
+   * why it is derived from whichever attempt is in its last measure or has
+   * just finished, rather than from `#current` alone. The host reads only
+   * `rhythmCall` from the module: it still does not know which family it is.
+   */
+  #foreshadowNotice(beat: number): ForeshadowNotice | null {
+    const run = this.#run;
+    if (!run) return null;
+    const candidates: { attempt: ActiveAttempt; next: RunSlot | null }[] = [];
+    if (this.#current) candidates.push({ attempt: this.#current, next: run.nextSlot });
+    if (this.#previous) candidates.push({ attempt: this.#previous, next: run.currentSlot });
+    for (const { attempt, next } of candidates) {
+      const runtime = attempt.runtime;
+      const revealBeat = runtime.endBeat - BEATS_PER_MEASURE;
+      const scrollBeat = runtime.endBeat;
+      if (beat < revealBeat || beat > scrollBeat + TIMELINE_HISTORY_BEATS + 2) continue;
+      const scenario = next?.scenario;
+      if (!scenario) return null;
+      const call = requireMinigame(scenario.minigameId, "foreshadow").rhythmCall ?? scenario.family;
+      return { call, revealBeat, scrollBeat };
+    }
+    return null;
   }
 
   #renderStrip(beat: number): void {
@@ -2177,6 +2238,7 @@ export class GameApp {
       // of that" are different findings with different fixes.
       "latency reported ms": (this.#audio.outputLatencySeconds * 1000).toFixed(1),
       "latency trim ms": String(this.#latencyTrimMs),
+      "snap perfect played": this.#snapPerfectPlayed ? "on" : "off",
       "latency comp ms": (
         this.#audio.outputLatencySeconds * 1000 +
         this.#latencyTrimMs

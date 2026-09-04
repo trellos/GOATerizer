@@ -69,6 +69,16 @@ function harness(difficulty: number, key: RunKey = G_MINOR, startBeat = 20) {
   return { attempt, events, advanceTo, playAt };
 }
 
+/** Plays every target before `upTo` perfectly, so the wings are stocked for a flourish. */
+function playUpTo(h: ReturnType<typeof harness>, upTo: { opportunityIndex: number }): void {
+  for (const target of h.attempt.targets) {
+    if (target.opportunityIndex >= upTo.opportunityIndex) break;
+    h.advanceTo(target.startBeat);
+    h.playAt(target.midi, target.startBeat);
+    h.advanceTo(target.startBeat + 0.001);
+  }
+}
+
 function playFlawlessly(difficulty: number, key: RunKey = G_MINOR): { attempt: AttemptRuntime; result: AttemptResult } {
   const h = harness(difficulty, key);
   for (const target of h.attempt.targets) {
@@ -244,6 +254,19 @@ describe("PerformMinigame on the timeline", () => {
     expect(spriteAt(attempt, "prop-0").assetId).toBe(FRONTMAN.bindings.signatureProps[0]);
   });
 
+  it("rides in with its own first measure rather than standing at the line during the previous act", () => {
+    const { attempt } = harness(1);
+    const base = viewFor(attempt, -6);
+    const stage = performIn(attempt).render({ ...base, span: { from: 1.2, to: 2.8 } });
+    const performer = (stage.sprites ?? []).find((sprite) => sprite.key === "performer")!;
+    const atLine = spriteAt(attempt, "performer");
+    // Shifted right by exactly the distance from the strike line to its first
+    // measure line, and so are the props beside it.
+    expect(performer.x - atLine.x).toBeCloseTo(1.2 - 0.5, 9);
+    const prop = (stage.sprites ?? []).find((sprite) => sprite.key === "prop-0")!;
+    expect(prop.x - spriteAt(attempt, "prop-0").x).toBeCloseTo(1.2 - 0.5, 9);
+  });
+
   it("makes every note a stage light and marks only the flourish notes", () => {
     const h = harness(1);
     const { flourishes } = firstTargets(h.attempt);
@@ -313,9 +336,40 @@ describe("PerformMinigame on the timeline", () => {
     expect(FRONTMAN.bindings.performerPoses).toContain(at("quarter", 1.5));
   });
 
-  it("brings a goat in from the wing for a flourish, walking rather than appearing", () => {
+  it("draws a goat to the wing for an ordinary note well played, and it waits there", () => {
+    const h = harness(1);
+    const { plain } = firstTargets(h.attempt);
+    h.advanceTo(plain.startBeat);
+    h.playAt(plain.midi, plain.startBeat);
+    h.advanceTo(plain.startBeat + 0.01);
+    expect(performIn(h.attempt).progress.staged).toBe(1);
+    expect(performIn(h.attempt).progress.crowd).toBe(0);
+    const waiting = (stageOf(h.attempt, plain.startBeat + 1).sprites ?? []).filter((s) => s.key.startsWith("staged-"));
+    expect(waiting).toHaveLength(1);
+    // On screen, at an edge, on the floor — visibly waiting, not off stage.
+    expect(waiting[0]!.x).toBeGreaterThan(0);
+    expect(waiting[0]!.x).toBeLessThan(1);
+    expect(waiting[0]!.x < 0.15 || waiting[0]!.x > 0.85).toBe(true);
+    expect(waiting[0]!.y).toBeGreaterThan(1);
+    expect(waiting[0]!.assetId).toBe(FRONTMAN.bindings.audienceStates[0]);
+  });
+
+  it("brings nobody over for a flourish with nobody waiting", () => {
     const h = harness(1);
     const { flourish } = firstTargets(h.attempt);
+    h.advanceTo(flourish.startBeat);
+    h.playAt(flourish.midi, flourish.startBeat);
+    h.advanceTo(flourish.startBeat + 0.01);
+    expect(performIn(h.attempt).progress.crowd).toBe(0);
+    // The pose still strikes: the flourish is the performer's, the crowd is earned.
+    expect(FRONTMAN.bindings.flourishPoses).toContain(spriteAt(h.attempt, "performer", flourish.startBeat + 0.01).assetId);
+  });
+
+  it("brings a waiting goat in from its wing for a flourish, walking rather than appearing", () => {
+    const h = harness(1);
+    const { flourish } = firstTargets(h.attempt);
+    playUpTo(h, flourish);
+    expect(performIn(h.attempt).progress.staged).toBeGreaterThan(0);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
     h.advanceTo(flourish.startBeat + 0.01);
@@ -323,8 +377,11 @@ describe("PerformMinigame on the timeline", () => {
 
     const arriving = crowdAt(h.attempt, flourish.startBeat + 0.01)[0]!;
     const settled = crowdAt(h.attempt, flourish.startBeat + 4)[0]!;
-    // Starts off the edge of the playfield, ends at its slot beside the performer.
-    expect(arriving.x > 1 || arriving.x < 0).toBe(true);
+    // Starts where it was waiting, just inside a wing, and ends at its slot
+    // beside the performer.
+    expect(arriving.x < 0.15 || arriving.x > 0.85).toBe(true);
+    expect(arriving.x).toBeGreaterThan(0);
+    expect(arriving.x).toBeLessThan(1);
     expect(settled.x).toBeGreaterThan(0);
     expect(settled.x).toBeLessThan(1);
     expect(settled.y).toBeGreaterThan(1); // on the floor, below the lanes
@@ -360,6 +417,7 @@ describe("PerformMinigame on the timeline", () => {
     // L4's first flourish is a quarter note: Perfect is within 0.18 beats, Good within 0.5.
     for (const [h, late] of [[perfect, 0], [good, 0.3]] as const) {
       const { flourish } = firstTargets(h.attempt);
+      playUpTo(h, flourish);
       h.advanceTo(flourish.startBeat);
       h.playAt(flourish.midi, flourish.startBeat, late);
       h.advanceTo(flourish.startBeat + late + 0.01);
@@ -372,6 +430,7 @@ describe("PerformMinigame on the timeline", () => {
   it("flinches on a wrong note, bores the crowd for a beat, and takes nothing away", () => {
     const h = harness(1);
     const { flourish } = firstTargets(h.attempt);
+    playUpTo(h, flourish);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
     h.advanceTo(flourish.startBeat + 0.01);
@@ -486,10 +545,14 @@ describe("PerformMinigame content rules", () => {
       })),
     }) as PerformMinigame;
     // L1's two flourish opportunities (index 5, 11 per authored pass), across both attempt repeats.
-    for (const index of [5, 11, 17, 23]) {
+    // Every note perfect: the wings fill to capacity and no further, and the
+    // flourishes seat what is waiting until the capacity is spent.
+    for (let index = 0; index < attempt.targets.length; index += 1) {
       minigame.onJudged({ id: index, outcome: "perfect", opportunityIndex: index, playedMidi: 60, lane: 0, beat: index }, index);
+      expect(minigame.progress.crowd + minigame.progress.staged).toBeLessThanOrEqual(2);
     }
     expect(minigame.progress.crowd).toBe(2);
+    expect(minigame.progress.staged).toBe(0);
     expect(minigame.progress.flourishesHit).toBe(4);
   });
 

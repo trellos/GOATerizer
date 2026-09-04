@@ -19,6 +19,7 @@
  * placed it looked like.
  */
 
+import { DEFAULT_LOOK } from "../src/scenario/minigames/timeline-actor.js";
 import { describe, expect, it } from "vitest";
 
 import type { TimelineActorState } from "../src/scenario/minigames/timeline-actor.js";
@@ -54,6 +55,11 @@ function landed(overrides: Partial<TimelineActorState> = {}): TimelineActorState
     landedBeat: 0,
     fromLane: 2,
     fallen: [],
+    capStreak: 12,
+    grewAtBeat: null,
+    horned: false,
+    wobbledAtBeat: null,
+    look: DEFAULT_LOOK,
     ...overrides,
   };
 }

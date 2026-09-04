@@ -31,6 +31,7 @@
 import {
   arc,
   decay,
+  spanAnchorX,
   MINIGAME_API_VERSION,
   type AttemptContext,
   type Judged,
@@ -98,6 +99,35 @@ const RAM_REST_BEATS = 1.2;
 const RAM_LEAP_BEATS = 0.7;
 /** Where the wolf stands, in beats right of the strike line. */
 const TARGET_AHEAD_BEATS = 0.35;
+
+/*
+ * The battle, made visible.
+ *
+ * Every landed note grows the ram a little; every missed or wrong one grows
+ * the wolf. Growth pulses so the eye is drawn to the thing that just grew, and
+ * the wolf flashes red when it is the wolf. At the end, a passed attempt (one
+ * star or more) is a won fight: the wolf tumbles, upside down, off the bottom
+ * of the screen as the minigame scrolls away, and lies there.
+ *
+ * Provisional numbers: how many notes fill the growth meter is a fraction of
+ * the attempt's own note count, so a dense level does not max out in the first
+ * measure and a sparse one still gets somewhere.
+ */
+/** Fraction of the attempt's notes that takes either animal to full size. */
+const GROWTH_NOTES_FRACTION = 0.5;
+/** How much bigger either animal gets at full growth. */
+const GROWTH_SCALE = 0.6;
+/** How far the ram rises off its lane at full growth, in lane-band units. */
+const RAM_LIFT = 0.08;
+/** The swell past the new size on a growth step, and how long it lasts. */
+const GROWTH_PULSE = 0.2;
+const GROWTH_PULSE_BEATS = 0.3;
+/** The wolf's red flash on a growth step. */
+const WOLF_FLASH_BEATS = 0.4;
+const WOLF_FLASH = "#ff3b3b";
+/** The tumble: how long the fall takes and where it ends, below the band. */
+export const TUMBLE_BEATS = 0.8;
+const TUMBLE_FLOOR_Y = 1.35;
 
 export type ThreeStepConfig = {
   background: string;
@@ -168,11 +198,23 @@ class ThreeStepMinigame implements Minigame {
   #targetDown = false;
   /** The lane the next note is on, for the lean. */
   #aim: number | null = null;
+  /** The battle: 0..1 growth per animal, and when each last grew. Attempt-global. */
+  #ramGrowth = 0;
+  #wolfGrowth = 0;
+  #ramGrewAtBeat: number | null = null;
+  #wolfGrewAtBeat: number | null = null;
+  /** Notes that take either animal to full size. */
+  readonly #growthNotes: number;
+  /** A star was earned: the fight is won, whatever happens after. */
+  #won = false;
+  /** The wolf's tumble, once the attempt is over and won. */
+  #tumbleStartBeat: number | null = null;
 
   constructor(config: ThreeStepConfig, level: ThreeStepLevel, context: AttemptContext) {
     this.#config = config;
     this.#level = level;
     this.#opportunities = context.opportunities;
+    this.#growthNotes = Math.max(1, Math.ceil(context.opportunities.length * GROWTH_NOTES_FRACTION));
   }
 
   /** Attempt-global group count, for the dev panel and tests. */
@@ -183,6 +225,16 @@ class ThreeStepMinigame implements Minigame {
   /** Whether the target is currently down. Visual-cycle-local. */
   get targetDown(): boolean {
     return this.#targetDown;
+  }
+
+  /** The battle, for tests and the dev panel: growth 0..1 each, and the outcome. */
+  get battle(): { ram: number; wolf: number; won: boolean; tumbling: boolean } {
+    return {
+      ram: this.#ramGrowth,
+      wolf: this.#wolfGrowth,
+      won: this.#won,
+      tumbling: this.#tumbleStartBeat !== null,
+    };
   }
 
   /**
@@ -203,9 +255,16 @@ class ThreeStepMinigame implements Minigame {
       // A broken group is not a group. The count that drives the alternate
       // ending only ever advances on a group played through.
       this.#inGroup = 0;
+      // The wolf feeds on mistakes.
+      this.#wolfGrowth = Math.min(1, this.#wolfGrowth + 1 / this.#growthNotes);
+      this.#wolfGrewAtBeat = beat;
       return;
     }
     if (!target) return;
+
+    // The ram feeds on notes landed.
+    this.#ramGrowth = Math.min(1, this.#ramGrowth + 1 / this.#growthNotes);
+    this.#ramGrewAtBeat = beat;
 
     const step = stepOf(target);
     const lane = target.lane;
@@ -262,32 +321,52 @@ class ThreeStepMinigame implements Minigame {
     this.#inGroup = 0;
   }
 
-  onStarEarned(): void {}
+  /** One star is a pass, and a pass is a won fight. Stars lock, so this never unwins. */
+  onStarEarned(stars: number): void {
+    if (stars >= 1) this.#won = true;
+  }
 
-  /** The finish pose simply becomes the held pose; nothing else changes. */
+  /**
+   * The finish pose becomes the held pose on a pass, and the wolf — beaten —
+   * goes over. A failed attempt leaves it standing, and as big as it got.
+   */
   onComplete(passed: boolean, _stars: number, beat: number): void {
+    this.#effects = [];
     if (passed) {
       this.#pose = { assetId: this.#config.finishPose, startBeat: beat, lane: this.#pose?.lane ?? 0 };
     }
+    if (passed || this.#won) this.#tumbleStartBeat = beat;
   }
 
   render(view: StageView): Stage {
     const sprites: Sprite[] = [];
+    const beat = view.beat;
 
     // The target waits at the strike line for the whole attempt: this family's
-    // notes come to the actor rather than the actor chasing them.
+    // notes come to the actor rather than the actor chasing them. Anchored to
+    // the attempt's own span, so it rides in with the first measure and out
+    // with the last rather than standing at the line during the previous act.
+    const anchorX = spanAnchorX(view);
     const targetArt = this.#targetDown
       ? (this.#config.targetVisuals[1] ?? this.#config.targetVisuals[0])
       : this.#config.targetVisuals[0];
     if (targetArt !== undefined) {
+      const restY = laneY(view, this.#aim ?? 0) + 0.12;
+      const tumble = this.#tumbleAt(beat);
+      const flash =
+        this.#wolfGrewAtBeat === null ? 0 : decay(this.#wolfGrewAtBeat, WOLF_FLASH_BEATS, beat);
       sprites.push({
         key: "target",
         assetId: targetArt,
-        x: view.strikeX + view.measure.beatWidth * TARGET_AHEAD_BEATS,
-        y: laneY(view, this.#aim ?? 0) + 0.12,
-        scale: ACTOR_SCALE,
+        x: anchorX + view.measure.beatWidth * TARGET_AHEAD_BEATS,
+        // The tumble: from where it stood to the floor below the band, turning
+        // over as it goes, and it stays there upside down.
+        y: restY + (TUMBLE_FLOOR_Y - restY) * tumble,
+        rotationDeg: 180 * tumble,
+        scale: ACTOR_SCALE * this.#growthScale(this.#wolfGrowth, this.#wolfGrewAtBeat, beat),
         anchor: "bottom",
         layer: "over",
+        ...(flash > 0 ? { tint: { colour: WOLF_FLASH, amount: flash * 0.8 } } : {}),
       });
     }
 
@@ -295,15 +374,16 @@ class ThreeStepMinigame implements Minigame {
     if (pose) {
       // Mid-leap the ram flies an arc between the two lanes; otherwise it
       // stands on the one its pose was set on, leaning at what is coming.
-      const restY = laneY(view, pose.lane);
-      const restX = view.strikeX - view.measure.beatWidth * RAM_REST_BEATS;
+      // Growth lifts it a little off its lane as well as making it bigger.
+      const restY = laneY(view, pose.lane) - RAM_LIFT * this.#ramGrowth;
+      const restX = anchorX - view.measure.beatWidth * RAM_REST_BEATS;
       const position = this.#ramPosition(view, { x: restX, y: restY });
       sprites.push({
         key: "ram",
         assetId: pose.assetId,
         x: position.x,
         y: position.y,
-        scale: ACTOR_SCALE,
+        scale: ACTOR_SCALE * this.#growthScale(this.#ramGrowth, this.#ramGrewAtBeat, beat),
         anchor: "bottom",
         layer: "over",
       });
@@ -313,18 +393,34 @@ class ThreeStepMinigame implements Minigame {
       sprites.push({
         key: `fx-${i}-${flash.startBeat}`,
         assetId: flash.assetId,
-        x: view.strikeX,
+        x: anchorX,
         y: laneY(view, flash.lane),
         // The same scale as the animals: the effects were drawn in the same
         // frame, and a flash that keeps its full size next to a scaled-down ram
         // reads as a different scene happening on top of this one.
         scale: ACTOR_SCALE,
         layer: "over",
-        opacity: decay(flash.startBeat, EFFECT_BEATS, view.beat),
+        opacity: decay(flash.startBeat, EFFECT_BEATS, beat),
       });
     }
 
     return { background: this.#config.background, sprites };
+  }
+
+  /** Size from growth, with the swell of a step that just happened. */
+  #growthScale(growth: number, grewAtBeat: number | null, beat: number): number {
+    const pulse =
+      grewAtBeat === null
+        ? 0
+        : Math.sin(Math.min(1, Math.max(0, (beat - grewAtBeat) / GROWTH_PULSE_BEATS)) * Math.PI);
+    return (1 + GROWTH_SCALE * growth) * (1 + GROWTH_PULSE * pulse);
+  }
+
+  /** 0 before the tumble, 1 once the wolf is down. Eased at the start: it topples. */
+  #tumbleAt(beat: number): number {
+    if (this.#tumbleStartBeat === null) return 0;
+    const t = Math.min(1, Math.max(0, (beat - this.#tumbleStartBeat) / TUMBLE_BEATS));
+    return t * t;
   }
 
   /**
@@ -347,7 +443,7 @@ class ThreeStepMinigame implements Minigame {
     if (!leap) return rest;
 
     const landing = {
-      x: view.strikeX - view.measure.beatWidth * RAM_LEAP_BEATS,
+      x: spanAnchorX(view) - view.measure.beatWidth * RAM_LEAP_BEATS,
       y: laneY(view, leap.to),
     };
 
@@ -407,6 +503,7 @@ class ThreeStepMinigame implements Minigame {
 export const THREE_STEP_MINIGAME: MinigameModule = {
   id: "ThreeStepMinigame",
   displayName: "Three-Step",
+  rhythmCall: "Ba Da Bing",
   apiVersion: MINIGAME_API_VERSION,
 
   authoring: {
@@ -572,9 +669,13 @@ export const THREE_STEP_MINIGAME: MinigameModule = {
 
   debug(instance: Minigame): Readonly<Record<string, string>> {
     const three = instance as ThreeStepMinigame;
+    const battle = three.battle;
     return {
       "triplet groups": String(three.groups),
       "target": three.targetDown ? "down" : "standing",
+      "battle ram/wolf": `${battle.ram.toFixed(2)}/${battle.wolf.toFixed(2)}${battle.won ? " won" : ""}${
+        battle.tumbling ? " tumbling" : ""
+      }`,
     };
   },
 };

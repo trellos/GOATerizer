@@ -135,6 +135,24 @@ sprites.push({ key: "goat", assetId: pose, x: note.rect.x + note.rect.w / 2,
 actor here and let the notes come to it — a forehead waiting for cans, a threat
 closing in. Often better than chasing a scrolling bar.
 
+Anchor it with **`spanAnchorX(view)`**, not `strikeX` itself. You are rendered
+from the moment your notes enter the timeline until your last measure has
+scrolled off, and `strikeX` belongs to whichever attempt is being *played* —
+an actor parked on it would be standing at the line during the previous
+minigame and would vanish the instant yours ended. `spanAnchorX` is `span.from`
+until your first measure reaches the line, `strikeX` while you play, and
+`span.to` once your last measure has passed: the actor rides in with its first
+measure and out with its last, at exactly the timeline's speed. Offsets ("half
+a beat back") apply to it unchanged.
+
+**Tint.** `Sprite.tint` washes a colour over the sprite's own pixels — a red
+flash on a hit, gold on a win. `{ colour, amount }`, amount 0..1.
+
+**The next minigame.** Give your module a `rhythmCall` — the family's rhythm
+said out loud, "Ba Da Bing". The host shows it in the final measure of the
+minigame *before* yours, so the player can feel the change coming. It is the
+one thing about a family the host announces.
+
 `view.measure.width` and `.beatWidth` give the measure geometry, so "one beat
 ahead" is `strikeX + view.measure.beatWidth` rather than a guess at scroll
 speed. Scroll speed is the host's and can change; never assume one.
@@ -200,9 +218,17 @@ read them since. The one thing they still assert is about the *music* — one
 waypoint per note opportunity — so `parseLevel` checks that and throws if the
 two halves of a scenario have been edited apart. Do not author new routes.
 
-The climb lands on the **target's** lane, never the played pitch: a wrong note
-kills the actor without moving it anywhere. See the next family for why that is
-the interesting half of the contrast.
+The climb lands on the **target's** lane, never the played pitch. A wrong note
+*wobbles* the goat (red blink, a shake) and nothing more — the target is still
+open (GDD §5.2) and a note the recognizer misheard and corrected must not
+already have killed it. Only a **miss** fells it: it tumbles, blinking red, to
+the floor below the band and mills there until the next minigame. The size cap
+is every note in the first two measures of the phrase, so two clean measures
+max the goat at any level; a landing that grew it pulses, its jumps trail a
+plume, and at the cap it grows horns — the next tier's poses. Tiers escalate
+by difficulty through derived ids, `goat_<id>_t1..t4_advance_01..04` for
+L4–L7 (`climbTierIds`), the same convention as `footholdArt`. See the next
+family for why the target-lane rule is the interesting half of the contrast.
 
 ### `RepeatMinigame` — Straight Sixteenths — REPEAT
 Built: `src/scenario/minigames/repeat-module.ts`.
@@ -244,6 +270,14 @@ Derive the A/B/C role from the note's position within its beat, not from
 `index % 3` — authored rhythm is not uniform. `arc()` is shipped for exactly this
 family: two little hops and a larger leap.
 
+Built (`src/scenario/minigames/three-step-minigame.ts`, Butt-Butt-BONK). The
+battle is visible: every landed note grows the ram a little and lifts it, every
+miss or wrong note grows the wolf and flashes it red (`Sprite.tint`), both with
+a pulse on the step. A star earned is a won fight, and on completion the wolf
+tumbles upside down below the band and lies there as the measures carry it
+off; a failed attempt leaves it standing, as big as it got. Both animals are
+anchored with `spanAnchorX`.
+
 Author a triplet with `duration: "eighthTriplet"` — a third of a beat, the only
 `NoteDuration` that is not a binary fraction. Write `durationBeats` and
 `startBeat` in the file as the decimals they nearly are (`0.333`, `1.667`); the
@@ -260,10 +294,13 @@ Built (`src/scenario/minigames/perform-minigame.ts`, Goat Frontman). Two
 things it adds to the canonical slots: `noteArt.body` (what every note is made
 of) and `noteArt.flourish` (an overlay marking a **flourish note**). Flourishes
 are authored per level as `visual.flourishBeats`, the phrase-relative start
-beats of the notes the designer marked `F`; on one the performer strikes a
-`flourishPoses[]` entry for the note's length and summons
-`visual.goatsPerFlourish` crowd members from the wings. Bad notes flinch and
-bore the crowd; nothing earned is taken away. Blues Lick material is written
+beats of the notes the designer marked `F`. The crowd is earned in two visible
+steps: a well-played *ordinary* note draws one goat to the nearest wing, where
+it waits on screen; on a flourish the performer strikes a `flourishPoses[]`
+entry for the note's length and the waiting goats walk over — Perfect releases
+up to `visual.goatsPerFlourish`, Good half, and a flourish with nobody waiting
+brings nobody. Bad notes flinch and bore the crowd; nothing earned is taken
+away, staged or seated. Blues Lick material is written
 in pentatonic degrees (`p1..p6`, `src/music/degrees.ts`) — one octave, root to
 root, the same span the lanes show — resolved to lanes by the run's mode.
 

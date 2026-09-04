@@ -757,6 +757,13 @@ Wrong notes are also drawn into timeline history as bad played notes.
 
 The player should be able to glance left and understand what actually happened.
 
+> **Revision (DECISION-058).** The colour language, as built: a **Perfect**
+> note is gold and *gleams* — a glint peaking on a beat, every other beat,
+> each note on its own phase — and the player's own bar sits flush with the
+> note's left and right edges. A **Good** note goes light grey, with the
+> played bar outlined where the two overlap. A **Miss** is an empty outline.
+> Green was retired: it did not read as lesser than gold.
+
 ## 12.4 Bass Line
 
 The bass line is drawn in the same timeline as darker / visually subordinate note shapes.

@@ -173,6 +173,18 @@ describe("timeline model", () => {
     ).toBe(true);
   });
 
+  it("keeps a finished attempt's targets until they have scrolled off, then drops them", () => {
+    const timeline = model();
+    const lastEnd = Math.max(...targets.map((t) => 100 + t.startBeat + t.durationBeats));
+    // Well inside history: the outgoing minigame is still rendering its exit.
+    timeline.prune(lastEnd + 1);
+    expect(timeline.attemptKeys).toEqual(["a0"]);
+    // Past the visible history plus its margin: gone, so the map cannot grow
+    // across a sixteen-slot run.
+    timeline.prune(lastEnd + TIMELINE_HISTORY_BEATS + 3);
+    expect(timeline.attemptKeys).toEqual([]);
+  });
+
   it("unrolls the looping bass across the window without storing repeats", () => {
     const timeline = model();
     // Beat 100 is 4 loops of 16 plus 4 -- well past the authored 0..15.

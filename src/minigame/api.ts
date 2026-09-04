@@ -210,6 +210,13 @@ export type Sprite = {
   readonly anchor?: "center" | "bottom";
   /** Registration nudge, added to `y` in the same units. Default 0. */
   readonly offsetY?: number;
+  /**
+   * A colour washed over the sprite's own pixels — a red flash on a hit, a
+   * gold glow on a win. `amount` is 0..1, the wash's opacity; 0 draws the art
+   * untouched. Applied to the art's silhouette only, never to its transparent
+   * surround, so a tinted sprite is still the same shape.
+   */
+  readonly tint?: { readonly colour: string; readonly amount: number };
 };
 
 /**
@@ -486,6 +493,16 @@ export interface MinigameAuthoring {
 export interface MinigameModule {
   readonly id: MinigameId;
   readonly displayName: string;
+  /**
+   * The family's rhythm, said out loud — "Ba Da Bing", "Boom Chika".
+   *
+   * Shown by the host in the final measure of the minigame *before* this one,
+   * so the player can anticipate the feel that is coming. A family's musical
+   * identity is the one thing about it the host is allowed to announce, and
+   * it announces it in the family's own words. Optional so a package written
+   * before it existed still loads; a family without one is announced by name.
+   */
+  readonly rhythmCall?: string;
   /** Must equal {@link MINIGAME_API_VERSION} for the host to load it. */
   readonly apiVersion: number;
 
@@ -596,4 +613,22 @@ export function arc(
 /** 1 at `startBeat`, falling linearly to 0 after `durationBeats`. */
 export function decay(startBeat: number, durationBeats: number, beat: number): number {
   return 1 - progress(startBeat, durationBeats, beat);
+}
+
+/**
+ * Where an actor that "waits at the strike line" actually stands this frame.
+ *
+ * The strike line belongs to whichever attempt is being played, and a family is
+ * rendered from the moment its notes enter the timeline until its last measure
+ * has scrolled off — so a wolf parked at `view.strikeX` would be standing at the
+ * line during the *previous* minigame and would vanish the instant its own
+ * ended. Anchoring to the attempt's own span instead: before the first measure
+ * reaches the line this returns `span.from`, so the actor rides in with its
+ * first measure line; during play it is `strikeX`; once the last measure has
+ * passed it returns `span.to`, so the actor rides out with the outgoing
+ * measures at exactly the timeline's speed. Offsets from the strike line
+ * ("a beat ahead", "half a beat back") apply to the result unchanged.
+ */
+export function spanAnchorX(view: StageView): number {
+  return Math.min(Math.max(view.strikeX, view.span.from), view.span.to);
 }

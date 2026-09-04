@@ -112,6 +112,37 @@ describe a level that no longer exists.
 
 ---
 
+## Open — from the reward-readability pass (DECISION-058)
+
+### The Rocky goat tiers are one ram in four costumes
+
+The design wants L4–L7 to be four increasingly badass goats. Sevarihk's
+Mountain Goat pack ships four variants (white/brown × small/large horns) and
+only the white large-horn sheets are vendored; the session that built the tiers
+could not reach `opengameart.org` (403 from its proxy, 2026-09-04 — the same
+host that answered 200 on 2026-09-02). So tiers 2–4 are the one ram with gold
+horns, a crown and a fire mane drawn over it by `scripts/import-scenario-art.mjs`.
+Fetching the other three variants and making tiers 1–3 three different animals
+is a file swap plus a provenance row; the ornament pass would then sit on top
+of the brown big-horn goat for L7. The gold-horn recolour also catches the
+coat's warm shading, which reads as a gold rim — fine as escalation, worth a
+narrower mask if it is ever redrawn.
+
+### A snapped Perfect bar hides lateness
+
+The Perfect played bar now sits flush with its note, which is the cleanest "you
+nailed it" and also erases the one on-screen cue that a player's rig is running
+late. It is a dev toggle (`?snapPlayed=0`) for that reason. The real answer is
+the timing nudge below — "your notes are landing 180ms late" said once, rather
+than read off a bar.
+
+### The prototype actor layer follows `#previous` too
+
+Until the climb goat moves into `Stage.sprites`, `game-app.ts` feeds the actor
+layer from the outgoing attempt when the current one has no prototype layer, so
+a fallen pile leaves with its measures. One more thing `prototypeLayer` carries
+that the bake would remove.
+
 ## Open — design decisions parked
 
 ### The G string can only ever offer one hand position

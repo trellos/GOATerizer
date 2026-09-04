@@ -13,3 +13,12 @@ react_goat_frontman_impressed.png):
   https://opengameart.org/content/mountain-goat-sprites
   License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
   Used cropped and downsampled; no colour was changed.
+
+Rocky Ascent, Rocky Ascent High, Rocky Descent, Rocky Descent High — the
+difficulty 4-7 goat (goat_<scenario>_t1..t4_advance_01..04.png):
+
+  "Mountain Goat Sprites" by Sevarihk
+  https://opengameart.org/content/mountain-goat-sprites
+  License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+  Used cropped; tiers 2-4 carry gold horns, a crown and a fire mane drawn
+  over the frames by this project.

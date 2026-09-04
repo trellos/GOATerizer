@@ -102,6 +102,17 @@ describe("the timeline actor", () => {
     expect(actor.decorations).toBe(0);
   });
 
+  it("takes its size cap from whoever owns it", () => {
+    const actor = new TimelineActor({ capStreak: 3 });
+    actor.land(0, 0);
+    actor.land(0, 1);
+    expect(actor.size).toBeLessThan(1);
+    actor.land(0, 2);
+    expect(actor.size).toBe(1);
+    expect(actor.state.horned).toBe(true);
+    expect(actor.state.capStreak).toBe(3);
+  });
+
   it("keeps the floor bounded", () => {
     const actor = new TimelineActor();
     for (let i = 0; i < 30; i += 1) {

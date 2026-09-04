@@ -28,6 +28,8 @@ export type DebugHandlers = {
   onMinigameDifficultySelect: (level: number) => void;
   /** A double-click on an `o` widget: pin it for the next minigame. */
   onMinigameCellPin: (scenarioId: string, level: number) => void;
+  /** The "snap Perfect played bar to its note" checkbox. */
+  onSnapPerfectPlayed: (snap: boolean) => void;
 };
 
 export class DebugPanel {
@@ -74,7 +76,18 @@ export class DebugPanel {
         ?.addEventListener("click", () => handlers.onAutoplay(mode));
     }
 
+    const snap = root.querySelector("#dev-snap-played");
+    if (snap instanceof HTMLInputElement) {
+      snap.addEventListener("change", () => handlers.onSnapPerfectPlayed(snap.checked));
+    }
+
     root.querySelector("#dev-close")?.addEventListener("click", () => this.setEnabled(false));
+  }
+
+  /** Reflects the snap setting, which may have been seeded from the URL. */
+  setSnapPerfectPlayed(snap: boolean): void {
+    const box = this.#root.querySelector("#dev-snap-played");
+    if (box instanceof HTMLInputElement) box.checked = snap;
   }
 
   /** Marks the active tier, so the panel says which one is running. */

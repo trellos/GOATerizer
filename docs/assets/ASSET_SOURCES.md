@@ -47,6 +47,30 @@ Directories: `rocky-ascent/`, `rocky-ascent-high/`, `rocky-descent/`,
 `rocky-descent-high/` — twelve files each, same twelve slots (the ten above
 plus the two derived `footholdArt` files), forty-eight files total.
 
+### The goat tiers (L4–L7) — Sevarihk's ram, dressed up
+
+`ClimbMinigame` escalates the goat by difficulty (`climberTiers`, DECISION-058).
+Tier 0 (L1–3) is the generated goat above. Tiers 1–4 are cut by
+`scripts/import-scenario-art.mjs` (`npm run art:import`) from the vendored
+`art-sources/sevarihk-mountain-goat/bergschaf-laufanimation-m.png`, right-facing
+row, frames 1–4, into every Rocky directory as
+`goat_<scenario id>_t<tier>_advance_01..04.png` — sixteen files per scenario,
+sixty-four in all. The ornaments are original work for this repository, drawn
+over the frames.
+
+| Tier | Difficulty | Derived from | Ornament | Author | Licence |
+|---|---|---|---|---|---|
+| `t1` | L4 | walk frames 1–4, trimmed | none | Sevarihk | CC-BY 4.0 |
+| `t2` | L5 | same | horns (and warm coat shading) recoloured gold | Sevarihk + this repo | CC-BY 4.0 |
+| `t3` | L6 | same | gold horns and a gold crown over the head | Sevarihk + this repo | CC-BY 4.0 |
+| `t4` | L7 | same | gold horns, crown and a fire mane along the back | Sevarihk + this repo | CC-BY 4.0 |
+
+At the size cap a goat swaps to the *next* tier's poses ("grows horns"), so
+every tier's art is preloaded whichever level is playing. Credit Sevarihk
+wherever a Rocky scenario's L4+ goat is shown — `public/CREDITS.txt` carries it.
+The pack's other variants (brown, small-horn) were not reachable from the build
+session; `docs/IDEAS.md` records the swap.
+
 **The background and the pose cycle are drawn; the rest is not.** The
 timeline-actor work moved the goat onto the note bars and reduced the scenario
 panel to a backdrop. The backdrop is `bg_*`, and the goat standing on the bars

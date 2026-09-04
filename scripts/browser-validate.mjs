@@ -349,7 +349,8 @@ async function canvasBox(page, id) {
  * blue-grey, and the labels are neutral. It tests *greenness* rather than
  * nearness to one RGB triple, because an antialiased grey label pixel lands
  * close to the moss triple by distance while never being green at all. The
- * Good-note colour is green, but a flawless autoplay never produces one.
+ * Good-note colour is a light grey and a flawless autoplay never produces one
+ * anyway; the gleam on a Perfect note is gold and white, not green.
  *
  * Counting a colour says exactly where the art did and did not reach, and
  * unlike hashing a strip of pixels it does not care that the timeline is
@@ -378,6 +379,33 @@ async function countNoteArt(page, region) {
     }
     return moss;
   }, region);
+}
+
+/**
+ * Ink in the top-right corner of the timeline canvas, above the lane band —
+ * where the "NEXT → …" notice is pinned during a minigame's final measure and
+ * nowhere else draws anything. Counted against the corner's own most common
+ * colour, so a scrim or a backdrop showing through does not read as ink.
+ */
+async function foreshadowInk(page) {
+  return page.evaluate(() => {
+    const canvas = document.getElementById("game-canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return -1;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return -1;
+    const w = Math.round(canvas.width * 0.3);
+    const h = Math.round(canvas.height * 0.22);
+    const { data } = ctx.getImageData(canvas.width - w, 0, w, h);
+    // The notice is a gold plate on whatever is behind it: count gold pixels.
+    let gold = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (r > 200 && g > 160 && b < 120 && data[i + 3] > 0) gold += 1;
+    }
+    return gold;
+  });
 }
 
 /** True when the canvas has drawn anything other than its ground colour. */
@@ -672,6 +700,15 @@ try {
     Number(await page.textContent("#hud-score")) > 0,
     `score ${await page.textContent("#hud-score")}`
   );
+
+  // The next minigame is foreshadowed in the final measure and nowhere
+  // earlier: a "NEXT → …" plate in the top-right, gold on a dark plate.
+  const inkEarly = await foreshadowInk(page);
+  check("nothing foreshadows the next minigame in the opening measures", inkEarly === 0, `${inkEarly} gold px`);
+  await waitForDev(page, "attempt beat", (value) => Number(value) >= 29);
+  const inkLate = await foreshadowInk(page);
+  check("the final measure foreshadows the next minigame's rhythm", inkLate > 40, `${inkLate} gold px`);
+  await page.screenshot({ path: path.join(SHOTS, "04b-foreshadow.png") });
 
   const ROCKY_L2 = /^Rocky Ascent L2$/;
   await waitForDev(page, "scenario", (value) => ROCKY_L2.test(value ?? ""));

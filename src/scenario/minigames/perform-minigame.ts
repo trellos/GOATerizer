@@ -26,6 +26,7 @@ import {
   decay,
   MINIGAME_API_VERSION,
   slide,
+  spanAnchorX,
   type AttemptContext,
   type Judged,
   type Minigame,
@@ -104,6 +105,20 @@ export type CrowdMember = {
   /** Which slot it fills, in arrival order. */
   slot: number;
   arrivedAtBeat: number;
+  /** The wing it walked in from: -1 left, 1 right. Absent: the slot's own side. */
+  fromSide?: -1 | 1;
+};
+
+/**
+ * A goat drawn to the wings by a well-played note, waiting for the flourish
+ * that brings it over. This is the step *before* the flourish pose: the crowd
+ * gathers at the edges as the lick is played, so the flourish has somebody to
+ * summon and the player can see the room filling up.
+ */
+export type StagedGoat = {
+  id: number;
+  side: -1 | 1;
+  stagedAtBeat: number;
 };
 
 export type PerformOptions = {
@@ -176,6 +191,12 @@ const CROWD_ROW_SETBACK_Y = 0.05;
 const CROWD_ROW_SHRINK = 0.12;
 /** Where a walking-in crowd member starts: just off each wing. */
 const WING_X = { left: -0.06, right: 1.06 };
+/** How far in from the wing a staged goat stands, so it is on screen, waiting. */
+const STAGED_INSET = 0.09;
+/** The little hop a goat makes as it arrives at the wing, and how long it lasts. */
+const STAGED_HOP = 0.03;
+const STAGED_HOP_BEATS = 0.35;
+const STAGED_BOB = 0.008;
 const CROWD_WALK_HOP = 0.012;
 const CROWD_CHEER_BOB = 0.02;
 const CROWD_JUMP = 0.06;
@@ -223,6 +244,7 @@ export class PerformMinigame implements Minigame {
   #impressed = false;
   #payoffAtBeat: number | null = null;
   #crowd: CrowdMember[] = [];
+  #staged: StagedGoat[] = [];
   #effects: PerformEffect[] = [];
   #nextId = 1;
   #finished = false;
@@ -244,6 +266,7 @@ export class PerformMinigame implements Minigame {
     successfulNotes: number;
     flourishesHit: number;
     crowd: number;
+    staged: number;
     impressed: boolean;
     finished: boolean;
     frozen: boolean;
@@ -252,6 +275,7 @@ export class PerformMinigame implements Minigame {
       successfulNotes: this.#successfulNotes,
       flourishesHit: this.#flourishesHit,
       crowd: this.#crowd.length,
+      staged: this.#staged.length,
       impressed: this.#impressed,
       finished: this.#finished,
       frozen: this.#frozen,
@@ -263,6 +287,11 @@ export class PerformMinigame implements Minigame {
     return this.#crowd;
   }
 
+  /** The goats waiting in the wings, in staging order. Read-only. */
+  get staged(): readonly StagedGoat[] {
+    return this.#staged;
+  }
+
   /* ------------------------------------------------------------------ */
   /* Minigame                                                            */
   /* ------------------------------------------------------------------ */
@@ -271,11 +300,15 @@ export class PerformMinigame implements Minigame {
    * One judged note.
    *
    * Perfect and Good both count as a successful note and both advance the
-   * pose; the difference is in the accent's strength and, on a flourish, in
-   * how much of the crowd turns up — Perfect draws the full count, Good half.
-   * A miss or a wrong note is embarrassment and nothing else: no crowd member
-   * ever leaves, because the crowd is the attempt-global record of what was
-   * earned, and taking it away would be charging twice for one mistake.
+   * pose. An ordinary note well played draws one goat to the nearest wing,
+   * where it waits; a flourish is what brings the waiting goats over —
+   * Perfect releases up to `goatsPerFlourish` of them, Good half. So the
+   * crowd is earned in two visible steps: gathering at the edges as the lick
+   * goes well, then crossing on the flourish. A flourish with nobody staged
+   * brings nobody, which is the cost of fluffing the lick before it. A miss
+   * or a wrong note is embarrassment and nothing else: no goat ever leaves,
+   * staged or seated, because the crowd is the attempt-global record of what
+   * was earned, and taking it away would be charging twice for one mistake.
    */
   onJudged(judged: Judged, beat: number): void {
     this.#beat = beat;
@@ -299,7 +332,10 @@ export class PerformMinigame implements Minigame {
     const [accent] = this.#bindings.accentEffects;
     if (accent) this.#spawnEffect("accent", accent, index, perfect ? 1 : 0.55, beat, ACCENT_LIFE_BEATS);
 
-    if (!this.#flourishOpportunities.has(index)) return;
+    if (!this.#flourishOpportunities.has(index)) {
+      this.#stage(beat);
+      return;
+    }
 
     // A flourish. The pose is held for the note it was played on — a half
     // note's flourish is a long one — but never for less than a readable beat.
@@ -312,7 +348,7 @@ export class PerformMinigame implements Minigame {
     const [swoosh] = this.#bindings.flourishEffects;
     if (swoosh) this.#spawnEffect("flourish", swoosh, null, perfect ? 1 : 0.7, beat, FLOURISH_FX_BEATS);
 
-    this.#summon(perfect ? this.#goatsPerFlourish : Math.ceil(this.#goatsPerFlourish / 2), beat);
+    this.#release(perfect ? this.#goatsPerFlourish : Math.ceil(this.#goatsPerFlourish / 2), beat);
   }
 
   /** Decays transient state. Purely visual; nothing here changes progress. */
@@ -377,7 +413,7 @@ export class PerformMinigame implements Minigame {
    * player can see them coming. The performer stands on the floor just left
    * of the strike line with its props, and the crowd fills the floor to either
    * side of it, each member walking in from the nearest wing when it was
-   * summoned. Everything below the lanes is positioned from `view.strikeX`
+   * summoned. Everything below the lanes is positioned from `spanAnchorX(view)`
    * and the measure geometry, never from a pixel.
    */
   render(view: StageView): Stage {
@@ -396,7 +432,13 @@ export class PerformMinigame implements Minigame {
       );
     }
 
-    const performerX = view.strikeX - PERFORMER_BACK_BEATS * view.measure.beatWidth;
+    // Anchored to this attempt's own span rather than the strike line itself,
+    // so the act rides in with its first measure and out with its last (see
+    // `spanAnchorX`). The wings move with it: they are the edges of *this*
+    // minigame's stage, not of the screen.
+    const anchorX = spanAnchorX(view);
+    const performerX = anchorX - PERFORMER_BACK_BEATS * view.measure.beatWidth;
+    const wingShift = anchorX - view.strikeX;
 
     // The crowd, behind the performer.
     const audience = this.#bindings.audienceStates;
@@ -406,10 +448,31 @@ export class PerformMinigame implements Minigame {
       const stateId = (cheering ? audience[1] : audience[0]) ?? audience[0] ?? "";
       const jumping = this.#payoffAtBeat !== null && beat - this.#payoffAtBeat < PAYOFF_JUMP_BEATS;
 
+      // The goats waiting in the wings: on screen, just inside each edge,
+      // hopping as they arrive and bobbing while they wait.
+      for (const goat of this.#staged) {
+        const wingX = goat.side < 0 ? WING_X.left + STAGED_INSET : WING_X.right - STAGED_INSET;
+        const since = beat - goat.stagedAtBeat;
+        const hop =
+          since < STAGED_HOP_BEATS ? STAGED_HOP * Math.sin((since / STAGED_HOP_BEATS) * Math.PI) : 0;
+        const bob = STAGED_BOB * Math.abs(Math.sin((beat + goat.id * 0.41) * Math.PI));
+        sprites.push({
+          key: `staged-${goat.id}`,
+          assetId: audience[0] ?? "",
+          x: wingX + wingShift,
+          y: CROWD_FEET_Y - hop - bob,
+          scale: CROWD_SCALE,
+          anchor: "bottom",
+          layer: "over",
+          z: 1,
+        });
+      }
+
       for (const member of this.#crowd) {
         const slot = crowdSlot(member.slot);
         const homeX = performerX + slot.dx;
-        const fromX = slot.dx < 0 ? WING_X.left : WING_X.right;
+        const side = member.fromSide ?? (slot.dx < 0 ? -1 : 1);
+        const fromX = (side < 0 ? WING_X.left + STAGED_INSET : WING_X.right - STAGED_INSET) + wingShift;
         const walking = beat - member.arrivedAtBeat < WALK_BEATS;
         const x = slide(fromX, homeX, member.arrivedAtBeat, WALK_BEATS, beat);
 
@@ -527,13 +590,26 @@ export class PerformMinigame implements Minigame {
     return poses[this.#poseIndex] ?? poses[0] ?? "";
   }
 
-  /** Crowd members walk in from the wings. Stops silently at capacity. */
-  #summon(count: number, beat: number): void {
-    for (let i = 0; i < count; i += 1) {
+  /**
+   * A well-played note draws one goat to a wing, alternating sides. Stops
+   * silently at capacity, counting the seated crowd and the waiting one
+   * together — a goat in the wings is a promise of a seat.
+   */
+  #stage(beat: number): void {
+    if (this.#crowd.length + this.#staged.length >= this.#crowdCapacity) return;
+    const side: -1 | 1 = this.#staged.length % 2 === 0 ? 1 : -1;
+    this.#staged = [...this.#staged, { id: this.#nextId++, side, stagedAtBeat: beat }];
+  }
+
+  /** A flourish: up to `count` of the waiting goats walk in from their wings. */
+  #release(count: number, beat: number): void {
+    const moving = this.#staged.slice(0, Math.max(0, count));
+    this.#staged = this.#staged.slice(moving.length);
+    for (const goat of moving) {
       if (this.#crowd.length >= this.#crowdCapacity) return;
       this.#crowd = [
         ...this.#crowd,
-        { id: this.#nextId++, slot: this.#crowd.length, arrivedAtBeat: beat },
+        { id: goat.id, slot: this.#crowd.length, arrivedAtBeat: beat, fromSide: goat.side },
       ];
     }
   }
@@ -639,6 +715,7 @@ export function performLevelData(data: unknown): PerformLevelData {
 export const PERFORM_MINIGAME: MinigameModule = {
   id: "PerformMinigame",
   displayName: "Perform",
+  rhythmCall: "Boom Chika",
   apiVersion: MINIGAME_API_VERSION,
 
   authoring: {

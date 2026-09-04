@@ -44,6 +44,12 @@ export type PlayedNote = {
   /** Null until this played note is judged, or if it never matched a target. */
   outcome: JudgmentOutcome | null;
   wrong: boolean;
+  /**
+   * The target this attack resolved, once judged Perfect or Good. What lets the
+   * view draw the played bar *against* the note it landed in — snapped flush
+   * on a Perfect, outlined where it overlaps on a Good.
+   */
+  target: { attemptKey: string; opportunityIndex: number } | null;
 };
 
 export type BassNoteView = {
@@ -197,6 +203,7 @@ export class TimelineModel {
       diatonic: laneOfMidi(midi, this.#key) !== null,
       outcome: null,
       wrong: false,
+      target: null,
     });
   }
 
@@ -214,11 +221,17 @@ export class TimelineModel {
     if (note && note.endBeat === null) note.endBeat = beat;
   }
 
-  markPlayedOutcome(id: string, outcome: JudgmentOutcome | null, wrong: boolean): void {
+  markPlayedOutcome(
+    id: string,
+    outcome: JudgmentOutcome | null,
+    wrong: boolean,
+    target: { attemptKey: string; opportunityIndex: number } | null = null
+  ): void {
     const note = this.#played.find((entry) => entry.id === id);
     if (!note) return;
     note.outcome = outcome;
     note.wrong = wrong;
+    note.target = target;
   }
 
   /**
@@ -236,13 +249,29 @@ export class TimelineModel {
     return this.#unreleasedPruned;
   }
 
-  /** Drops played notes that have scrolled well past the left edge. */
+  /**
+   * Drops what has scrolled well past the left edge: played notes, and whole
+   * attempts once their last note has.
+   *
+   * An attempt is *not* dropped when it completes. Its family keeps rendering
+   * while its final measure scrolls away — a notice pinned to it, a knocked-out
+   * enemy lying where it fell, the last four beats of history — and a family
+   * that is only asked while it holds targets would pop out at the handover.
+   * `game-app.ts` used to remove the finished attempt's targets on completion
+   * for exactly that reason; now the timeline decides, from geometry.
+   */
   prune(nowBeat: number): void {
     this.#played = this.#played.filter((note) => {
       if (nowBeat - note.startBeat < HISTORY_BEATS) return true;
       if (note.endBeat === null) this.#unreleasedPruned += 1;
       return false;
     });
+
+    for (const attemptKey of this.attemptKeys) {
+      const targets = this.targetsFor(attemptKey);
+      const lastEnd = Math.max(...targets.map((t) => t.startBeat + t.durationBeats));
+      if (nowBeat - lastEnd >= HISTORY_BEATS) this.removeTargets(attemptKey);
+    }
   }
 
   clearPlayed(): void {

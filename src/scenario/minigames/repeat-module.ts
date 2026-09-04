@@ -176,6 +176,7 @@ class RepeatModuleMinigame implements Minigame {
 export const REPEAT_MINIGAME: MinigameModule = {
   id: "RepeatMinigame",
   displayName: "Repeat",
+  rhythmCall: "Boom Boom Boom Boom",
   apiVersion: MINIGAME_API_VERSION,
 
   authoring: {

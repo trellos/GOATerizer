@@ -30,6 +30,7 @@ import type { Sprite } from "../src/minigame/api.js";
 import { requireMinigame } from "../src/minigame/registry.js";
 import { SCENARIOS } from "../src/scenario/registry.js";
 import {
+  applyTint,
   artPixelSize,
   drawStageSprites,
   orderedSprites,
@@ -226,6 +227,63 @@ describe("drawing", () => {
       spriteBox(sprite(), GOAT, GEOMETRY).anchorX,
       spriteBox(sprite(), GOAT, GEOMETRY).anchorY,
     ]);
+  });
+});
+
+describe("tint", () => {
+  it("washes the colour inside the art's silhouette, after the art, at the asked amount", () => {
+    const ops: string[] = [];
+    const state = { composite: "", alpha: 1, fill: "" };
+    const canvas = { width: 0, height: 0 };
+    const ctx = {
+      canvas,
+      save: () => void ops.push("save"),
+      restore: () => void ops.push("restore"),
+      clearRect: () => void ops.push("clear"),
+      drawImage: () => void ops.push(`draw@${state.composite}`),
+      fillRect: () => void ops.push(`fill@${state.composite}:${state.alpha}:${state.fill}`),
+      set globalCompositeOperation(value: string) {
+        state.composite = value;
+      },
+      set globalAlpha(value: number) {
+        state.alpha = value;
+      },
+      set fillStyle(value: string) {
+        state.fill = value;
+      },
+      set imageSmoothingEnabled(_value: boolean) {},
+    } as unknown as CanvasRenderingContext2D;
+
+    applyTint(ctx, GOAT, { colour: "#ff3b3b", amount: 0.6 });
+    // Natural size, so the caller's scaling is what scales it.
+    expect(canvas).toEqual({ width: GOAT.width, height: GOAT.height });
+    expect(ops).toEqual(["save", "clear", "draw@source-over", "fill@source-atop:0.6:#ff3b3b", "restore"]);
+  });
+
+  it("is clamped to 0..1 and leaves an untinted sprite's draw alone", () => {
+    const state = { alpha: 1 };
+    const ctx = {
+      canvas: { width: 0, height: 0 },
+      save() {},
+      restore() {},
+      clearRect() {},
+      drawImage() {},
+      fillRect() {
+        expect(state.alpha).toBe(1);
+      },
+      set globalCompositeOperation(_v: string) {},
+      set globalAlpha(value: number) {
+        state.alpha = value;
+      },
+      set fillStyle(_v: string) {},
+      set imageSmoothingEnabled(_v: boolean) {},
+    } as unknown as CanvasRenderingContext2D;
+    applyTint(ctx, GOAT, { colour: "#fff", amount: 4 });
+
+    // Without a document there is no scratch canvas; the art is drawn as is.
+    const { calls, ctx: recording } = recorder();
+    drawStageSprites(recording, [sprite({ tint: { colour: "#f00", amount: 1 } })], "over", GEOMETRY, images(["a"]));
+    expect(calls.filter((call) => call.startsWith("draw:"))).toEqual(["draw:a"]);
   });
 });
 

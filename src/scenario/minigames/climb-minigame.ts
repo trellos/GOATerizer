@@ -26,7 +26,12 @@ import {
   type StageView,
 } from "../../minigame/api.js";
 import { arr, num, obj, ScenarioDataError, str, strings } from "../parse.js";
-import { TimelineActor, type TimelineActorState } from "./timeline-actor.js";
+import {
+  TimelineActor,
+  type ActorLook,
+  type PlumeKind,
+  type TimelineActorState,
+} from "./timeline-actor.js";
 
 /** Wider than the bar it sits under, so a run of footholds reads as one face. */
 const CRAG_SCALE = 1.55;
@@ -34,9 +39,27 @@ const CRAG_SCALE = 1.55;
 const CRAG_FADED = 0.4;
 const CRAG_SOLID = 1;
 
+/**
+ * How the goat escalates with difficulty.
+ *
+ * One entry per look, from the first difficulty it applies at. Tier 0 is the
+ * scenario's own `climberPoses`; the others are derived ids (see
+ * {@link climbTierIds}) so a Rocky scenario binds nothing extra to get them —
+ * the same convention as `footholdArt`. `hornedPoses` is what the goat swaps
+ * to when its streak reaches the size cap ("grows horns"): the next tier's
+ * poses, so growing horns at L4 is a preview of L5's goat.
+ */
+export type ClimberTier = {
+  fromDifficulty: number;
+  poses: readonly string[];
+  hornedPoses: readonly string[];
+  plume: PlumeKind;
+};
+
 export type ClimbConfig = {
   background: string;
   climberPoses: readonly string[];
+  climberTiers: readonly ClimberTier[];
   finishPose: string;
   waypointVisuals: readonly string[];
   destinationVisual: string;
@@ -49,7 +72,46 @@ export type ClimbConfig = {
 export type ClimbLevel = {
   visualSpanMeasures: number;
   resetBetweenMeasures: boolean;
+  /** The authored difficulty, which picks the goat's tier. */
+  difficulty: number;
 };
+
+/** The difficulty each derived goat tier starts at. Provisional. */
+export const CLIMB_TIER_FROM_DIFFICULTY: readonly number[] = [1, 4, 5, 6, 7];
+const TIER_PLUMES: readonly PlumeKind[] = ["dust", "dust", "sparks", "sparks", "fire"];
+const TIER_POSE_COUNT = 4;
+
+/**
+ * The derived pose ids of goat tier `tier` (1 and up) for a scenario:
+ * `goat_<id>_t<tier>_advance_01..04`. Tier 0 is the authored `climberPoses`.
+ */
+export function climbTierIds(scenarioId: string, tier: number): string[] {
+  return Array.from(
+    { length: TIER_POSE_COUNT },
+    (_, i) => `goat_${scenarioId}_t${tier}_advance_${String(i + 1).padStart(2, "0")}`
+  );
+}
+
+/** Every tier, base first, each pointing at the next as its horned look. */
+export function climbTiers(scenarioId: string, climberPoses: readonly string[]): ClimberTier[] {
+  const poses = CLIMB_TIER_FROM_DIFFICULTY.map((_, tier) =>
+    tier === 0 ? [...climberPoses] : climbTierIds(scenarioId, tier)
+  );
+  return CLIMB_TIER_FROM_DIFFICULTY.map((fromDifficulty, tier) => ({
+    fromDifficulty,
+    poses: poses[tier] ?? [],
+    hornedPoses: poses[Math.min(tier + 1, poses.length - 1)] ?? [],
+    plume: TIER_PLUMES[tier] ?? "dust",
+  }));
+}
+
+/** The tier a difficulty plays at: the last one whose floor it has reached. */
+export function climbTierFor(tiers: readonly ClimberTier[], difficulty: number): ClimberTier {
+  let chosen = tiers[0];
+  for (const tier of tiers) if (difficulty >= tier.fromDifficulty) chosen = tier;
+  if (!chosen) throw new Error("a climb needs at least one tier");
+  return chosen;
+}
 
 /**
  * The note-bar art ids, derived from the scenario id rather than authored.
@@ -63,17 +125,35 @@ export function climbNoteArtIds(scenarioId: string): { body: string; crag: strin
   return { body: `note_${scenarioId}_ledge`, crag: `note_${scenarioId}_crag` };
 }
 
+/**
+ * The streak that maxes the goat: every note in the first two measures of the
+ * phrase. Two clean measures, whatever the level authors in them.
+ */
+export function climbCapStreak(context: AttemptContext): number {
+  const twoMeasures = 2 * context.plan.beatsPerMeasure;
+  const inFirstTwo = context.opportunities.filter((o) => o.startBeat < twoMeasures).length;
+  return Math.max(1, inFirstTwo);
+}
+
 class ClimbMinigame implements Minigame {
   readonly #config: ClimbConfig;
-  readonly #actor = new TimelineActor();
+  readonly #tier: ClimberTier;
+  readonly #actor: TimelineActor;
   /** Attempt-relative start beat per opportunity, for the actor's own clock. */
   readonly #opportunities: AttemptContext["opportunities"];
   /** How far along the phrase the climb has got, for the ridge's fill-in. */
   #reached = -1;
 
-  constructor(config: ClimbConfig, context: AttemptContext) {
+  constructor(config: ClimbConfig, level: ClimbLevel, context: AttemptContext) {
     this.#config = config;
     this.#opportunities = context.opportunities;
+    this.#tier = climbTierFor(config.climberTiers, level.difficulty);
+    const look: ActorLook = {
+      poseCount: this.#tier.poses.length,
+      hasHornedPoses: this.#tier.hornedPoses.length > 0,
+      plume: this.#tier.plume,
+    };
+    this.#actor = new TimelineActor({ capStreak: climbCapStreak(context), look });
   }
 
   /** The actor's state, for the layer that still draws it. */
@@ -85,8 +165,11 @@ class ClimbMinigame implements Minigame {
    * Lands on the **target's** lane, never the played pitch.
    *
    * `timeline-actor.ts` explains why that distinction keeps a single mistake
-   * from ending a run. A wrong note kills the actor without moving it anywhere.
-   * This was `AttemptRuntime.#driveActor`.
+   * from ending a run. Only a **miss** — the target's window closing unhit —
+   * fells the actor. A wrong note shakes it and nothing more: the target is
+   * still open (GDD §5.2), and a note the recognizer misheard and corrected a
+   * moment later must not have already killed the goat. That was the
+   * "disappears for no reason" of the playtest.
    */
   onJudged(judged: Judged): void {
     const target =
@@ -102,7 +185,7 @@ class ClimbMinigame implements Minigame {
         if (target) this.#actor.fall(target.startBeat);
         break;
       case "wrong":
-        this.#actor.fall(judged.beat);
+        this.#actor.wobble(judged.beat);
         break;
     }
   }
@@ -114,7 +197,13 @@ class ClimbMinigame implements Minigame {
 
   /** TRANSITIONAL — see {@link Minigame.prototypeLayer}. */
   prototypeLayer(): { kind: "actor"; state: unknown; sprites: readonly string[] } {
-    return { kind: "actor", state: this.#actor.state, sprites: this.#config.climberPoses };
+    // Base poses first, then the horned set; `look.poseCount` says where the
+    // split is, so the layer can pick a cycle without knowing a tier.
+    return {
+      kind: "actor",
+      state: this.#actor.state,
+      sprites: [...this.#tier.poses, ...this.#tier.hornedPoses],
+    };
   }
 
   update(): void {}
@@ -256,6 +345,7 @@ function generateWaypoints(
 export const CLIMB_MINIGAME: MinigameModule = {
   id: "ClimbMinigame",
   displayName: "Climb",
+  rhythmCall: "Do Ray Me",
   apiVersion: MINIGAME_API_VERSION,
 
   authoring: {
@@ -367,9 +457,11 @@ export const CLIMB_MINIGAME: MinigameModule = {
       );
     }
 
+    const climberPoses = many("climberPoses", 1);
     return {
       background: one("background"),
-      climberPoses: many("climberPoses", 1),
+      climberPoses,
+      climberTiers: climbTiers(scenarioId, climberPoses),
       finishPose: one("finishPose"),
       waypointVisuals: many("waypointVisuals", 1),
       destinationVisual: one("destinationVisual"),
@@ -390,6 +482,7 @@ export const CLIMB_MINIGAME: MinigameModule = {
     return {
       visualSpanMeasures: num(plan["visualSpanMeasures"], "level.measurePlan.visualSpanMeasures"),
       resetBetweenMeasures: plan["resetBetweenMeasures"] === true,
+      difficulty: num(level["difficulty"], "level.difficulty"),
     };
   },
 
@@ -402,6 +495,7 @@ export const CLIMB_MINIGAME: MinigameModule = {
     return [
       climb.background,
       ...climb.climberPoses,
+      ...climb.climberTiers.flatMap((tier) => [...tier.poses, ...tier.hornedPoses]),
       climb.finishPose,
       ...climb.waypointVisuals,
       climb.destinationVisual,
@@ -412,7 +506,7 @@ export const CLIMB_MINIGAME: MinigameModule = {
   },
 
   create(context: AttemptContext): Minigame {
-    return new ClimbMinigame(context.config as ClimbConfig, context);
+    return new ClimbMinigame(context.config as ClimbConfig, context.data as ClimbLevel, context);
   },
 
   /**
@@ -431,7 +525,8 @@ export const CLIMB_MINIGAME: MinigameModule = {
       // size is its square root against a cap, so the first few notes move it
       // far more than the last few, and it is size that drives how the landing
       // reads (`ui/timeline/actor-layer.ts`).
-      "actor size": state.size.toFixed(2),
+      "actor size": `${state.size.toFixed(2)} (cap ${state.capStreak})`,
+      "actor tier": `${state.look.plume}${state.horned ? " horned" : ""}`,
     };
   },
 };
