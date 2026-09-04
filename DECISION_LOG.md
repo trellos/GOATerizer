@@ -4,7 +4,7 @@ Maintained per `AGENTS.md`'s Decision Logging Protocol. Newest entries first.
 
 ---
 
-#### DECISION-058: The rewards read — gold gleams, the outgoing minigame scrolls out, and a wrong note no longer fells the climber
+#### DECISION-061: The rewards read — gold gleams, the outgoing minigame scrolls out, and a wrong note no longer fells the climber
 
 * **Date:** 2026-09-04
 * **Status:** Accepted

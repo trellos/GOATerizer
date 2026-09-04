@@ -49,7 +49,7 @@ plus the two derived `footholdArt` files), forty-eight files total.
 
 ### The goat tiers (L4–L7) — Sevarihk's ram, dressed up
 
-`ClimbMinigame` escalates the goat by difficulty (`climberTiers`, DECISION-058).
+`ClimbMinigame` escalates the goat by difficulty (`climberTiers`, DECISION-061).
 Tier 0 (L1–3) is the generated goat above. Tiers 1–4 are cut by
 `scripts/import-scenario-art.mjs` (`npm run art:import`) from the vendored
 `art-sources/sevarihk-mountain-goat/bergschaf-laufanimation-m.png`, right-facing

@@ -112,7 +112,7 @@ describe a level that no longer exists.
 
 ---
 
-## Open — from the reward-readability pass (DECISION-058)
+## Open — from the reward-readability pass (DECISION-061)
 
 ### The Rocky goat tiers are one ram in four costumes
 

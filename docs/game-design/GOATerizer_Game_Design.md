@@ -757,7 +757,7 @@ Wrong notes are also drawn into timeline history as bad played notes.
 
 The player should be able to glance left and understand what actually happened.
 
-> **Revision (DECISION-058).** The colour language, as built: a **Perfect**
+> **Revision (DECISION-061).** The colour language, as built: a **Perfect**
 > note is gold and *gleams* — a glint peaking on a beat, every other beat,
 > each note on its own phase — and the player's own bar sits flush with the
 > note's left and right edges. A **Good** note goes light grey, with the
