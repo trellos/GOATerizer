@@ -1084,6 +1084,61 @@ button.chip[data-selected="true"] {
   background: #2b8ba4;
 }
 
+/*
+ * The difficulty ladder.
+ *
+ * A level is a button with a grip under it, and the *slot* — both together — is
+ * what a drag moves, so the number and its handle never come apart. The row
+ * does not wrap: a ladder is an order, and an order that folds onto a second
+ * line stops reading as one.
+ */
+.level-row {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.level-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* The slots the drag steps over slide; the one under the pointer does not. */
+  transition: transform 120ms ease;
+}
+
+.level-slot[data-dragging="true"] {
+  transition: none;
+  position: relative;
+  z-index: 2;
+}
+
+.level-handle {
+  padding: 0.05rem 0.2rem;
+  font-size: 0.65rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--text-dim);
+  background: transparent;
+  border-color: transparent;
+  cursor: grab;
+  /* The gesture is a drag; a scroll or a text selection under one is noise. */
+  touch-action: none;
+  user-select: none;
+}
+
+.level-handle:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+
+.level-slot[data-dragging="true"] .level-handle {
+  color: var(--accent-strong);
+  border-color: var(--accent-strong);
+  cursor: grabbing;
+}
+
 .editor-controls {
   display: flex;
   flex-direction: column;
@@ -1183,6 +1238,16 @@ button.chip[data-selected="true"] {
   font-size: 0.82rem;
   max-height: 6rem;
   overflow-y: auto;
+}
+
+/*
+ * Red is reserved for a refusal. A list that only *tells* the author something —
+ * a difficulty that has left the ladder, notes outside the loop — is the same
+ * list in a neutral hand.
+ */
+.editor-problems[data-blocking="false"] {
+  border-color: var(--line);
+  background: var(--panel-raised);
 }
 
 #editor-status {
