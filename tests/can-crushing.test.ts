@@ -250,7 +250,11 @@ describe("Can Crushing, played", () => {
     const playAt = (midi: number, attemptBeat: number) => {
       const at = (startBeat + attemptBeat) * SECONDS_PER_BEAT;
       clock.time = Math.max(clock.time, at);
-      provider.attack(midi, at);
+      const id = provider.attack(midi, at);
+      // A note is judged when it ends: hold it for its target's written length.
+      const aimed = attempt.targets.find((t) => t.midi === midi && Math.abs(t.startBeat - attemptBeat) <= 0.5);
+      provider.schedule([{ at: at + (aimed ? aimed.durationBeats : 1) * SECONDS_PER_BEAT, kind: "release", id }]);
+      return id;
     };
     return { attempt, advanceTo, playAt };
   }
@@ -285,7 +289,7 @@ describe("Can Crushing, played", () => {
     for (const target of h.attempt.targets) {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
-      h.advanceTo(target.startBeat + 0.001);
+      h.advanceTo(target.startBeat + target.durationBeats + 0.001);
     }
     h.advanceTo(ATTEMPT_BEATS);
     expect(repeatState(h.attempt.minigame).crushed).toBe(h.attempt.targets.length);
@@ -299,7 +303,7 @@ describe("Can Crushing, played", () => {
     h.advanceTo(target.startBeat);
     // A fifth above the root: right rhythm, wrong pitch, still in the key.
     h.playAt(target.midi + 7, target.startBeat);
-    h.advanceTo(target.startBeat + 0.001);
+    h.advanceTo(target.startBeat + 0.001); // a wrong note is judged at once
 
     const can = repeatState(h.attempt.minigame).cans.at(-1)!;
     expect(can.fate).toBe("wrong");
@@ -314,7 +318,7 @@ describe("Can Crushing, played", () => {
     // A major third in a minor key: off the scale entirely, so there is no
     // lane it belongs on and none is invented for it.
     h.playAt(target.midi + 4, target.startBeat);
-    h.advanceTo(target.startBeat + 0.001);
+    h.advanceTo(target.startBeat + 0.001); // a wrong note is judged at once
 
     expect(repeatState(h.attempt.minigame).cans.at(-1)).toMatchObject({ wobbly: true, fate: "wrong" });
   });

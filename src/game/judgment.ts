@@ -33,7 +33,11 @@ import type { ResolvedTarget } from "./targets.js";
 export type JudgmentOutcome = "perfect" | "good" | "miss";
 
 /** Why a correct pitch only earned a Good. Surfaced in the debug panel. */
-export type GoodReason = "timing" | "octave";
+/**
+ * Why a hit was Good rather than Perfect: the attack's timing, an
+ * octave-equivalent pitch, or a release outside the note's end window.
+ */
+export type GoodReason = "timing" | "octave" | "release";
 
 export type JudgmentEvent =
   | {
@@ -43,6 +47,8 @@ export type JudgmentEvent =
       playedMidi: number;
       /** Signed beats from the ideal attack. Negative is early. */
       beatDelta: number;
+      /** When the verdict was reached: the release, or the end window closing. */
+      atBeat: number;
     }
   | {
       type: "GoodNote";
@@ -51,8 +57,9 @@ export type JudgmentEvent =
       playedMidi: number;
       beatDelta: number;
       reason: GoodReason;
+      atBeat: number;
     }
-  | { type: "MissedNote"; target: ResolvedTarget }
+  | { type: "MissedNote"; target: ResolvedTarget; atBeat: number }
   | {
       type: "WrongNote";
       attackId: string;
@@ -150,12 +157,32 @@ export function computeWindows(targets: readonly ResolvedTarget[]): TargetWindow
   });
 }
 
+/**
+ * A hit whose verdict is not in yet.
+ *
+ * A note is judged when it *ends*, not when it starts. The attack decides
+ * what the note could be — Perfect or Good, by pitch and timing — and the
+ * release decides what it is: on time and the attack's verdict stands; held
+ * under half the written length and it is a Miss; let go outside the end
+ * window otherwise and it is a Good. Until then the target is taken but
+ * unjudged, and nothing downstream has been told anything.
+ */
+type PendingVerdict = {
+  outcome: "perfect" | "good";
+  reason: GoodReason;
+  attackId: string;
+  attackBeat: number;
+  playedMidi: number;
+};
+
 type TargetSlot = {
   target: ResolvedTarget;
   windows: TargetWindows;
   outcome: JudgmentOutcome | null;
   /** Which attack resolved it, for revision handling. */
   resolvedBy: string | null;
+  /** The attack that has claimed this target, awaiting its release. */
+  pending: PendingVerdict | null;
 };
 
 /** What the judge remembers about one played note. */
@@ -201,7 +228,7 @@ export class TargetJudge {
     this.#slots = options.targets.map((target, index) => {
       const window = windows[index];
       if (!window) throw new Error(`no timing window for target ${index}`);
-      return { target, windows: window, outcome: null, resolvedBy: null };
+      return { target, windows: window, outcome: null, resolvedBy: null, pending: null };
     });
     this.#key = options.key;
     this.#octaveEquivalent = options.octaveEquivalentMatch ?? OCTAVE_EQUIVALENT_MATCH;
@@ -221,7 +248,12 @@ export class TargetJudge {
   }
 
   get openTargetCount(): number {
-    return this.#slots.filter((slot) => slot.outcome === null).length;
+    return this.#slots.filter((slot) => slot.outcome === null && slot.pending === null).length;
+  }
+
+  /** Targets a note has claimed but not yet finished: sounding, unjudged. */
+  get pendingTargetCount(): number {
+    return this.#slots.filter((slot) => slot.pending !== null).length;
   }
 
   windowsFor(opportunityIndex: number): TargetWindows | undefined {
@@ -232,7 +264,7 @@ export class TargetJudge {
   currentTarget(beat: number): ResolvedTarget | null {
     let best: TargetSlot | null = null;
     for (const slot of this.#slots) {
-      if (slot.outcome !== null) continue;
+      if (slot.outcome !== null || slot.pending !== null) continue;
       if (beat > slot.target.startBeat + slot.windows.good) continue;
       if (!best || slot.target.startBeat < best.target.startBeat) best = slot;
     }
@@ -264,7 +296,7 @@ export class TargetJudge {
       wrong: false,
       released: false,
     });
-    this.#resolve(match.slot, match.outcome, attackId, midi, beat, match.reason);
+    this.#claim(match.slot, match.outcome, attackId, midi, beat, match.reason);
   }
 
   /**
@@ -291,7 +323,7 @@ export class TargetJudge {
 
     record.wrong = false;
     record.resolvedSlot = match.index;
-    this.#resolve(match.slot, match.outcome, attackId, midi, at, match.reason);
+    this.#claim(match.slot, match.outcome, attackId, midi, at, match.reason);
   }
 
   /**
@@ -345,25 +377,75 @@ export class TargetJudge {
     if (record.resolvedSlot === null) return;
     const slot = this.#slots[record.resolvedSlot];
     if (!slot) return;
-    // Belt and braces: a slot an attack resolved is Perfect or Good by
-    // construction, and a released miss must never reach the duck.
-    if (slot.outcome !== "perfect" && slot.outcome !== "good") return;
-    if (slot.resolvedBy !== attackId) return;
+    const pending = slot.pending;
+    if (!pending || pending.attackId !== attackId) return;
 
     const endBeat = slot.target.startBeat + slot.target.durationBeats;
     const beatDelta = beat - endBeat;
-    if (Math.abs(beatDelta) > slot.windows.good) return;
-
-    this.#emit({ type: "NoteReleasedOnTime", target: slot.target, attackId, beatDelta });
+    if (Math.abs(beatDelta) <= slot.windows.good) {
+      // On time: the attack's verdict stands, and the duck hears about it.
+      this.#settle(slot, pending, pending.outcome, pending.reason, beat);
+      this.#emit({ type: "NoteReleasedOnTime", target: slot.target, attackId, beatDelta });
+      return;
+    }
+    this.#settleOffTime(slot, pending, beat);
   }
 
-  /** Expires every target whose window has closed. Idempotent. */
+  /**
+   * A release outside the end window. Held for less than half the written
+   * note and it was never really played: a Miss. Held past half but let go
+   * early or late beyond the window: a Good, however clean the attack was.
+   */
+  #settleOffTime(slot: TargetSlot, pending: PendingVerdict, beat: number): void {
+    const held = beat - pending.attackBeat;
+    if (held < slot.target.durationBeats / 2) {
+      this.#settle(slot, pending, "miss", pending.reason, beat);
+    } else {
+      this.#settle(slot, pending, "good", "release", beat);
+    }
+  }
+
+  /**
+   * Every pending note still sounding past its end window is settled as a
+   * late release, and every open target whose window has closed is a miss.
+   * Idempotent.
+   */
   tick(beat: number): void {
     for (const slot of this.#slots) {
-      if (slot.outcome !== null) continue;
+      const pending = slot.pending;
+      if (pending && beat > slot.target.startBeat + slot.target.durationBeats + slot.windows.good) {
+        this.#settleOffTime(slot, pending, beat);
+      }
+    }
+    this.#expire(beat);
+  }
+
+  /**
+   * The attempt is over: whatever is still sounding is judged as released
+   * now. A note that would have been on time had it stopped now keeps its
+   * verdict; one held for less than half its length is a miss, as ever.
+   */
+  close(beat: number): void {
+    for (const slot of this.#slots) {
+      const pending = slot.pending;
+      if (!pending) continue;
+      const endBeat = slot.target.startBeat + slot.target.durationBeats;
+      if (Math.abs(beat - endBeat) <= slot.windows.good) {
+        this.#settle(slot, pending, pending.outcome, pending.reason, beat);
+      } else {
+        this.#settleOffTime(slot, pending, beat);
+      }
+    }
+    this.#expire(beat);
+  }
+
+  /** Expires every unclaimed target whose window has closed. Idempotent. */
+  #expire(beat: number): void {
+    for (const slot of this.#slots) {
+      if (slot.outcome !== null || slot.pending !== null) continue;
       if (beat <= slot.target.startBeat + slot.windows.good) continue;
       slot.outcome = "miss";
-      this.#emit({ type: "MissedNote", target: slot.target });
+      this.#emit({ type: "MissedNote", target: slot.target, atBeat: beat });
       this.#emit({ type: "TargetResolved", target: slot.target, outcome: "miss" });
     }
   }
@@ -373,18 +455,18 @@ export class TargetJudge {
   #findMatch(
     midi: number,
     beat: number
-  ): { slot: TargetSlot; index: number; outcome: JudgmentOutcome; reason: GoodReason } | null {
+  ): { slot: TargetSlot; index: number; outcome: "perfect" | "good"; reason: GoodReason } | null {
     let best: {
       slot: TargetSlot;
       index: number;
-      outcome: JudgmentOutcome;
+      outcome: "perfect" | "good";
       reason: GoodReason;
       rank: number;
       distance: number;
     } | null = null;
 
     for (const [index, slot] of this.#slots.entries()) {
-      if (slot.outcome !== null) continue;
+      if (slot.outcome !== null || slot.pending !== null) continue;
       const delta = beat - slot.target.startBeat;
       const distance = Math.abs(delta);
       if (distance > slot.windows.good) continue;
@@ -399,7 +481,7 @@ export class TargetJudge {
       // Exact pitch always beats an octave-equivalent one; within a rank, the
       // closest target in time wins.
       const rank = exact ? 0 : 1;
-      const outcome: JudgmentOutcome =
+      const outcome: "perfect" | "good" =
         exact && distance <= slot.windows.perfect ? "perfect" : "good";
       const reason: GoodReason = exact ? "timing" : "octave";
 
@@ -413,29 +495,38 @@ export class TargetJudge {
       : null;
   }
 
-  #resolve(
+  /** An attack claims a target. Nothing is emitted: the verdict waits for the end. */
+  #claim(
     slot: TargetSlot,
-    outcome: JudgmentOutcome,
+    outcome: "perfect" | "good",
     attackId: string,
     playedMidi: number,
     beat: number,
     reason: GoodReason
   ): void {
-    slot.outcome = outcome;
+    slot.pending = { outcome, reason, attackId, attackBeat: beat, playedMidi };
     slot.resolvedBy = attackId;
-    const beatDelta = beat - slot.target.startBeat;
+  }
+
+  /** The verdict, once and for all. */
+  #settle(
+    slot: TargetSlot,
+    pending: PendingVerdict,
+    outcome: JudgmentOutcome,
+    reason: GoodReason,
+    atBeat: number
+  ): void {
+    slot.pending = null;
+    slot.outcome = outcome;
+    const beatDelta = pending.attackBeat - slot.target.startBeat;
+    const { attackId, playedMidi } = pending;
 
     if (outcome === "perfect") {
-      this.#emit({ type: "PerfectNote", target: slot.target, attackId, playedMidi, beatDelta });
+      this.#emit({ type: "PerfectNote", target: slot.target, attackId, playedMidi, beatDelta, atBeat });
+    } else if (outcome === "good") {
+      this.#emit({ type: "GoodNote", target: slot.target, attackId, playedMidi, beatDelta, reason, atBeat });
     } else {
-      this.#emit({
-        type: "GoodNote",
-        target: slot.target,
-        attackId,
-        playedMidi,
-        beatDelta,
-        reason,
-      });
+      this.#emit({ type: "MissedNote", target: slot.target, atBeat });
     }
     this.#emit({ type: "TargetResolved", target: slot.target, outcome });
   }

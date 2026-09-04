@@ -353,11 +353,17 @@ export interface Minigame {
   /**
    * One judged note — the only thing that may change progress.
    *
-   * Delivered on the beat the note was judged. An earlier design flew an energy
-   * streak from the timeline to a separate scenario panel and called this on its
-   * *arrival*, so the reaction read as caused rather than coincident; with the
-   * actors on the timeline the judged note and the reaction are already the same
-   * pixels, and the delay bought nothing.
+   * Delivered on the beat the note was judged — which is the note's **end**,
+   * not its start: the host judges a note when it finishes, so a Perfect or a
+   * Good arrives as the note is let go (or as its end window closes), and a
+   * note dropped early arrives as a miss. `beat` is that moment; start your
+   * reaction from it rather than from the opportunity's start beat, which by
+   * then is a note-length in the past. A wrong note is still delivered at once.
+   *
+   * An earlier design flew an energy streak from the timeline to a separate
+   * scenario panel and called this on its *arrival*, so the reaction read as
+   * caused rather than coincident; with the actors on the timeline the judged
+   * note and the reaction are already the same pixels.
    */
   onJudged(judged: Judged, beat: number): void;
 

@@ -55,7 +55,13 @@ function harness(difficulty: number, startBeat = 20) {
   const playAt = (midi: number, attemptBeat: number) => {
     const at = (startBeat + attemptBeat) * SECONDS_PER_BEAT;
     clock.time = Math.max(clock.time, at);
-    return provider.attack(midi, at);
+    const id = provider.attack(midi, at);
+    // A note is judged when it ends: hold it for the written length of the
+    // target it is aimed at (or a beat, aimed at nothing) and let it go then.
+    const aimed = attempt.targets.find((t) => t.midi === midi && Math.abs(t.startBeat - attemptBeat) <= 0.5);
+    const heldBeats = aimed ? aimed.durationBeats : 1;
+    provider.schedule([{ at: at + heldBeats * SECONDS_PER_BEAT, kind: "release", id }]);
+    return id;
   };
   return { attempt, advanceTo, playAt };
 }
@@ -67,7 +73,7 @@ describe("a wrong note shakes the goat; only a miss fells it", () => {
     if (!first || !second) throw new Error("need two targets");
     h.advanceTo(first.startBeat);
     h.playAt(first.midi, first.startBeat);
-    h.advanceTo(first.startBeat + 0.01);
+    h.advanceTo(first.startBeat + first.durationBeats + 0.001);
     expect(climbActor(h.attempt.minigame).alive).toBe(true);
 
     // A wrong note *before* the second target's window — it matches nothing.
@@ -81,7 +87,7 @@ describe("a wrong note shakes the goat; only a miss fells it", () => {
 
     // The correct note still lands, on the same goat, one step longer.
     h.playAt(second.midi, second.startBeat);
-    h.advanceTo(second.startBeat + 0.01);
+    h.advanceTo(second.startBeat + second.durationBeats + 0.001);
     const landed = climbActor(h.attempt.minigame);
     expect(landed.alive).toBe(true);
     expect(landed.streak).toBe(2);
@@ -113,7 +119,7 @@ describe("a wrong note shakes the goat; only a miss fells it", () => {
       const target = targets[i]!;
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
-      h.advanceTo(target.startBeat + 0.01);
+      h.advanceTo(target.startBeat + target.durationBeats + 0.001);
     }
     const state = climbActor(h.attempt.minigame);
     expect(state.alive).toBe(true);
@@ -133,7 +139,7 @@ describe("growth", () => {
       for (const target of h.attempt.targets.filter((t) => t.startBeat < 8)) {
         h.advanceTo(target.startBeat);
         h.playAt(target.midi, target.startBeat);
-        h.advanceTo(target.startBeat + 0.01);
+        h.advanceTo(target.startBeat + target.durationBeats + 0.001);
       }
       const state = climbActor(h.attempt.minigame);
       expect(state.size).toBe(1);

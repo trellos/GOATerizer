@@ -1105,6 +1105,12 @@ export class TimelineView {
       if (note.diatonic) {
         ctx.fillStyle = colour;
         ctx.fillRect(x, y - height / 2, width, height);
+        // Still sounding: sparks spit from the bar's growing end and from its
+        // top and bottom edges. The note is not judged until it ends, so this
+        // is the "keep holding" — the bar is alive, and so is the verdict.
+        if (note.endBeat === null && note.outcome === null) {
+          this.#drawSoundingSparks(note.id, x, y, width, height, nowBeat);
+        }
         // A dark hairline, so a white bar inside a gold target still reads as
         // two separate things at a glance.
         ctx.strokeStyle = "rgba(8,10,14,0.85)";
@@ -1143,6 +1149,46 @@ export class TimelineView {
       ctx.fillRect(x, y - 2, width, 4);
     }
 
+    ctx.restore();
+  }
+
+  /**
+   * Sparks off a sounding note: a few from the leading end, a few off the
+   * top and bottom. Each spark is a pure function of the beat and its index,
+   * so nothing is stored and a dropped frame moves nothing.
+   */
+  #drawSoundingSparks(id: string, x: number, y: number, width: number, height: number, nowBeat: number): void {
+    const ctx = this.#ctx;
+    let seed = 0;
+    for (let i = 0; i < id.length; i += 1) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
+    const right = x + width;
+    const reach = Math.max(6, height * 1.4);
+    ctx.save();
+    ctx.fillStyle = "#fff6c4";
+    for (let k = 0; k < 9; k += 1) {
+      const phase = ((seed >>> (k % 8)) & 255) / 255;
+      // Each spark lives for a third of a beat and is reborn on its own phase.
+      const life = (nowBeat * 3 + phase * 7) % 1;
+      const spin = (k * 2.399 + phase) % 1;
+      const size = Math.max(1, height * 0.18 * (1 - life));
+      ctx.globalAlpha = 0.9 * (1 - life);
+      let sx: number;
+      let sy: number;
+      if (k < 4) {
+        // Off the end, forward and fanning out.
+        sx = right + life * reach * (0.6 + spin * 0.6);
+        sy = y + (spin - 0.5) * height * 1.6 * life;
+      } else if (k < 7) {
+        // Off the top, drifting up and back.
+        sx = right - spin * Math.min(width, reach * 2) - life * reach * 0.3;
+        sy = y - height / 2 - life * reach * 0.8;
+      } else {
+        // Off the bottom.
+        sx = right - spin * Math.min(width, reach * 2) - life * reach * 0.3;
+        sy = y + height / 2 + life * reach * 0.8;
+      }
+      ctx.fillRect(Math.round(sx), Math.round(sy), Math.ceil(size), Math.ceil(size));
+    }
     ctx.restore();
   }
 

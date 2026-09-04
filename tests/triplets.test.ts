@@ -238,6 +238,7 @@ describe("a triplet on the timeline and under the judge", () => {
     // The first beat's three notes, each played dead on its own third.
     for (let i = 0; i < 3; i += 1) {
       judge.attack(`a${i}`, targets[i]!.midi, targets[i]!.startBeat);
+      judge.release(`a${i}`, targets[i]!.startBeat + targets[i]!.durationBeats);
     }
     // Past the third note's window (2/3 + 1/6) but not the fourth's, so any
     // miss reported here is one of these three.
@@ -269,6 +270,9 @@ describe("a triplet on the timeline and under the judge", () => {
     const judge = new TargetJudge({ targets, key: KEY });
 
     judge.attack("a", targets[1]!.midi, targets[1]!.startBeat);
+    // Claimed by the attack, judged at the release: one target either way.
+    expect(judge.pendingTargetCount).toBe(1);
+    judge.release("a", targets[1]!.startBeat + targets[1]!.durationBeats);
     const resolved = judge.outcomes.filter((outcome) => outcome !== null);
     expect(resolved).toHaveLength(1);
   });

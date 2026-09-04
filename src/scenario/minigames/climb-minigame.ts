@@ -179,10 +179,12 @@ class ClimbMinigame implements Minigame {
       case "good":
         if (!target) return;
         this.#reached = Math.max(this.#reached, target.index);
-        this.#actor.land(target.lane, target.startBeat, target.startBeat + target.durationBeats);
+        // The hop starts when the verdict lands — at the note's end — onto the
+        // bar just played, whose trailing edge the goat then rides.
+        this.#actor.land(target.lane, judged.beat, target.startBeat + target.durationBeats);
         break;
       case "miss":
-        if (target) this.#actor.fall(target.startBeat);
+        if (target) this.#actor.fall(judged.beat);
         break;
       case "wrong":
         this.#actor.wobble(judged.beat);

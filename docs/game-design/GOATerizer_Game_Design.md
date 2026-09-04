@@ -397,6 +397,17 @@ Judgment may care about:
 
 A loose start or stop may downgrade Perfect to Good rather than automatically failing the note.
 
+> **Revision (DECISION-062).** As built, **every** target is judged when the
+> note ends, not when it starts. The attack decides what the note could be
+> (Perfect or Good, by pitch and timing); the release decides what it is. Let
+> go inside the end window — the target's own Good window, measured from its
+> end — and the attack's verdict stands. Held for **less than half** its
+> written length, the note is a **Miss**, however clean the attack. Held past
+> half but let go outside the window, early or late, it is a **Good**. A note
+> still sounding when the end window closes is settled as a late release.
+> Until the verdict the bar stays in its upcoming colour and the player's own
+> bar grows with sparks off it. Wrong notes are still judged at once.
+
 ## 5.5 Bends and Continuous Gestures
 
 Bends are not treated as two disconnected pitch events.

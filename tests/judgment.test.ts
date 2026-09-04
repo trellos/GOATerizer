@@ -36,6 +36,13 @@ function makeJudge(targets: readonly ResolvedTarget[]) {
       judge.attack(id, midi, beat);
       return id;
     },
+    /** Attack, then let go `heldBeats` later: a note is judged when it ends. */
+    hold: (midi: number, beat: number, heldBeats: number) => {
+      const id = `a${nextId++}`;
+      judge.attack(id, midi, beat);
+      judge.release(id, beat + heldBeats);
+      return id;
+    },
   };
 }
 
@@ -107,24 +114,24 @@ describe("judging one target", () => {
     harness = makeJudge(levelTargets(1));
   });
 
-  it("calls a dead-on correct pitch Perfect", () => {
+  it("calls a dead-on correct pitch, held for its length, Perfect", () => {
     const target = levelTargets(1)[0]!;
-    harness.play(target.midi, target.startBeat);
-    expect(harness.types()).toEqual(["PerfectNote", "TargetResolved"]);
+    harness.hold(target.midi, target.startBeat, target.durationBeats);
+    expect(harness.types()).toEqual(["PerfectNote", "TargetResolved", "NoteReleasedOnTime"]);
     const perfect = harness.events[0];
     expect(perfect?.type === "PerfectNote" && perfect.beatDelta).toBe(0);
   });
 
   it("calls a correct pitch inside the Perfect window Perfect", () => {
     const target = levelTargets(1)[2]!;
-    harness.play(target.midi, target.startBeat + TIMING_WINDOWS_BEATS.quarter.perfect - 0.01);
+    harness.hold(target.midi, target.startBeat + TIMING_WINDOWS_BEATS.quarter.perfect - 0.01, target.durationBeats);
     expect(harness.types()).toContain("PerfectNote");
   });
 
   it("calls a correct pitch that is late but inside the Good window Good", () => {
     const target = levelTargets(1)[2]!;
-    harness.play(target.midi, target.startBeat + 0.4);
-    expect(harness.types()).toEqual(["GoodNote", "TargetResolved"]);
+    harness.hold(target.midi, target.startBeat + 0.4, target.durationBeats);
+    expect(harness.types()).toEqual(["GoodNote", "TargetResolved", "NoteReleasedOnTime"]);
     const good = harness.events[0];
     expect(good?.type === "GoodNote" && good.reason).toBe("timing");
     expect(good?.type === "GoodNote" && good.beatDelta).toBeCloseTo(0.4, 9);
@@ -132,13 +139,13 @@ describe("judging one target", () => {
 
   it("calls a correct pitch that is early but inside the Good window Good", () => {
     const target = levelTargets(1)[3]!;
-    harness.play(target.midi, target.startBeat - 0.4);
-    expect(harness.types()).toEqual(["GoodNote", "TargetResolved"]);
+    harness.hold(target.midi, target.startBeat - 0.4, target.durationBeats);
+    expect(harness.types()).toEqual(["GoodNote", "TargetResolved", "NoteReleasedOnTime"]);
   });
 
   it("caps a right-pitch-class-wrong-octave hit at Good", () => {
     const target = levelTargets(1)[0]!;
-    harness.play(target.midi + 12, target.startBeat);
+    harness.hold(target.midi + 12, target.startBeat, target.durationBeats);
     const good = harness.events[0];
     expect(good?.type).toBe("GoodNote");
     expect(good?.type === "GoodNote" && good.reason).toBe("octave");
@@ -155,6 +162,7 @@ describe("judging one target", () => {
   it("resolves a target exactly once", () => {
     const target = levelTargets(1)[0]!;
     harness.play(target.midi, target.startBeat);
+    // A second attack while the first is still sounding: the target is taken.
     harness.play(target.midi, target.startBeat + 0.1);
     harness.judge.tick(target.startBeat + 5);
 
@@ -187,8 +195,8 @@ describe("wrong notes", () => {
     harness.play(target.midi + 1, target.startBeat - 0.3); // a semitone off
     expect(harness.types()).toEqual(["WrongNote"]);
 
-    harness.play(target.midi, target.startBeat + 0.05);
-    expect(harness.types()).toEqual(["WrongNote", "PerfectNote", "TargetResolved"]);
+    harness.hold(target.midi, target.startBeat + 0.05, target.durationBeats);
+    expect(harness.types()).toEqual(["WrongNote", "PerfectNote", "TargetResolved", "NoteReleasedOnTime"]);
   });
 
   it("still misses when only wrong notes arrive before the deadline", () => {
@@ -247,11 +255,15 @@ describe("wrong notes", () => {
     expect(harness.types()).toEqual(["WrongNote"]);
 
     harness.judge.retune(id, target.midi);
+    // Revised into a hit: the verdict still waits for the note's end.
+    expect(harness.types()).toEqual(["WrongNote", "PlayedNoteRevised"]);
+    harness.judge.release(id, target.startBeat + target.durationBeats);
     expect(harness.types()).toEqual([
       "WrongNote",
       "PlayedNoteRevised",
       "PerfectNote",
       "TargetResolved",
+      "NoteReleasedOnTime",
     ]);
   });
 
@@ -260,8 +272,10 @@ describe("wrong notes", () => {
     const target = levelTargets(1)[0]!;
     const id = harness.play(target.midi, target.startBeat);
     harness.judge.retune(id, target.midi + 4);
+    harness.judge.release(id, target.startBeat + target.durationBeats);
     const resolutions = harness.events.filter((event) => event.type === "TargetResolved");
     expect(resolutions).toHaveLength(1);
+    expect(harness.judge.outcomes[0]).toBe("perfect");
   });
 });
 
@@ -375,7 +389,7 @@ describe("releases", () => {
   it("scores nothing", () => {
     const target = levelTargets(1)[2]!;
     const score = new AttemptScore({ streakBonusEligible: true });
-    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 });
+    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0, atBeat: 0 });
     const before = score.snapshot;
 
     score.apply({ type: "NoteReleasedOnTime", target, attackId: "a", beatDelta: 0 });
@@ -384,11 +398,99 @@ describe("releases", () => {
   });
 });
 
+/**
+ * The note is judged when it ends.
+ *
+ * The attack decides what a note *could* be; the release decides what it is.
+ * Held for under half its written length it is a miss, however clean the
+ * attack; let go outside the end window otherwise it is a Good; still sounding
+ * when the end window closes it is settled as a late release.
+ */
+describe("duration", () => {
+  const end = (target: ResolvedTarget) => target.startBeat + target.durationBeats;
+
+  it("says nothing while the note is sounding", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    harness.play(targets[0]!.midi, targets[0]!.startBeat);
+    expect(harness.types()).toEqual([]);
+    expect(harness.judge.outcomes[0]).toBeNull();
+    expect(harness.judge.pendingTargetCount).toBe(1);
+    expect(harness.judge.openTargetCount).toBe(targets.length - 1);
+  });
+
+  it("misses a note let go before half its length, however clean the attack", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    harness.hold(targets[0]!.midi, targets[0]!.startBeat, 0.2);
+    expect(harness.types()).toEqual(["MissedNote", "TargetResolved"]);
+    expect(harness.judge.outcomes[0]).toBe("miss");
+  });
+
+  it("caps at Good a note held past half but let go outside the end window", () => {
+    // Quarter notes: the end window is half a beat either side of the end.
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[0]!;
+    harness.hold(target.midi, target.startBeat, target.durationBeats + 0.7); // late
+    const good = harness.events[0];
+    expect(good?.type).toBe("GoodNote");
+    expect(good?.type === "GoodNote" && good.reason).toBe("release");
+    expect(harness.types()).not.toContain("NoteReleasedOnTime");
+  });
+
+  it("keeps Perfect for a release anywhere inside the end window", () => {
+    const targets = levelTargets(1);
+    const target = targets[1]!;
+    for (const offset of [-0.45, 0, 0.45]) {
+      const harness = makeJudge(targets);
+      harness.hold(target.midi, target.startBeat, target.durationBeats + offset);
+      expect(harness.types()).toEqual(["PerfectNote", "TargetResolved", "NoteReleasedOnTime"]);
+    }
+  });
+
+  it("settles a note still sounding when its end window closes, as a late Good", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[0]!;
+    harness.play(target.midi, target.startBeat);
+    harness.judge.tick(end(target) + 0.4);
+    expect(harness.types()).toEqual([]);
+    harness.judge.tick(end(target) + 0.51);
+    // (The tick also expires the next target, whose window closed too.)
+    const forTarget = harness.events.filter((e) => "target" in e && e.target.opportunityIndex === 0);
+    expect(forTarget.map((e) => e.type)).toEqual(["GoodNote", "TargetResolved"]);
+    const good = harness.events[0];
+    expect(good?.type === "GoodNote" && good.reason).toBe("release");
+    expect(good?.type === "GoodNote" && good.atBeat).toBeCloseTo(end(target) + 0.51, 9);
+  });
+
+  it("judges whatever is still sounding when the attempt closes", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const last = targets[targets.length - 1]!;
+    harness.play(last.midi, last.startBeat);
+    harness.judge.close(end(last));
+    expect(harness.judge.outcomes[targets.length - 1]).toBe("perfect");
+  });
+
+  it("does not let a second attack steal a target that is still sounding", () => {
+    const targets = levelTargets(1);
+    const harness = makeJudge(targets);
+    const target = targets[0]!;
+    const first = harness.play(target.midi, target.startBeat);
+    harness.play(target.midi, target.startBeat + 0.1);
+    expect(harness.types()).toEqual(["WrongNote"]);
+    harness.judge.release(first, end(target));
+    expect(harness.judge.outcomes[0]).toBe("perfect");
+  });
+});
+
 describe("dense subdivisions stay unambiguous", () => {
   it("assigns each eighth-note attack to its own target at L6", () => {
     const targets = levelTargets(6);
     const harness = makeJudge(targets);
-    for (const target of targets) harness.play(target.midi, target.startBeat);
+    for (const target of targets) harness.hold(target.midi, target.startBeat, target.durationBeats);
 
     expect(harness.events.filter((e) => e.type === "PerfectNote")).toHaveLength(targets.length);
     expect(harness.events.filter((e) => e.type === "WrongNote")).toHaveLength(0);
@@ -399,7 +501,7 @@ describe("dense subdivisions stay unambiguous", () => {
     const targets = levelTargets(6);
     const harness = makeJudge(targets);
     const target = targets[6]!;
-    harness.play(target.midi, target.startBeat + 0.12);
+    harness.hold(target.midi, target.startBeat + 0.12, target.durationBeats);
 
     const good = harness.events.find((e) => e.type === "GoodNote");
     expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(6);
@@ -417,7 +519,7 @@ describe("dense subdivisions stay unambiguous", () => {
     // forgiveness rather than a free pass.
     const targets = levelTargets(6);
     const harness = makeJudge(targets);
-    harness.play(targets[7]!.midi, targets[6]!.startBeat);
+    harness.hold(targets[7]!.midi, targets[6]!.startBeat, targets[7]!.durationBeats);
 
     const good = harness.events.find((e) => e.type === "GoodNote");
     expect(good?.type === "GoodNote" && good.target.opportunityIndex).toBe(7);
@@ -460,9 +562,9 @@ describe("score", () => {
   it("accumulates score and judgment points separately", () => {
     const score = new AttemptScore({ streakBonusEligible: false });
     const target = levelTargets(1)[0]!;
-    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 });
-    score.apply({ type: "GoodNote", target, attackId: "b", playedMidi: target.midi, beatDelta: 0.3, reason: "timing" });
-    score.apply({ type: "MissedNote", target });
+    score.apply({ type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0, atBeat: 0 });
+    score.apply({ type: "GoodNote", target, attackId: "b", playedMidi: target.midi, beatDelta: 0.3, reason: "timing", atBeat: 0 });
+    score.apply({ type: "MissedNote", target, atBeat: 0 });
 
     const snapshot = score.snapshot;
     expect(snapshot.score).toBe(SCORE_VALUES.perfect + SCORE_VALUES.good);
@@ -473,13 +575,13 @@ describe("score", () => {
   it("breaks the streak on a miss and on a wrong note", () => {
     const score = new AttemptScore({ streakBonusEligible: false });
     const target = levelTargets(1)[0]!;
-    const perfect = { type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 } as const;
+    const perfect = { type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0, atBeat: 0 } as const;
 
     score.apply(perfect);
     score.apply(perfect);
     expect(score.snapshot.streak).toBe(2);
 
-    score.apply({ type: "MissedNote", target });
+    score.apply({ type: "MissedNote", target, atBeat: 0 });
     expect(score.snapshot.streak).toBe(0);
 
     score.apply(perfect);
@@ -490,7 +592,7 @@ describe("score", () => {
 
   it("withholds the streak bonus on material that is not streak-eligible", () => {
     const target = levelTargets(1)[0]!;
-    const perfect = { type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0 } as const;
+    const perfect = { type: "PerfectNote", target, attackId: "a", playedMidi: target.midi, beatDelta: 0, atBeat: 0 } as const;
 
     const plain = new AttemptScore({ streakBonusEligible: false });
     const bonus = new AttemptScore({ streakBonusEligible: true });
@@ -538,11 +640,11 @@ describe("stars", () => {
     const flawless = new AttemptScore({ streakBonusEligible: false });
     const oneScruffy = new AttemptScore({ streakBonusEligible: false });
     targets.forEach((target, i) => {
-      flawless.apply({ type: "PerfectNote", target, attackId: `p${i}`, playedMidi: target.midi, beatDelta: 0 });
+      flawless.apply({ type: "PerfectNote", target, attackId: `p${i}`, playedMidi: target.midi, beatDelta: 0, atBeat: 0 });
       if (i === 3) {
-        oneScruffy.apply({ type: "GoodNote", target, attackId: `g${i}`, playedMidi: target.midi, beatDelta: 0.4, reason: "timing" });
+        oneScruffy.apply({ type: "GoodNote", target, attackId: `g${i}`, playedMidi: target.midi, beatDelta: 0.4, reason: "timing", atBeat: 0 });
       } else {
-        oneScruffy.apply({ type: "PerfectNote", target, attackId: `p${i}`, playedMidi: target.midi, beatDelta: 0 });
+        oneScruffy.apply({ type: "PerfectNote", target, attackId: `p${i}`, playedMidi: target.midi, beatDelta: 0, atBeat: 0 });
       }
     });
 

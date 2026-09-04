@@ -76,7 +76,13 @@ function harness(difficulty: number, key: RunKey = G_MINOR, startBeat = 20) {
   const playAt = (midi: number, attemptBeat: number, offsetBeats = 0) => {
     const at = (startBeat + attemptBeat + offsetBeats) * SECONDS_PER_BEAT;
     clock.time = Math.max(clock.time, at);
-    provider.attack(midi, at);
+    const id = provider.attack(midi, at);
+    // A note is judged when it ends: hold it for the written length of the
+    // target it is aimed at (or a beat, aimed at nothing) and let it go then.
+    const aimed = attempt.targets.find((t) => t.midi === midi && Math.abs(t.startBeat - attemptBeat) <= 0.5);
+    const heldBeats = aimed ? aimed.durationBeats : 1;
+    provider.schedule([{ at: at + heldBeats * SECONDS_PER_BEAT, kind: "release", id }]);
+    return id;
   };
   return { attempt, events, advanceTo, playAt };
 }
@@ -87,7 +93,7 @@ function playUpTo(h: ReturnType<typeof harness>, upTo: { opportunityIndex: numbe
     if (target.opportunityIndex >= upTo.opportunityIndex) break;
     h.advanceTo(target.startBeat);
     h.playAt(target.midi, target.startBeat);
-    h.advanceTo(target.startBeat + 0.001);
+    h.advanceTo(target.startBeat + target.durationBeats + 0.001);
   }
 }
 
@@ -96,7 +102,7 @@ function playFlawlessly(difficulty: number, key: RunKey = G_MINOR): { attempt: A
   for (const target of h.attempt.targets) {
     h.advanceTo(target.startBeat);
     h.playAt(target.midi, target.startBeat);
-    h.advanceTo(target.startBeat + 0.001);
+    h.advanceTo(target.startBeat + target.durationBeats + 0.001);
   }
   h.advanceTo(ATTEMPT_BEATS);
   const result = h.attempt.result;
@@ -320,7 +326,7 @@ describe("PerformMinigame on the timeline", () => {
     const { plain } = firstTargets(h.attempt);
     const before = spriteAt(h.attempt, "performer").assetId;
     h.playAt(plain.midi, plain.startBeat);
-    h.advanceTo(plain.startBeat + 0.01);
+    h.advanceTo(plain.startBeat + plain.durationBeats + 0.001);
     const after = spriteAt(h.attempt, "performer", plain.startBeat + 0.01).assetId;
     expect(after).not.toBe(before);
     expect(FRONTMAN.bindings.performerPoses).toContain(after);
@@ -332,17 +338,19 @@ describe("PerformMinigame on the timeline", () => {
     const { flourish } = firstTargets(h.attempt);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
-    h.advanceTo(flourish.startBeat + 0.01);
-    const struck = spriteAt(h.attempt, "performer", flourish.startBeat + 0.01);
+    // The note is judged when it ends, so the pose strikes at the end.
+    const verdict = flourish.startBeat + flourish.durationBeats;
+    h.advanceTo(verdict + 0.001);
+    const struck = spriteAt(h.attempt, "performer", verdict + 0.01);
     expect(FRONTMAN.bindings.flourishPoses).toContain(struck.assetId);
     // Lifted off the floor mid-pose.
-    expect(spriteAt(h.attempt, "performer", flourish.startBeat + 0.4).y).toBeLessThan(struck.y + 0.0001);
+    expect(spriteAt(h.attempt, "performer", verdict + 0.4).y).toBeLessThan(struck.y + 0.0001);
     // A swoosh at the performer.
-    const fx = (stageOf(h.attempt, flourish.startBeat + 0.1).sprites ?? []).filter((s) => s.key.startsWith("fx-"));
+    const fx = (stageOf(h.attempt, verdict + 0.1).sprites ?? []).filter((s) => s.key.startsWith("fx-"));
     expect(fx.some((s) => s.assetId === FRONTMAN.bindings.flourishEffects[0])).toBe(true);
 
-    h.advanceTo(flourish.startBeat + 2);
-    expect(FRONTMAN.bindings.performerPoses).toContain(spriteAt(h.attempt, "performer", flourish.startBeat + 2).assetId);
+    h.advanceTo(verdict + 2);
+    expect(FRONTMAN.bindings.performerPoses).toContain(spriteAt(h.attempt, "performer", verdict + 2).assetId);
   });
 
   it("holds a half-note flourish longer than a quarter-note one", () => {
@@ -375,7 +383,7 @@ describe("PerformMinigame on the timeline", () => {
     const { plain } = firstTargets(h.attempt);
     h.advanceTo(plain.startBeat);
     h.playAt(plain.midi, plain.startBeat);
-    h.advanceTo(plain.startBeat + 0.01);
+    h.advanceTo(plain.startBeat + plain.durationBeats + 0.001);
     expect(performIn(h.attempt).progress.staged).toBe(1);
     expect(performIn(h.attempt).progress.crowd).toBe(0);
     const waiting = (stageOf(h.attempt, plain.startBeat + 1).sprites ?? []).filter((s) => s.key.startsWith("staged-"));
@@ -393,7 +401,7 @@ describe("PerformMinigame on the timeline", () => {
     const { flourish } = firstTargets(h.attempt);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
-    h.advanceTo(flourish.startBeat + 0.01);
+    h.advanceTo(flourish.startBeat + flourish.durationBeats + 0.001);
     expect(performIn(h.attempt).progress.crowd).toBe(0);
     // The pose still strikes: the flourish is the performer's, the crowd is earned.
     expect(FRONTMAN.bindings.flourishPoses).toContain(spriteAt(h.attempt, "performer", flourish.startBeat + 0.01).assetId);
@@ -406,7 +414,7 @@ describe("PerformMinigame on the timeline", () => {
     expect(performIn(h.attempt).progress.staged).toBeGreaterThan(0);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
-    h.advanceTo(flourish.startBeat + 0.01);
+    h.advanceTo(flourish.startBeat + flourish.durationBeats + 0.001);
     expect(performIn(h.attempt).progress.crowd).toBe(1);
 
     const arriving = crowdAt(h.attempt, flourish.startBeat + 0.01)[0]!;
@@ -464,7 +472,7 @@ describe("PerformMinigame on the timeline", () => {
       playUpTo(h, flourish);
       h.advanceTo(flourish.startBeat);
       h.playAt(flourish.midi, flourish.startBeat, late);
-      h.advanceTo(flourish.startBeat + late + 0.01);
+      h.advanceTo(flourish.startBeat + late + flourish.durationBeats + 0.01);
     }
     const perFlourish = performLevelData(level(4).data).goatsPerFlourish;
     expect(performIn(perfect.attempt).progress.crowd).toBe(perFlourish);
@@ -477,14 +485,14 @@ describe("PerformMinigame on the timeline", () => {
     playUpTo(h, flourish);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
-    h.advanceTo(flourish.startBeat + 0.01);
+    h.advanceTo(flourish.startBeat + flourish.durationBeats + 0.001);
     const earned = performIn(h.attempt).progress.crowd;
 
     const next = h.attempt.targets[flourish.opportunityIndex + 1]!;
     // Stock the wings first, so the mistake costs a waiting goat, not a seat.
     h.advanceTo(next.startBeat);
     h.playAt(next.midi, next.startBeat);
-    h.advanceTo(next.startBeat + 0.01);
+    h.advanceTo(next.startBeat + next.durationBeats + 0.001);
     const waiting = performIn(h.attempt).progress.staged;
     expect(waiting).toBeGreaterThan(0);
 
@@ -515,7 +523,7 @@ describe("PerformMinigame on the timeline", () => {
     playUpTo(h, flourish);
     h.advanceTo(flourish.startBeat);
     h.playAt(flourish.midi, flourish.startBeat);
-    h.advanceTo(flourish.startBeat + 0.01);
+    h.advanceTo(flourish.startBeat + flourish.durationBeats + 0.001);
     const minigame = performIn(h.attempt);
     // Empty the wings by hand: every waiting goat is dismissed by a mistake.
     let guard = 0;
@@ -562,7 +570,7 @@ describe("PerformMinigame on the timeline", () => {
     for (const target of h.attempt.targets) {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
-      h.advanceTo(target.startBeat + 0.001);
+      h.advanceTo(target.startBeat + target.durationBeats + 0.001);
     }
     const { attempt } = h;
     const lastNoteBeat = attempt.targets[attempt.targets.length - 1]!.startBeat;

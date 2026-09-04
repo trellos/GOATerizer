@@ -165,13 +165,14 @@ describe("the ladder as a state machine", () => {
 });
 
 describe("which judgments move the duck", () => {
-  const missed: JudgmentEvent = { type: "MissedNote", target: TARGET };
+  const missed: JudgmentEvent = { type: "MissedNote", target: TARGET, atBeat: 0 };
   const perfect: JudgmentEvent = {
     type: "PerfectNote",
     target: TARGET,
     attackId: "a",
     playedMidi: TARGET.midi,
     beatDelta: 0,
+    atBeat: 0,
   };
   const good: JudgmentEvent = {
     type: "GoodNote",
@@ -180,6 +181,7 @@ describe("which judgments move the duck", () => {
     playedMidi: TARGET.midi,
     beatDelta: 0.3,
     reason: "timing",
+    atBeat: 0,
   };
   const released: JudgmentEvent = {
     type: "NoteReleasedOnTime",
@@ -302,19 +304,25 @@ describe("ducking a real attempt", () => {
     expect(h.duck.gain).toBeGreaterThan(0);
   });
 
-  it("comes back over four correctly started notes", () => {
+  it("comes back over four correctly played notes that are never let go", () => {
     const h = harness(1);
     for (const target of h.attempt.targets.slice(0, 4)) h.advanceTo(target.startBeat + 0.6);
     expect(h.duck.gain).toBeLessThan(1);
 
-    // Four clean attacks and nothing else — no releases, so this is the "starts
-    // a note at the correct time" half of the rule on its own.
-    const recovering = h.attempt.targets.slice(4, 8);
-    recovering.forEach((target, index) => {
+    // Four clean attacks, each held past its end window and never released:
+    // the judge settles each as a (late) hit when the window closes, and no
+    // release event is ever reported — so this is the "played the note" half
+    // of the rule on its own.
+    // Five attacks, so the fifth is sounding — not expiring — when the tick
+    // that settles the first four lands.
+    const recovering = h.attempt.targets.slice(4, 9);
+    for (const target of recovering) {
       h.advanceTo(target.startBeat);
       h.playAt(target.midi, target.startBeat);
-      if (index < recovering.length - 1) expect(h.duck.gain).toBeLessThan(1);
-    });
+    }
+    const fourth = recovering[3]!;
+    expect(h.duck.gain).toBeLessThan(1); // still sounding: nothing judged yet
+    h.advanceTo(fourth.startBeat + fourth.durationBeats + 0.6);
     expect(h.duck.gain).toBe(1);
   });
 
@@ -345,38 +353,50 @@ describe("ducking a real attempt", () => {
     expect(h.duck.gain).toBe(bottom);
   });
 
-  it("is not restored by a note dropped nowhere near its end", () => {
+  it("ducks further for a note dropped nowhere near its end: that is a miss", () => {
     const h = harness(1);
-    for (const target of h.attempt.targets.slice(0, 4)) h.advanceTo(target.startBeat + 0.6);
+    for (const target of h.attempt.targets.slice(0, 3)) h.advanceTo(target.startBeat + 0.6);
 
-    const target = h.attempt.targets[4]!;
+    const target = h.attempt.targets[3]!;
     h.advanceTo(target.startBeat);
+    const before = h.duck.gain;
     const id = h.playAt(target.midi, target.startBeat);
-    const afterAttack = h.duck.gain; // the attack itself was correct: one rung
+    expect(h.duck.gain).toBe(before); // sounding: nothing is judged yet
     h.releaseAt(id, target.startBeat + 0.05); // let go almost immediately
-    expect(h.duck.gain).toBe(afterAttack);
+    // Held for under half its length, the note was never really played.
+    expect(h.duck.misses).toBe(4);
+    expect(h.duck.gain).toBeLessThan(before);
   });
 
-  it("leaves the score, the stars and the goat alone when a release lands", () => {
-    // The whole reason a release is allowed to exist as a judgment event.
+  it("scores the note once, at its end, and the release itself adds nothing", () => {
+    // The whole reason a release is allowed to exist as a judgment event: it
+    // is what *settles* the note, and it is worth nothing on top of that.
     const h = harness(1);
     const target = h.attempt.targets[0]!;
     h.advanceTo(target.startBeat);
     const id = h.playAt(target.midi, target.startBeat);
 
-    const score = h.attempt.score.snapshot;
-    const stars = h.attempt.starMeter.stars;
-    const actor = climbActor(h.attempt.minigame);
+    // Sounding: nothing has been scored or moved yet.
+    expect(h.attempt.score.snapshot.perfect).toBe(0);
+    expect(climbActor(h.attempt.minigame).alive).toBe(false);
 
     h.releaseAt(id, target.startBeat + target.durationBeats);
 
-    expect(h.attempt.score.snapshot).toEqual(score);
-    expect(h.attempt.starMeter.stars).toBe(stars);
-    // The goat does not take a second step because a note ended tidily.
-    expect(climbActor(h.attempt.minigame)).toEqual(actor);
-    // ...and it really did happen, so the assertions above mean something.
+    // The verdict lands with the release: one Perfect, one step.
+    expect(h.attempt.score.snapshot.perfect).toBe(1);
+    const score = h.attempt.score.snapshot;
+    const stars = h.attempt.starMeter.stars;
+    const actor = climbActor(h.attempt.minigame);
+    expect(actor.alive).toBe(true);
     expect(h.duck.gain).toBe(1);
     expect(h.gains).toHaveLength(3); // PerfectNote, TargetResolved, release
+
+    // A second release of the same note is nothing at all.
+    h.releaseAt(id, target.startBeat + target.durationBeats + 0.1);
+    expect(h.attempt.score.snapshot).toEqual(score);
+    expect(h.attempt.starMeter.stars).toBe(stars);
+    expect(climbActor(h.attempt.minigame)).toEqual(actor);
+    expect(h.gains).toHaveLength(3);
   });
 
   it("stays full for a flawless run of notes", () => {

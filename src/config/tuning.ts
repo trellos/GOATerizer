@@ -461,8 +461,13 @@ export const AUTOPLAY_PLUCK_GAP_SECONDS = 0.1;
  * MIRRORS Tuninator tracking.minStableMs = 55 (must exceed it)
  */
 export const AUTOPLAY_PLUCK_MIN_SOUNDING_SECONDS = 0.08;
-/** Cap, so a whole note at 60bpm does not drone for four seconds. */
-export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 0.9;
+/**
+ * Cap on how long a pluck sounds. Set high enough that no authored note is
+ * cut short: a note is judged at its end, and one held for less than half its
+ * written length is a miss, so autoplay has to hold a whole note at 60bpm for
+ * most of its four seconds like a player would.
+ */
+export const AUTOPLAY_PLUCK_MAX_SOUNDING_SECONDS = 8;
 
 /**
  * Loudness of the autoplay monitor (`src/dev/autoplay-monitor.ts`) — the

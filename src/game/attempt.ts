@@ -267,6 +267,10 @@ export class AttemptRuntime {
   #toJudged(judgment: JudgmentEvent): Judged | null {
     const id = this.#judgedCount;
     switch (judgment.type) {
+      // `beat` is when the verdict landed — the note's end, not its start. A
+      // note is judged when it finishes, and a family reacting to it should
+      // start its reaction then rather than back-date it to an attack whose
+      // animation would already be over.
       case "PerfectNote":
       case "GoodNote":
         this.#judgedCount += 1;
@@ -276,7 +280,7 @@ export class AttemptRuntime {
           opportunityIndex: judgment.target.opportunityIndex,
           playedMidi: judgment.playedMidi,
           lane: lanePositionOfMidi(judgment.playedMidi, this.key),
-          beat: judgment.target.startBeat,
+          beat: judgment.atBeat,
         };
       case "MissedNote":
         this.#judgedCount += 1;
@@ -286,7 +290,7 @@ export class AttemptRuntime {
           opportunityIndex: judgment.target.opportunityIndex,
           playedMidi: null,
           lane: null,
-          beat: judgment.target.startBeat,
+          beat: judgment.atBeat,
         };
       case "WrongNote":
         this.#judgedCount += 1;
@@ -305,8 +309,9 @@ export class AttemptRuntime {
 
   #finish(beat: number): void {
     if (this.#complete) return;
-    // Expire anything whose window closed exactly on the boundary.
-    this.judge.tick(beat);
+    // Whatever is still sounding is judged now, and anything whose window
+    // closed exactly on the boundary expires.
+    this.judge.close(beat);
     this.#complete = true;
 
     const stars = this.starMeter.update(this.score.judgmentPoints, this.score.consistencyPoints);

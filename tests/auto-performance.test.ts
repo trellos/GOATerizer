@@ -42,15 +42,27 @@ function plan(mode: AutoplayMode, difficulty = 2, seed = 7, attemptIndex = 0) {
 }
 
 /** Runs a whole performance through the real judge, in beat order. */
-function judgePerformance(targets: readonly ResolvedTarget[], gestures: readonly { beat: number; midi: number }[]) {
+function judgePerformance(
+  targets: readonly ResolvedTarget[],
+  gestures: readonly { beat: number; midi: number; durationBeats: number }[]
+) {
   const events: JudgmentEvent[] = [];
   const judge = new TargetJudge({ targets, key: KEY });
   judge.onEvent((event) => events.push(event));
-  gestures.forEach((gesture, index) => {
-    judge.tick(gesture.beat);
-    judge.attack(`auto-${index}`, gesture.midi, gesture.beat);
-  });
-  judge.tick(Number.MAX_SAFE_INTEGER);
+  // Attacks and releases in beat order, as the provider would deliver them:
+  // a note is judged when it ends, so the release is half the performance.
+  const timeline = gestures
+    .flatMap((gesture, index) => [
+      { at: gesture.beat, kind: "attack" as const, gesture, id: `auto-${index}` },
+      { at: gesture.beat + gesture.durationBeats, kind: "release" as const, gesture, id: `auto-${index}` },
+    ])
+    .sort((a, b) => a.at - b.at || (a.kind === "release" ? -1 : 1));
+  for (const step of timeline) {
+    judge.tick(step.at);
+    if (step.kind === "attack") judge.attack(step.id, step.gesture.midi, step.at);
+    else judge.release(step.id, step.at);
+  }
+  judge.close(Number.MAX_SAFE_INTEGER);
   return events;
 }
 

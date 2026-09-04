@@ -275,8 +275,9 @@ class ThreeStepMinigame implements Minigame {
 
     if (step === "c") {
       const from = this.#pose?.lane ?? lane;
-      this.#leap = { from, to: lane, startBeat: target.startBeat };
-      this.#pose = { assetId: this.#stepCPose(), startBeat: target.startBeat, lane };
+      // The leap starts when the verdict lands — at the note's end.
+      this.#leap = { from, to: lane, startBeat: beat };
+      this.#pose = { assetId: this.#stepCPose(), startBeat: beat, lane };
       this.#remember({ assetId: this.#pick(this.#config.majorStepEffects), startBeat: beat, lane });
       this.#targetDown = true;
       // Only a full A-B-C counts. `#inGroup` reaching 2 means both taps landed.
@@ -290,7 +291,7 @@ class ThreeStepMinigame implements Minigame {
 
     this.#pose = {
       assetId: step === "b" ? this.#config.stepB : this.#config.stepA,
-      startBeat: target.startBeat,
+      startBeat: beat,
       lane,
     };
     this.#remember({ assetId: this.#pick(this.#config.minorStepEffects), startBeat: beat, lane });

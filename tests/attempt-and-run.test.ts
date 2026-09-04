@@ -59,7 +59,13 @@ function harness(difficulty: number, startBeat = 20) {
   const playAt = (midi: number, attemptBeat: number, offsetBeats = 0) => {
     const at = (startBeat + attemptBeat + offsetBeats) * SECONDS_PER_BEAT;
     clock.time = Math.max(clock.time, at);
-    return provider.attack(midi, at);
+    const id = provider.attack(midi, at);
+    // A note is judged when it ends: hold it for the written length of the
+    // target it is aimed at (or a beat, aimed at nothing) and let it go then.
+    const aimed = attempt.targets.find((t) => t.midi === midi && Math.abs(t.startBeat - attemptBeat) <= 0.5);
+    const heldBeats = aimed ? aimed.durationBeats : 1;
+    provider.schedule([{ at: at + heldBeats * SECONDS_PER_BEAT, kind: "release", id }]);
+    return id;
   };
 
   const releaseAt = (id: string, attemptBeat: number) => {
@@ -80,7 +86,7 @@ function playFlawlessly(difficulty: number): {
   for (const target of h.attempt.targets) {
     h.advanceTo(target.startBeat);
     h.playAt(target.midi, target.startBeat);
-    h.advanceTo(target.startBeat + 0.001);
+    h.advanceTo(target.startBeat + target.durationBeats + 0.001);
   }
   h.advanceTo(ATTEMPT_BEATS);
   const result = h.attempt.result;
@@ -121,7 +127,7 @@ describe("a whole attempt", () => {
     for (const target of h.attempt.targets) {
       h.advanceTo(target.startBeat);
       const id = h.playAt(target.midi, target.startBeat);
-      h.advanceTo(target.startBeat + 0.001);
+      h.advanceTo(target.startBeat + target.durationBeats + 0.001);
       h.releaseAt(id, target.startBeat + target.durationBeats);
     }
     h.advanceTo(ATTEMPT_BEATS);
@@ -157,7 +163,7 @@ describe("a whole attempt", () => {
     h.attempt.targets.forEach((target, index) => {
       h.advanceTo(target.startBeat);
       if (index >= half) h.playAt(target.midi, target.startBeat);
-      h.advanceTo(target.startBeat + 0.001);
+      h.advanceTo(target.startBeat + target.durationBeats + 0.001);
     });
     h.advanceTo(ATTEMPT_BEATS);
     const result = h.attempt.result!;
