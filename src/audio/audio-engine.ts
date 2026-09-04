@@ -11,6 +11,8 @@
  * {@link AudioEngine.unlock}, which is only ever called from a click handler.
  */
 
+import { softClipCurve } from "./soft-clip.js";
+
 export type AudioEngineStatus = "locked" | "running" | "suspended" | "failed";
 
 export class AudioEngine {
@@ -84,26 +86,13 @@ export class AudioEngine {
         // then rounds the peak instead of squaring it off. The harmonics that
         // adds on a peak are the same ones that make a limiter sound "punchy",
         // which is a fair description of what the backing was missing.
-        const clipper = this.#context.createWaveShaper();
-        const curve = new Float32Array(2048);
-        // Linear below the knee, bending above it. A plain normalised `tanh`
-        // was tried first and is a trap: scaling it so full scale maps to full
-        // scale gives everything *below* full scale a gain of up to 1.4, which
-        // is a distortion pedal, not a limiter — it made every measured band
-        // louder, including the ones that were already loud enough.
         //
-        // This is continuous in value and in slope at the knee, so nothing
-        // below 0.7 is touched at all, and it approaches but never reaches 1.
-        const KNEE = 0.7;
-        for (let i = 0; i < curve.length; i += 1) {
-          const x = (i / (curve.length - 1)) * 2 - 1;
-          const magnitude = Math.abs(x);
-          curve[i] =
-            magnitude <= KNEE
-              ? x
-              : Math.sign(x) * (KNEE + (1 - KNEE) * Math.tanh((magnitude - KNEE) / (1 - KNEE)));
-        }
-        clipper.curve = curve;
+        // The curve is `softClipCurve`, which is shared with the drum bus and
+        // documents its own shape and the trap it avoids. The knee is high here
+        // because this one is *protection* — nothing below 0.7 is touched at all
+        // — where the drum bus deliberately drives into a lower one.
+        const clipper = this.#context.createWaveShaper();
+        clipper.curve = softClipCurve(0.7);
         clipper.oversample = "2x";
 
         this.#master.connect(clipper);

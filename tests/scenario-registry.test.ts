@@ -108,56 +108,38 @@ describe("scenario registry", () => {
     expect(scenarioById("does_not_exist")).toBeUndefined();
   });
 
-  it("declares the supported levels the scenario files author", () => {
-    expect([...ROCKY_ASCENT.supportedLevels]).toEqual([1, 2, 3, 4, 5, 6]);
-    expect([...ROCKY_DESCENT.supportedLevels]).toEqual([1, 2, 3, 4]);
-    expect([...ROCKY_ASCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6, 7]);
-    expect([...ROCKY_DESCENT_HIGH.supportedLevels]).toEqual([3, 4, 5, 6]);
-    expect([...CAN_CRUSHING.supportedLevels]).toEqual([1, 2, 3, 4]);
-    expect([...GOAT_FRONTMAN.supportedLevels]).toEqual([1, 2, 3, 4]);
+  /*
+   * What used to be here: a literal `supportedLevels` per scenario, a table of
+   * which scenario ids cover each difficulty, and "L7 is authored by exactly one
+   * scenario". All three transcribed the content rather than testing it, so
+   * every one of them went red the first time a designer authored a new
+   * difficulty in the minigame editor — which is a tool whose whole purpose is
+   * to make them go red. They are now invariants in `scenario-content.test.ts`:
+   * a scenario declares exactly the levels it authors, and every difficulty the
+   * run can ask for is covered by something. Those hold for content that does
+   * not exist yet, and they still catch the failure the literals were reaching
+   * for — a scenario advertising a level it cannot play.
+   */
+
+  it("pools more than one scenario at a difficulty several of them author", () => {
+    // The behaviour the id tables were standing in front of. `run.ts` picks from
+    // this pool, so what matters is that it is a pool rather than which members
+    // it has today.
+    const pooled = [1, 2, 3, 4, 5, 6, 7].filter(
+      (difficulty) => scenariosForDifficulty(difficulty).length > 1
+    );
+    expect(pooled.length).toBeGreaterThan(0);
   });
 
-  it.each([
-    [1, ["butt_butt_bonk", "can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
-    [2, ["butt_butt_bonk", "can_crushing", "goat_frontman", "rocky_ascent", "rocky_descent"]],
-    [
-      3,
-      [
-        "butt_butt_bonk",
-        "can_crushing",
-        "goat_frontman",
-        "rocky_ascent",
-        "rocky_ascent_high",
-        "rocky_descent",
-        "rocky_descent_high",
-      ],
-    ],
-    [
-      4,
-      [
-        "butt_butt_bonk",
-        "can_crushing",
-        "goat_frontman",
-        "rocky_ascent",
-        "rocky_ascent_high",
-        "rocky_descent",
-        "rocky_descent_high",
-      ],
-    ],
-    [5, ["butt_butt_bonk", "rocky_ascent", "rocky_ascent_high", "rocky_descent_high"]],
-    [6, ["butt_butt_bonk", "rocky_ascent", "rocky_ascent_high", "rocky_descent_high"]],
-    [7, ["rocky_ascent_high"]],
-  ])("difficulty %i is covered by exactly %j", (difficulty, expectedIds) => {
-    const ids = scenariosForDifficulty(difficulty)
-      .map((scenario) => scenario.id)
-      .sort();
-    expect(ids).toEqual([...expectedIds].sort());
-  });
-
-  it("L7 is authored by exactly one scenario — the high ascent is the ceiling", () => {
-    expect(scenariosForDifficulty(7).map((scenario) => scenario.id)).toEqual([
-      "rocky_ascent_high",
-    ]);
+  it("offers a scenario only at a difficulty it actually authors", () => {
+    for (let difficulty = 1; difficulty <= 7; difficulty += 1) {
+      for (const scenario of scenariosForDifficulty(difficulty)) {
+        expect(
+          scenario.levels.has(difficulty),
+          `${scenario.id} is offered at L${difficulty} without authoring it`
+        ).toBe(true);
+      }
+    }
   });
 
   it("authors every target inside the one-octave pitch space, in either mode", () => {
