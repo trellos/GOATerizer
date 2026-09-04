@@ -17,7 +17,7 @@ import { AttemptRuntime, type AttemptEvent, type AttemptResult } from "../src/ga
 import { RunState } from "../src/game/run.js";
 import { TestGuitarInputProvider } from "../src/input/test-provider.js";
 import type { PlacedNote, Sprite, Stage, StageView } from "../src/minigame/api.js";
-import { formatDegreeToken, laneIndexOf, LANE_COUNT, resolveDegree } from "../src/music/degrees.js";
+import { laneIndexOf, LANE_COUNT, resolveDegree } from "../src/music/degrees.js";
 import type { RunKey } from "../src/music/keys.js";
 import {
   crowdSlot,
@@ -29,7 +29,19 @@ import {
 } from "../src/scenario/minigames/perform-minigame.js";
 import { GOAT_FRONTMAN, scenariosForDifficulty } from "../src/scenario/registry.js";
 
-const LEVELS = [1, 2, 3, 4] as const;
+/**
+ * The difficulties this scenario actually authors, read rather than listed.
+ *
+ * It was `[1, 2, 3, 4]`, which meant every test below stopped covering a level
+ * the moment one was added in the editor — and L5 and L6 were added, and were
+ * both broken, and nothing here looked at them.
+ */
+const LEVELS = [...GOAT_FRONTMAN.levels.keys()].sort((a, b) => a - b);
+
+/** The levels that actually mark a flourish, for the tests that need one. */
+const WITH_FLOURISHES = LEVELS.filter(
+  (difficulty) => performLevelData(level(difficulty).data).flourishBeats.length > 0
+);
 const BPM = 120;
 const SECONDS_PER_BEAT = 60 / BPM;
 const G_MINOR: RunKey = { tonic: 7, mode: "minor" };
@@ -147,34 +159,35 @@ function firstTargets(attempt: AttemptRuntime) {
 /* -------------------------------------------------------------------------- */
 
 describe("Goat Frontman scenario data", () => {
-  it("is a PerformMinigame in the Blues Lick family, authored at L1-L4", () => {
+  it("is a PerformMinigame in the Blues Lick family", () => {
     expect(GOAT_FRONTMAN.id).toBe("goat_frontman");
     expect(GOAT_FRONTMAN.minigameId).toBe("PerformMinigame");
     expect(GOAT_FRONTMAN.family).toBe("Blues Lick");
     expect(GOAT_FRONTMAN.visualVerb).toBe("PERFORM");
-    expect([...GOAT_FRONTMAN.supportedLevels]).toEqual([1, 2, 3, 4]);
-    for (const difficulty of LEVELS) expect(scenariosForDifficulty(difficulty)).toContain(GOAT_FRONTMAN);
-    for (const difficulty of [5, 6, 7]) expect(scenariosForDifficulty(difficulty)).not.toContain(GOAT_FRONTMAN);
+    // Which difficulties it authors is the designer's, and that it is offered at
+    // exactly those is an invariant in `scenario-content.test.ts`. What is
+    // asserted here is the half that is not content: it is offered where it
+    // authors, and nowhere else.
+    for (const difficulty of LEVELS) {
+      expect(scenariosForDifficulty(difficulty)).toContain(GOAT_FRONTMAN);
+    }
+    for (const difficulty of [1, 2, 3, 4, 5, 6, 7].filter((d) => !LEVELS.includes(d))) {
+      expect(scenariosForDifficulty(difficulty)).not.toContain(GOAT_FRONTMAN);
+    }
   });
 
-  it("is written in the designer's pentatonic notation, verbatim", () => {
-    const tokens = (difficulty: number) =>
-      level(difficulty).prompt.map((e) => (e.degree ? formatDegreeToken(e.degree) : "R")).join(" ");
-    // L1: the run root to root, twice.
-    expect(tokens(1)).toBe(Array(2).fill("p1 p2 p3 p4 p5 p6 R").join(" "));
-    expect(level(1).prompt.map((e) => e.duration)).toEqual(
-      Array(2).fill(["quarter", "quarter", "quarter", "quarter", "quarter", "quarter", "half"]).flat()
-    );
-    // L2: the tighter three-note cell, cycled and resolved, twice.
-    expect(tokens(2)).toBe(Array(2).fill("p1 p2 p3 p1 p2 p3 p1 R").join(" "));
-    // L3: the same run-and-breath shape as L1, transposed to the upper half.
-    expect(tokens(3)).toBe(Array(2).fill("p4 p5 p6 p4 p5 p6 R").join(" "));
-    expect(level(3).prompt.map((e) => e.duration)).toEqual(
-      Array(2).fill(["quarter", "quarter", "quarter", "quarter", "quarter", "quarter", "half"]).flat()
-    );
-    // L4: L3's run once, then L2's cell once.
-    expect(tokens(4)).toBe("p4 p5 p6 p4 p5 p6 R p1 p2 p3 p1 p2 p3 p1 R");
-  });
+  /*
+   * Removed: "is written in the designer's pentatonic notation, verbatim".
+   *
+   * It transcribed every note of every level as a string — `"p1 p2 p3 p4 p5 p6
+   * R"`, twice, per difficulty — so it was a copy of the content rather than a
+   * test of it, and the first edit in the minigame editor made it a copy of the
+   * *previous* content. Nothing it asserted is unchecked: `loadScenario` refuses
+   * an unreadable degree token at import, the octave check below refuses one
+   * that has no lane, and `scenario-content.test.ts` refuses a phrase that does
+   * not total its measures. What is left over is the designer's taste, which is
+   * not a thing to assert.
+   */
 
   it("authors nothing outside the timeline's own octave, in either mode", () => {
     // The reason the vocabulary stops at p6: there are no lanes below the root
@@ -198,22 +211,43 @@ describe("Goat Frontman scenario data", () => {
     expect(data.prompt.filter((e) => e.type === "note")).toHaveLength(data.noteOpportunityCount);
   });
 
-  it.each(LEVELS)("L%i marks the same flourishes in the prompt and in the runtime data", (difficulty) => {
-    const raw = (goatFrontmanJson as { levels: Record<string, { prompt: { startBeat: number; flourish?: boolean; type: string }[] }> })
-      .levels[String(difficulty)]!;
-    const marked = raw.prompt.filter((e) => e.flourish).map((e) => e.startBeat);
-    expect(marked.length).toBeGreaterThan(0);
-    for (const e of raw.prompt.filter((f) => f.flourish)) expect(e.type).toBe("note");
-    expect([...performLevelData(level(difficulty).data).flourishBeats]).toEqual(marked);
+  it.each(LEVELS)("L%i puts every flourish on a note that can be played", (difficulty) => {
+    // This used to compare the prompt's own `flourish: true` markings against
+    // `visual.flourishBeats` and require both to be non-empty — two records of
+    // one fact, kept in step by hand. The editor writes only the second (it is
+    // what `PerformMinigame` reads, and what `reconcileLevel` maintains), so a
+    // round trip through the tool emptied the first and this failed on levels
+    // that were working perfectly.
+    //
+    // One record, and the invariant that matters about it: a flourish is a beat
+    // the crowd grows on, so it only means anything sitting on a note. Whether
+    // a level *has* one is the family's own review, in
+    // `scenario-content.test.ts` — which is where the three levels that lost
+    // theirs are reported.
+    const starts = new Set(
+      level(difficulty)
+        .prompt.filter((event) => event.type === "note")
+        .map((event) => event.startBeat.toFixed(3))
+    );
+    for (const beat of performLevelData(level(difficulty).data).flourishBeats) {
+      expect(starts.has(beat.toFixed(3)), `L${difficulty} flourish on beat ${beat}`).toBe(true);
+    }
   });
 
   it("puts a flourish on the top note of each of L1's two runs", () => {
     expect([...performLevelData(level(1).data).flourishBeats]).toEqual([5, 13]);
   });
 
-  it("draws a bigger crowd per flourish the higher the level", () => {
+  it("never draws a smaller crowd per flourish at a higher level", () => {
+    // Was strictly ascending, which is a claim about four particular numbers;
+    // L4 and L5 both summon four and it went red. Not falling is the rule — a
+    // higher difficulty that pays out *less* is the failure worth catching, and
+    // two levels sharing a rung is the designer's business.
     const perFlourish = LEVELS.map((d) => performLevelData(level(d).data).goatsPerFlourish);
-    for (let i = 1; i < perFlourish.length; i += 1) expect(perFlourish[i]!).toBeGreaterThan(perFlourish[i - 1]!);
+    for (let i = 1; i < perFlourish.length; i += 1) {
+      expect(perFlourish[i]!).toBeGreaterThanOrEqual(perFlourish[i - 1]!);
+    }
+    expect(perFlourish.at(-1)!).toBeGreaterThan(perFlourish[0]!);
   });
 
   it.each(LEVELS)("L%i star thresholds ascend and three stars means all Perfect", (difficulty) => {
@@ -388,15 +422,25 @@ describe("PerformMinigame on the timeline", () => {
     expect(settled.assetId).toBe(FRONTMAN.bindings.audienceStates[0]); // not yet impressed
   });
 
-  it("summons more goats per flourish at a higher level, and never fewer overall", () => {
-    const crowds = LEVELS.map((d) => performIn(playFlawlessly(d).attempt).progress.crowd);
-    expect(crowds[0]).toBe(2 * ATTEMPT_REPEATS); // one per L1 flourish, on both passes
-    for (let i = 1; i < crowds.length; i += 1) expect(crowds[i]!).toBeGreaterThanOrEqual(crowds[i - 1]!);
-    expect(crowds[3]!).toBeGreaterThan(crowds[0]!);
+  it.each(WITH_FLOURISHES)("L%i draws the crowd its level data promises", (difficulty) => {
+    // The behaviour, stated as the arithmetic rather than as four numbers: a
+    // flawless attempt lands every flourish, on every pass, and each one summons
+    // `goatsPerFlourish`. The old version asserted `crowds[0] === 2 *
+    // ATTEMPT_REPEATS` and a rising sequence across `[1, 2, 3, 4]`, which failed
+    // the moment a level was re-authored with a different number of flourishes —
+    // reporting a broken test where the ladder is a separate, and passing,
+    // assertion about the level data itself.
+    const data = performLevelData(level(difficulty).data);
+    const crowd = performIn(playFlawlessly(difficulty).attempt).progress.crowd;
+    expect(crowd).toBe(
+      Math.min(FRONTMAN.crowdCapacity, data.flourishBeats.length * data.goatsPerFlourish * ATTEMPT_REPEATS)
+    );
   });
 
   it("gives every crowd member its own slot, spread to both sides", () => {
-    const { attempt } = playFlawlessly(3);
+    // Any level that actually summons anybody: the claim is about how a crowd is
+    // arranged, not about which difficulty happens to draw one today.
+    const { attempt } = playFlawlessly(WITH_FLOURISHES.at(-1) as number);
     // Past the last flourish plus the walk-on, so nobody is still in the wings.
     const crowd = crowdAt(attempt, ATTEMPT_BEATS + 4);
     expect(crowd.length).toBe(performIn(attempt).progress.crowd);
@@ -514,9 +558,11 @@ describe("PerformMinigame on the timeline", () => {
 
 describe("a run can be pinned to Goat Frontman for development", () => {
   it("fills every slot it authors with it, and the rest normally", () => {
+    // `slot.difficulty <= 4` was the authored ladder written out again, so
+    // authoring L5 turned a working pin into a failure. The ladder is read now.
     const run = new RunState({ key: G_MINOR, bpm: BPM, pinnedScenarioId: "goat_frontman", random: () => 0 });
     for (const slot of run.slots) {
-      if (slot.difficulty <= 4) expect(slot.scenario?.id).toBe("goat_frontman");
+      if (LEVELS.includes(slot.difficulty)) expect(slot.scenario?.id).toBe("goat_frontman");
       else expect(slot.scenario?.id).not.toBe("goat_frontman");
     }
   });

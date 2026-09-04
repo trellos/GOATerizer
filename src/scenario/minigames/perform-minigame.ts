@@ -758,6 +758,50 @@ export const PERFORM_MINIGAME: MinigameModule = {
         },
       };
     },
+
+    /**
+     * The crowd is the whole family. This says when it cannot arrive.
+     *
+     * `reconcileLevel` above drops a flourish whose note has moved rather than
+     * sliding it onto a neighbour, which is right — the alternative is inventing
+     * choreography — but it is *silent*, and a level can come out of an editing
+     * session with every one of them gone. Then the performer plays, the poses
+     * cycle, nobody walks on from the wings, and nothing anywhere says so. That
+     * is what this reports.
+     */
+    reviewLevel(level, shape) {
+      const visual = (level["visual"] as Record<string, unknown>) ?? {};
+      const beats = Array.isArray(visual["flourishBeats"]) ? visual["flourishBeats"] : [];
+      const perFlourish =
+        typeof visual["goatsPerFlourish"] === "number" ? visual["goatsPerFlourish"] : 0;
+      const found: string[] = [];
+
+      if (beats.length === 0) {
+        found.push(
+          "no flourish, so no crowd ever walks on — mark the note the run peaks on, " +
+            "the way L1 marks the top of each of its two runs"
+        );
+      } else if (perFlourish <= 0) {
+        found.push(
+          `${beats.length} flourishes but goatsPerFlourish is ${perFlourish}, ` +
+            "so landing one summons nobody"
+        );
+      }
+
+      // Post-reconcile this should be impossible, so finding one means the file
+      // was edited by hand — which is exactly when nothing else is watching.
+      const onNotes = new Set(shape.noteStartBeats.map((beat) => beat.toFixed(3)));
+      const stranded = beats.filter(
+        (beat) => typeof beat === "number" && !onNotes.has(beat.toFixed(3))
+      );
+      if (stranded.length > 0) {
+        found.push(
+          `flourishes on beat ${stranded.join(", ")} sit where there is no note, ` +
+            "so they can never be played"
+        );
+      }
+      return found;
+    },
   },
 
   parseConfig(raw: unknown): PerformConfig {

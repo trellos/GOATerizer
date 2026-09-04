@@ -763,3 +763,141 @@ describe("reordering the difficulty ladder", () => {
     expect(shape(new EditorDocument(raw!, 5).notes)).toEqual(wasL3);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* The family's own review of a level the editor built                         */
+/* -------------------------------------------------------------------------- */
+
+/** One scenario's authored JSON, straight off the discovered library. */
+const rawOf = (id: string): Json =>
+  SCENARIO_SOURCES.find((source) => source.id === id)!.raw as Json;
+
+describe("buildLevel and the family's review", () => {
+  /**
+   * A real PERFORM document, so the notes, the vocabulary and the family are
+   * the shipped ones rather than a fixture that could drift from them.
+   */
+  const performing = () => {
+    const document = new EditorDocument(rawOf("goat_frontman"), 1);
+    return {
+      difficulty: 1,
+      minigameId: document.minigameId,
+      notes: document.notes,
+      loopMeasures: document.loopMeasures,
+      vocabulary: document.vocabulary,
+    };
+  };
+
+  /** The beat of some note actually on this timeline, for a flourish to sit on. */
+  const aNoteBeat = (): number => {
+    const { notes, loopMeasures, vocabulary } = performing();
+    const beat = promptFromNotes(notes, loopMeasures, vocabulary).noteStartBeats[0];
+    if (beat === undefined) throw new Error("the fixture scenario has no notes");
+    return beat;
+  };
+
+  /**
+   * The failure this seam exists for, from the editor's side.
+   *
+   * A PERFORM level whose flourishes have been left behind by moving the notes
+   * is not a *problem* — the timeline spells fine, the file saves, the game
+   * plays it — and it is not a level anybody meant to author. Before
+   * `reviewLevel` there was nowhere for that to be said, and three shipped
+   * levels reached the repository in exactly this state.
+   */
+  it("reports a PERFORM level whose flourishes were all dropped", () => {
+    const built = buildLevel({
+      // Beat 9.5 is a half-beat off the grid this scenario's quarters sit on, so
+      // `reconcileLevel` drops the flourish — silently, and correctly.
+      existing: { visual: { flourishBeats: [9.5], goatsPerFlourish: 2 } },
+      ...performing(),
+    });
+
+    expect(built.problems).toEqual([]);
+    expect(built.level).not.toBeNull();
+    expect(built.notices).toHaveLength(1);
+    expect(built.notices[0]).toContain("no flourish");
+  });
+
+  it("says nothing about a flourish that still lands on a note", () => {
+    const built = buildLevel({
+      existing: { visual: { flourishBeats: [aNoteBeat()], goatsPerFlourish: 1 } },
+      ...performing(),
+    });
+    expect(built.notices).toEqual([]);
+  });
+
+  it("writes the review into the level's own validation block", () => {
+    // So a file carries its own findings and a reviewer reading a diff can see
+    // them. It used to be stamped `{ status: "ok", issues: [] }` whatever was
+    // true, which is a field that can only ever say one thing.
+    const clean = buildLevel({
+      existing: { visual: { flourishBeats: [aNoteBeat()], goatsPerFlourish: 1 } },
+      ...performing(),
+    });
+    const broken = buildLevel({
+      existing: { visual: { flourishBeats: [], goatsPerFlourish: 1 } },
+      ...performing(),
+    });
+    expect((clean.level as { validation: { status: string } }).validation.status).toBe("ok");
+    const validation = (broken.level as { validation: { status: string; issues: string[] } })
+      .validation;
+    expect(validation.status).toBe("incomplete");
+    expect(validation.issues).toEqual(broken.notices);
+  });
+
+  it("shows the open level's findings, not the one just left", () => {
+    // Switching difficulty stashes the outgoing level and reads the incoming
+    // one, so taking the notices from the stash labels the *outgoing* level's
+    // findings with the incoming level's number — confidently wrong, which is
+    // worse than silent.
+    //
+    // Asserted as agreement with `buildLevel` rather than against a level that
+    // happens to be broken today: the claim is that the notices belong to the
+    // level on screen, and it has to hold after the content is fixed too.
+    const raw = rawOf("goat_frontman");
+    const levels = Object.keys((raw as { levels: Record<string, unknown> }).levels)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const document = new EditorDocument(raw, levels[0] as number);
+
+    for (const difficulty of [...levels, ...levels.slice().reverse()]) {
+      document.selectLevel(difficulty);
+      expect(document.difficulty).toBe(difficulty);
+      const expected = buildLevel({
+        existing: document.levelAt(difficulty),
+        difficulty,
+        minigameId: document.minigameId,
+        notes: document.notes,
+        loopMeasures: document.loopMeasures,
+        vocabulary: document.vocabulary,
+      }).notices;
+      expect(document.notices, `L${difficulty}`).toEqual(expected);
+    }
+  });
+
+  it("actually finds something to say about the library as it stands", () => {
+    // The guard on the test above: it compares two computations, so it would
+    // pass just as happily if `reviewLevel` never returned anything at all. The
+    // three Goat Frontman levels that lost their flourishes are the live proof
+    // that the wiring reaches the screen, and this fails when they are fixed —
+    // at which point delete it, because the seam will have a better witness.
+    const document = new EditorDocument(rawOf("goat_frontman"), 3);
+    expect(document.notices.join(" ")).toContain("no flourish");
+  });
+
+  it("raises nothing on a timeline there is no level to review", () => {
+    // Order matters: a problem is a refusal, a notice is a remark, and an empty
+    // timeline is neither — it is how a difficulty is deleted (DECISION-057).
+    const built = buildLevel({
+      existing: null,
+      difficulty: 1,
+      minigameId: "PerformMinigame",
+      notes: [],
+      loopMeasures: 4,
+      vocabulary: performing().vocabulary,
+    });
+    expect(built.empty).toBe(true);
+    expect(built.notices).toEqual([]);
+  });
+});

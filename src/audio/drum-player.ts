@@ -6,65 +6,39 @@
  * Nothing here chains `setTimeout` to place a beat, so a slow frame cannot
  * shift the pulse (`AGENTS.md` §5).
  *
- * The voices are synthesised rather than sampled — no asset, no licence, no
- * load — and they are shaped for the speakers this game is actually played on.
- * The bass sits at 40-75 Hz by design, which a laptop speaker barely
- * reproduces; the kick therefore leads with a click transient rather than
- * relying on its fundamental, and the snare and hats carry the beat in the
- * midrange where every speaker is honest.
- *
- * The kit is bigger than the pulse needs because the pattern it plays is not
- * fixed: `drum-pattern.ts` picks one of seven intensities per minigame, and the
- * top ones want cymbals and toms. Everything added for those — ride, crash,
- * tom, floor — is deliberately quieter at the peak than the kick and hat, and
- * earns its size from *length* instead. The drum bus feeds the master with no
- * limiter anywhere in the chain, so a loud rung has to be loud by being dense,
- * not by being closer to the ceiling.
+ * What each drum sounds like is not here — it is `DrumKit` in `drum-voices.ts`,
+ * which knows nothing about beats and takes a plain `BaseAudioContext`. This
+ * file is the scheduler and nothing else.
  */
 
 import { BACKBEAT_PATTERN, type DrumHit, type DrumPattern } from "./drum-pattern.js";
+import { DrumKit } from "./drum-voices.js";
 import { forEachLoopEvent } from "./loop-scheduling.js";
 import type { Transport } from "./transport.js";
 
 const TICK_MS = 25;
 const LOOKAHEAD_S = 0.15;
 
-type ScheduledVoice = {
-  startTime: number;
-  source: AudioScheduledSourceNode;
-  gain: GainNode;
-};
+/** How far behind the clock a sounded hit is forgotten about. */
+const REAP_SECONDS = 2;
 
 export class DrumPlayer {
   readonly #context: AudioContext;
   readonly #transport: Transport;
-  readonly #output: GainNode;
-  /** One second of white noise, reused by every snare and hat hit. */
-  readonly #noise: AudioBuffer;
+  readonly #kit: DrumKit;
   #pattern: DrumPattern = BACKBEAT_PATTERN;
   #timer: ReturnType<typeof setInterval> | null = null;
   #scheduledThroughBeat = 0;
-  #voices: ScheduledVoice[] = [];
 
   constructor(context: AudioContext, transport: Transport, destination: AudioNode) {
     this.#context = context;
     this.#transport = transport;
-    this.#output = context.createGain();
-    // Subordinate to the guitar, like the bass — but the pulse is the one thing
-    // the player cannot afford to lose, and at 0.5 it measured 0.14 peak above
-    // 800 Hz, which is where a laptop or phone speaker starts reproducing.
-    this.#output.gain.value = 0.85;
-    this.#output.connect(destination);
-
-    const frames = Math.floor(context.sampleRate);
-    this.#noise = context.createBuffer(1, frames, context.sampleRate);
-    const channel = this.#noise.getChannelData(0);
-    for (let i = 0; i < frames; i += 1) channel[i] = Math.random() * 2 - 1;
+    this.#kit = new DrumKit(context, destination);
   }
 
-  /** Overall level, 0..1. Lets the player turn the kit down without muting. */
-  setLevel(level: number): void {
-    this.#output.gain.value = Math.max(0, Math.min(1, level));
+  /** Scales the kit's designed level, 0..1. Turns it down without muting. */
+  setLevel(fraction: number): void {
+    this.#kit.setLevel(fraction);
   }
 
   setPattern(pattern: DrumPattern): void {
@@ -89,16 +63,16 @@ export class DrumPlayer {
       clearInterval(this.#timer);
       this.#timer = null;
     }
-    this.#cancelFutureVoices();
+    this.#kit.cancelFrom(this.#context.currentTime);
   }
 
   dispose(): void {
     this.stop();
-    this.#output.disconnect();
+    this.#kit.dispose();
   }
 
   #reschedule(): void {
-    this.#cancelFutureVoices();
+    this.#kit.cancelFrom(this.#context.currentTime);
     if (this.#timer !== null) {
       this.#scheduledThroughBeat = this.#transport.beat;
       this.#tick();
@@ -117,229 +91,10 @@ export class DrumPlayer {
     );
 
     this.#scheduledThroughBeat = horizonBeat;
-    this.#reapVoices();
+    this.#kit.reap(this.#context.currentTime - REAP_SECONDS);
   }
 
   #scheduleHit(hit: DrumHit, atBeat: number): void {
-    const at = this.#transport.contextTimeAt(atBeat);
-    switch (hit.voice) {
-      case "kick":
-        this.#kick(at, hit.velocity);
-        break;
-      case "snare":
-        this.#snare(at, hit.velocity);
-        break;
-      case "tick":
-        this.#sixteenthTick(at, hit.velocity);
-        break;
-      case "trip":
-        this.#tripletClick(at, hit.velocity);
-        break;
-      case "ride":
-        this.#ride(at, hit.velocity);
-        break;
-      case "crash":
-        this.#crash(at, hit.velocity);
-        break;
-      case "tom":
-        this.#tom(at, hit.velocity, 260, 150, 0.22, 900);
-        break;
-      case "floor":
-        this.#tom(at, hit.velocity, 165, 92, 0.34, 620);
-        break;
-      default:
-        this.#hat(at, hit.velocity);
-        break;
-    }
-  }
-
-  /**
-   * A struck membrane: a sine swept downwards under a fast attack.
-   *
-   * Kick, rack tom and floor tom are the same instrument at three sizes, so they
-   * are one synth with three sets of numbers rather than three near-identical
-   * methods. The sweep is a third of the decay in every case, which is what
-   * makes a drum sound struck rather than plucked.
-   */
-  #drumTone(at: number, velocity: number, fromHz: number, toHz: number, seconds: number): void {
-    const osc = this.#context.createOscillator();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(fromHz, at);
-    osc.frequency.exponentialRampToValueAtTime(toHz, at + seconds * 0.32);
-
-    const gain = this.#context.createGain();
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.9 * velocity), at + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
-
-    osc.connect(gain);
-    gain.connect(this.#output);
-    osc.start(at);
-    osc.stop(at + seconds + 0.04);
-    this.#voices.push({ startTime: at, source: osc, gain });
-  }
-
-  /**
-   * Pitch-swept sine with a click on top.
-   *
-   * The sweep from 150 Hz down to 48 Hz is the body. On a small speaker almost
-   * none of that survives, so the click — a very short noise burst — is what
-   * actually marks beat 1 there. On headphones both are audible and it reads as
-   * one drum.
-   */
-  #kick(at: number, velocity: number): void {
-    this.#drumTone(at, velocity, 150, 48, 0.28);
-    this.#noiseBurst(at, 0.02, velocity * 0.5, { type: "bandpass", frequency: 1400, Q: 0.8 });
-  }
-
-  /**
-   * A tom: the same membrane an octave or two up, with a stick attack.
-   *
-   * Toms only appear in the top rung's fill, where they have to be heard as
-   * *different drums* arriving rather than as the kick moving around. The tone
-   * is pulled back slightly and the attack noise pitched into the midrange, so
-   * the fill reads on a small speaker for the same reason the hat does.
-   */
-  #tom(
-    at: number,
-    velocity: number,
-    fromHz: number,
-    toHz: number,
-    seconds: number,
-    attackHz: number
-  ): void {
-    this.#drumTone(at, velocity * 0.85, fromHz, toHz, seconds);
-    this.#noiseBurst(at, 0.022, velocity * 0.2, { type: "bandpass", frequency: attackHz, Q: 1 });
-  }
-
-  /**
-   * The ride: a longer, lower-centred wash laid *over* the on-beat hat.
-   *
-   * It never replaces the hat, because the hat is the transient the pulse
-   * survives on. What the ride adds is sustain — the beat stops being a row of
-   * clicks and starts ringing — which is the cheapest way to make a bar sound
-   * bigger without making it louder. Its peak is deliberately well under the
-   * hat's for that reason.
-   */
-  #ride(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.25, velocity * 0.16, { type: "bandpass", frequency: 5200, Q: 1.8 });
-  }
-
-  /**
-   * The crash: a wide, bright wash lasting most of a beat.
-   *
-   * Peak level is modest and the *length* does the work, which is both how a
-   * crash actually behaves and what keeps the top rungs off the master's
-   * ceiling: the bus has no limiter, and a crash lands on the same instant as a
-   * kick and a hat. Capped under the noise buffer's one second, or it would be
-   * truncated rather than decayed.
-   */
-  #crash(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.85, velocity * 0.2, { type: "highpass", frequency: 3000, Q: 0.7 });
-  }
-
-  /** Band-passed noise, wide and short: the backbeat, in the midrange. */
-  #snare(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.16, velocity * 0.7, { type: "bandpass", frequency: 1900, Q: 0.55 });
-  }
-
-  /** Very short high-passed noise. Marks the eighths without masking anything. */
-  #hat(at: number, velocity: number): void {
-    // Two bursts, and the lower one is the point.
-    //
-    // This was a single 7 kHz burst at 0.4, which is what a hi-hat looks like
-    // on a spectrum and not what one sounds like on a laptop. Small speakers
-    // roll off hard at the top as well as the bottom, so a hat living entirely
-    // above 7 kHz measures present and is heard as a faint shimmer — playtest
-    // feedback was that the drums were "not obvious" and that nothing was
-    // arriving between the beats, when in fact every one of those hits was
-    // being scheduled and sounded.
-    //
-    // The body at 3.2 kHz is what carries it; the bright burst on top is what
-    // still makes it a hat rather than a click. Together they are audible in
-    // the band every speaker actually reproduces.
-    this.#noiseBurst(at, 0.05, velocity * 0.55, { type: "bandpass", frequency: 3200, Q: 0.7 });
-    this.#noiseBurst(at, 0.035, velocity * 0.4, { type: "highpass", frequency: 7000, Q: 0.7 });
-  }
-
-  /**
-   * The sixteenth marker: brighter and shorter than the hat.
-   *
-   * Sixteenths arrive twice as often as the hats they sit between, so this has
-   * to be small enough not to become the loudest thing in the mix while still
-   * being clearly a *different* sound — separated by timbre, not volume.
-   */
-  #sixteenthTick(at: number, velocity: number): void {
-    // Centred at 6 kHz rather than high-passed at 11 kHz. The old placement was
-    // above where most laptop and phone speakers reproduce anything at all, so
-    // the sixteenth grid — the one feel a player most needs warning of — was
-    // the least audible thing in the kit. It stays shorter and brighter than
-    // the hat, which is what separates the two by timbre; it is no longer
-    // separated from it by being inaudible.
-    this.#noiseBurst(at, 0.022, velocity * 0.42, { type: "bandpass", frequency: 6000, Q: 0.6 });
-  }
-
-  /**
-   * The triplet marker: a short pitched click, deliberately woody.
-   *
-   * Triplets and sixteenths can be signalled in the same bar, and two noise
-   * bursts an octave apart would just blur. Pitching this one down into the
-   * midrange makes the two grids separable even when they overlap.
-   */
-  #tripletClick(at: number, velocity: number): void {
-    this.#noiseBurst(at, 0.03, velocity * 0.3, { type: "bandpass", frequency: 2600, Q: 5 });
-  }
-
-  #noiseBurst(
-    at: number,
-    seconds: number,
-    peak: number,
-    filterSpec: { type: BiquadFilterType; frequency: number; Q: number }
-  ): void {
-    const source = this.#context.createBufferSource();
-    source.buffer = this.#noise;
-    // Start at a random offset so consecutive hits are not bit-identical.
-    const offset = Math.random() * Math.max(0, this.#noise.duration - seconds - 0.01);
-
-    const filter = this.#context.createBiquadFilter();
-    filter.type = filterSpec.type;
-    filter.frequency.value = filterSpec.frequency;
-    filter.Q.value = filterSpec.Q;
-
-    const gain = this.#context.createGain();
-    gain.gain.setValueAtTime(Math.max(0.0001, peak), at);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + seconds);
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.#output);
-    source.start(at, offset, seconds + 0.01);
-    source.stop(at + seconds + 0.02);
-
-    this.#voices.push({ startTime: at, source, gain });
-  }
-
-  /** Silences anything scheduled but not yet sounding. */
-  #cancelFutureVoices(): void {
-    const now = this.#context.currentTime;
-    const surviving: ScheduledVoice[] = [];
-    for (const voice of this.#voices) {
-      if (voice.startTime > now) {
-        try {
-          voice.source.stop(now);
-        } catch {
-          // Already stopped; nothing to do.
-        }
-        voice.gain.disconnect();
-      } else {
-        surviving.push(voice);
-      }
-    }
-    this.#voices = surviving;
-  }
-
-  #reapVoices(): void {
-    const cutoff = this.#context.currentTime - 2;
-    this.#voices = this.#voices.filter((voice) => voice.startTime > cutoff);
+    this.#kit.strike(hit.voice, this.#transport.contextTimeAt(atBeat), hit.velocity);
   }
 }

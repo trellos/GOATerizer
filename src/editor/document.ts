@@ -63,6 +63,7 @@ export class EditorDocument {
   #dirty = false;
   /** Problems reading the level, if any. Shown rather than thrown. */
   #readProblems: readonly string[] = [];
+  #notices: readonly string[] = [];
   /**
    * Levels emptied this session, by difficulty.
    *
@@ -124,6 +125,17 @@ export class EditorDocument {
 
   get readProblems(): readonly string[] {
     return this.#readProblems;
+  }
+
+  /**
+   * What the open level's family said about it — `MinigameAuthoring.reviewLevel`.
+   *
+   * Never blocks a save. It is the family saying the level is playable and
+   * incomplete, which an author mid-edit is entitled to be; the repository's own
+   * content test is what refuses to let one ship.
+   */
+  get notices(): readonly string[] {
+    return this.#notices;
   }
 
   get supportedLevels(): readonly number[] {
@@ -239,6 +251,35 @@ export class EditorDocument {
     this.#loopMeasures = this.#notes.length > 0 ? inferLoopMeasures(this.#notes) : PHRASE_MEASURES;
     this.#selection = new Set();
     this.#undo = [];
+    this.#review();
+  }
+
+  /**
+   * Asks the family what it thinks of the level now open.
+   *
+   * Separate from {@link EditorDocument.#stashLevel} because that one builds the
+   * level being *left*: switching difficulty stashes the old one and reads the
+   * new one, so taking the notices from the stash would label the outgoing
+   * level's findings with the incoming level's number — which is worse than
+   * showing nothing, because it is confidently wrong.
+   *
+   * Cheap enough to run on a level change rather than being cached against the
+   * notes: it is one prompt build for a timeline somebody just opened, not
+   * something on the repaint path.
+   */
+  #review(): void {
+    const template =
+      this.levelAt(this.#difficulty) ??
+      this.#emptied.get(this.#difficulty) ??
+      this.#templateLevel(this.#difficulty);
+    this.#notices = buildLevel({
+      existing: template,
+      difficulty: this.#difficulty,
+      minigameId: this.minigameId,
+      notes: this.#notes,
+      loopMeasures: this.#loopMeasures,
+      vocabulary: this.#vocabulary,
+    }).notices;
   }
 
   /**
@@ -261,6 +302,7 @@ export class EditorDocument {
       loopMeasures: this.#loopMeasures,
       vocabulary: this.#vocabulary,
     });
+    this.#notices = built.notices;
     if (built.empty) return this.#dropLevel();
     if (!built.level) return [...built.problems];
     this.#raw = withLevel(this.#raw, this.#difficulty, built.level);

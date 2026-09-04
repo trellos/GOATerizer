@@ -539,6 +539,26 @@ export const THREE_STEP_MINIGAME: MinigameModule = {
         },
       };
     },
+
+    /**
+     * `parseLevel` already refuses a level whose triplets do not come in whole
+     * groups, so a loadable level always has headbutts in it. What it cannot see
+     * is the side the ram butts from: `alternateAfterGroups` counts *groups*, and
+     * a level with fewer groups than that never alternates at all — every leap
+     * comes from the same side, for the whole attempt.
+     */
+    reviewLevel(level, shape) {
+      const visual = (level["visual"] as Record<string, unknown>) ?? {};
+      const after = visual["alternateAfterGroups"];
+      const groups = Math.floor(shape.noteOpportunityCount / 3);
+      if (typeof after !== "number" || after <= 0) return [];
+      return groups > 0 && after >= groups
+        ? [
+            `alternateAfterGroups is ${after} but the phrase holds ${groups} groups, ` +
+              "so the ram leaps from the same side every time",
+          ]
+        : [];
+    },
   },
 
   parseConfig(raw: unknown): ThreeStepConfig {

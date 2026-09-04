@@ -998,13 +998,21 @@ try {
   // subdivision layer was scheduled, sounded, and never measured — and when it
   // turned out to be inaudible on a real speaker, nothing failed.
   //
-  // So this measures a minigame. Rocky Ascent L1 is quarter notes and L4 has
-  // eighths in it, and the kit is supposed to say so: one transient per beat
-  // under the first, two under the second.
+  // So this measures a minigame. Rocky Ascent L1 is quarter notes and L6 is
+  // thirty-two eighths, and the kit is supposed to say so: one transient per
+  // beat under the first, two under the second.
+  //
+  // L6, not L4. The Scale content redo moved this scenario's eighth-note
+  // material up the ladder — L4 is fourteen quarters and a half now — so the
+  // eighths half of this check had been asking a bar of quarter notes to
+  // produce two transients a beat, and failing for a reason that was nothing to
+  // do with the kit. DECISION-054 corrected the note-density comparison below
+  // for exactly this and missed this one; it names the two ends of the ladder
+  // for the same reason that one does.
   {
     for (const [level, perBeat, what] of [
       [1, 1, "quarter-note material gets a quarter-note beat"],
-      [4, 2, "material with eighths in it gets the eighths marked"],
+      [6, 2, "material with eighths in it gets the eighths marked"],
     ]) {
       const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
       await page.addInitScript(MASTER_TAP);

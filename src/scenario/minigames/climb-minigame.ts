@@ -420,6 +420,44 @@ export const CLIMB_MINIGAME: MinigameModule = {
         },
       };
     },
+
+    /**
+     * A climb has to go somewhere. This says when the route does not.
+     *
+     * `reconcileLevel` resamples an existing route to the new note count, and
+     * resampling is faithful: a route that has collapsed onto one height stays
+     * collapsed at any length. The goat then hops along a flat line for the
+     * whole attempt, which loads, parses and plays, and is not a climb.
+     */
+    reviewLevel(level, shape) {
+      const visual = (level["visual"] as Record<string, unknown>) ?? {};
+      const route = (visual["route"] as Record<string, unknown>) ?? {};
+      const waypoints = Array.isArray(route["waypoints"]) ? route["waypoints"] : [];
+      const found: string[] = [];
+
+      if (waypoints.length !== shape.noteOpportunityCount) {
+        found.push(
+          `${waypoints.length} waypoints for ${shape.noteOpportunityCount} note ` +
+            "opportunities — the goat has nowhere to stand on some of its notes"
+        );
+      }
+
+      const heights = waypoints
+        .map((point) => (point as Record<string, unknown>)?.["y"])
+        .filter((y): y is number => typeof y === "number");
+      if (heights.length > 1) {
+        const rise = Math.max(...heights) - Math.min(...heights);
+        // A twentieth of the frame. Below that the route is a flat line with a
+        // wobble on it, whichever direction it was drawn in.
+        if (rise < 0.05) {
+          found.push(
+            `the route rises ${rise.toFixed(3)} of the frame across ${heights.length} ` +
+              "waypoints — the goat crosses the screen without climbing"
+          );
+        }
+      }
+      return found;
+    },
   },
 
   parseConfig(raw: unknown): ClimbConfig {

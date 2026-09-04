@@ -93,10 +93,21 @@ npm test                  # vitest — the rules, headless, no microphone
 npm run typecheck         # tsc --noEmit
 npm run build             # typecheck + production build
 npm run validate:browser  # build, serve, drive real Chromium through a whole run
+npm run audio:demo        # render the backing band to WAVs you can listen to
 npm run art               # regenerate the placeholder pixel art
 npm run art:import        # cut vendored third-party art (art-sources/) into scenario assets
 npm run shoot:actors      # close-ups and animation strips of the timeline actors
 ```
+
+`npm run audio:demo` renders the drum kit and the bass through an
+`OfflineAudioContext` in headless Chromium — the shipped voice code, behind the
+game's own master chain — and writes five WAVs to `audio-demo/`: the kit and the
+bass each as several candidates on the same bars, the depths of the sub's slow
+drift, the whole backing before against after, and the new mix built up a part
+at a time. It is the listening
+half of `npm run validate:browser`, which measures bands and onsets and cannot
+tell anybody whether a kit cuts through. `--out <dir>` and `--bpm <n>` are the
+only options.
 
 `node scripts/author-rocky-scenarios.mjs` re-derives the authored musical
 content of all four Rocky-family scenario files (phrases, star thresholds, and
@@ -293,6 +304,15 @@ That is the whole procedure: the registry globs the directory, and which asset
 ids the scenario needs is the minigame's own answer (`assetIds`) rather than a
 list anybody maintains. No code changes and no gameplay changes. `src/scenario/load.ts` validates the file and throws
 loudly rather than repairing it.
+
+**Three rungs of validation, and they mean different things.** `load.ts` throws
+on a file it cannot map — a phrase that does not total its measures, a degree
+token with no lane. A family's own `parseLevel` throws on its own block. And
+`MinigameAuthoring.reviewLevel` reports a level that is perfectly loadable and
+that the family says should not ship — a PERFORM level with no flourish plays
+fine and never grows a crowd. The editor shows those without blocking a save;
+`tests/scenario-content.test.ts` fails on them. Everything the new scenario has
+to satisfy is checked there automatically, with nothing to add per scenario.
 
 ---
 

@@ -98,6 +98,19 @@ export type LevelBuild = {
   readonly noteOpportunityCount: number;
   readonly problems: readonly string[];
   /**
+   * What the level's own family thinks is wrong with it — see
+   * `MinigameAuthoring.reviewLevel`.
+   *
+   * Separate from {@link LevelBuild.problems} because the two mean different
+   * things to a save. A problem is a timeline that cannot be written down as a
+   * prompt, and the editor refuses it. A notice is a level that saves and plays
+   * perfectly well and that its family says should not ship — most often
+   * because a reconcile quietly dropped the thing the family exists to do. An
+   * author mid-edit is allowed to be half-finished, so this never blocks; the
+   * repository test does the blocking.
+   */
+  readonly notices: readonly string[];
+  /**
    * Whether the timeline is empty rather than unspellable.
    *
    * A difficulty with nothing to play is not a difficulty — an attempt with no
@@ -128,10 +141,16 @@ export function buildLevel(options: {
   const prompt = promptFromNotes(notes, loopMeasures, vocabulary);
   const noteOpportunityCount = prompt.noteStartBeats.length;
   if (prompt.problems.length > 0) {
-    return { level: null, noteOpportunityCount, problems: prompt.problems, empty: false };
+    return {
+      level: null,
+      noteOpportunityCount,
+      problems: prompt.problems,
+      notices: [],
+      empty: false,
+    };
   }
   if (noteOpportunityCount === 0) {
-    return { level: null, noteOpportunityCount, problems: [], empty: true };
+    return { level: null, noteOpportunityCount, problems: [], notices: [], empty: true };
   }
 
   const was = (existing ?? {}) as Json;
@@ -150,21 +169,45 @@ export function buildLevel(options: {
     authoredBeatCount: PHRASE_BEATS,
     stars: starsBlock(was["stars"], noteOpportunityCount),
     scoring: (was["scoring"] as Json) ?? { streakBonusEligible: false },
-    validation: { status: "ok", issues: [] },
   };
 
   const minigame = requireMinigame(minigameId, "the minigame editor");
+  const shape = {
+    difficulty,
+    noteOpportunityCount,
+    measures: PHRASE_MEASURES,
+    attemptRepeats: ATTEMPT_REPEATS,
+    noteStartBeats: prompt.noteStartBeats,
+  };
   const reconciled = minigame.authoring
-    ? minigame.authoring.reconcileLevel(level, {
-        difficulty,
-        noteOpportunityCount,
-        measures: PHRASE_MEASURES,
-        attemptRepeats: ATTEMPT_REPEATS,
-        noteStartBeats: prompt.noteStartBeats,
-      })
+    ? minigame.authoring.reconcileLevel(level, shape)
     : level;
+  const notices = minigame.authoring?.reviewLevel?.(reconciled, shape) ?? [];
 
-  return { level: reconciled, noteOpportunityCount, problems: [], empty: false };
+  return {
+    // The `validation` block is written from the review rather than stamped
+    // `ok`. It used to be the latter unconditionally, which made it a field
+    // that could only ever say one thing — and it went on saying it while three
+    // of Goat Frontman's levels lost every flourish they had.
+    level: { ...reconciled, validation: validationBlock(notices) },
+    noteOpportunityCount,
+    problems: [],
+    notices,
+    empty: false,
+  };
+}
+
+/** The level's own record of what its family said about it, for the file. */
+function validationBlock(notices: readonly string[]): Json {
+  return notices.length === 0
+    ? { status: "ok", issues: [] }
+    : {
+        status: "incomplete",
+        issues: [...notices],
+        note:
+          "Raised by the minigame family's own reviewLevel (src/minigame/api.ts). " +
+          "The level loads and plays; the family says it should not ship like this.",
+      };
 }
 
 /**
